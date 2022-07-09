@@ -1,0 +1,11 @@
+{
+    "plugin": {	
+        "name":"payments",
+		"description":"This plugin overrides the old K-Loans payment functionality with much more added functionality",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : false
+		}  
+    }
+}

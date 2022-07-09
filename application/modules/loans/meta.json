@@ -1,0 +1,14 @@
+{
+    "plugin": {	
+        "name":"loans",
+		"description":"This plugin enables using different type of interest rate computations",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-money'></i>",
+			"sub_menus":{"New Loan":"view/-1","Transactions":"index"},
+			"label":"Loans"
+		}  
+    }
+}

@@ -1,0 +1,3 @@
+ALTER TABLE `c19_customers`
+	ADD COLUMN `parent_id` INT(11) NULL DEFAULT '0',
+	ADD COLUMN `added_date` DATETIME NULL DEFAULT NULL;

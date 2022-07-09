@@ -1,0 +1,19 @@
+<?php 
+$lang["message_information"] = "Información del mensaje";
+$lang["message_sender_name"] = "Nombre del remitente";
+$lang["message_recipient_name"] = "Nombre del destinatario";
+$lang["message_header"] = "Sujeto";
+$lang["message_other"] = "Otro";
+$lang["message_update"] = "Actualizar mensaje";
+$lang["message_new"] = "Nuevo mensaje";
+$lang["message_none_selected"] = "No has seleccionado ningún mensaje.";
+$lang["message_info"] = "Información del mensaje";
+$lang["message_successful_adding"] = "Ha agregado correctamente el mensaje";
+$lang["message_successful_updating"] = "Ha actualizado correctamente el mensaje";
+$lang["message_error_adding_updating"] = "Mensaje de error al agregar/actualizar";
+$lang["message_successful_deleted"] = "Has eliminado con éxito";
+$lang["message_confirm_delete"] = "¿Está seguro de que desea eliminar los tipos de préstamo seleccionados?";
+$lang["message_one_or_multiple"] = "Mensaje(s)";
+$lang["message_cannot_be_deleted"] = "No se pudo eliminar el/los mensaje(s)";
+$lang["message_sender"] = "Remitente";
+$lang["message_recipient"] = "Destinatario";

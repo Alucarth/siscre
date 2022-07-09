@@ -1,0 +1,14 @@
+{
+    "plugin": {	
+        "name":"leads",
+		"description":"Customer Dashboard Plugin",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-random'></i>",
+			"sub_menus":{"View Site":"index", "Articles":"articles","Registered Members":"members"},
+			"label":"Leads"
+		}  
+    }
+}

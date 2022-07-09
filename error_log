@@ -1,0 +1,15 @@
+[28-Jan-2022 00:22:34 UTC] PHP Warning:  mysqli_connect(): (HY000/1045): Access denied for user ''@'localhost' (using password: NO) in /home/solcredi/public_html/siscre/phpminiadmin.php on line 564
+[28-Jan-2022 00:22:34 UTC] PHP Warning:  mysqli_connect(): (HY000/1045): Access denied for user ''@'localhost' (using password: NO) in /home/solcredi/public_html/siscre/phpminiadmin.php on line 564
+[28-Jan-2022 00:22:34 UTC] PHP Warning:  mysqli_query() expects parameter 1 to be mysqli, bool given in /home/solcredi/public_html/siscre/phpminiadmin.php on line 607
+[28-Jan-2022 00:23:03 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[28-Jan-2022 00:24:26 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[28-Jan-2022 00:26:52 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[28-Jan-2022 00:27:14 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[28-Jan-2022 00:29:10 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[28-Jan-2022 00:30:22 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[28-Jan-2022 00:32:07 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[01-Feb-2022 01:32:35 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[17-Feb-2022 10:44:58 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[17-Feb-2022 10:45:27 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[17-Feb-2022 10:46:06 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98
+[17-Feb-2022 10:46:17 UTC] PHP Warning:  A non-numeric value encountered in /home/solcredi/public_html/siscre/phpminiadmin.php on line 98

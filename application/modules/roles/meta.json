@@ -1,0 +1,13 @@
+{
+    "plugin": {	
+        "name":"roles",
+		"description":"Improved User Type permissions for K-loans",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-lock'></i>",
+			"sub_menus":{"New Item":"view/-1","Item List":"index"}
+		}  
+    }
+}

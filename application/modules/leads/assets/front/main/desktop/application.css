@@ -1,0 +1,153 @@
+.hero_widget {
+	position: relative;
+	padding: 142px 0 92px;
+	background-image: url(../../main-bg.jpg);
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: cover
+}
+
+@media(max-width:960px) {
+	.hero_widget {
+		background-image: url(../../main-bg-mobile-big-d89dd97843cdeced8d7345c91494ec80cc27e60823c29cf07de7c148017123d9.jpg)
+	}
+}
+
+@media(max-width:768px) {
+	.hero_widget {
+		padding: 78px 0 30px
+	}
+}
+
+.hero_widget__body {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex
+}
+
+@media(max-width:960px) {
+	.hero_widget__body {
+		-webkit-box-orient: vertical;
+		-webkit-box-direction: normal;
+		-ms-flex-direction: column;
+		flex-direction: column
+	}
+}
+
+.hero_widget__calculation {
+	margin-right: 30px;
+	width: 388px
+}
+
+@media(max-width:960px) {
+	.hero_widget__calculation {
+		margin: 0 auto 27px
+	}
+	.hero_widget__calculation .sliders__title {
+		color: #fff !important
+	}
+	.hero_widget__calculation .hero_widget__value {
+		color: #fff !important
+	}
+	.hero_widget__calculation .hero_widget__name {
+		color: #fff !important
+	}
+}
+
+@media(max-width:768px) {
+	.hero_widget__calculation {
+		width: 100%
+	}
+}
+
+.hero_widget__title {
+	margin-bottom: 35px;
+	max-width: 350px
+}
+
+@media(max-width:960px) {
+	.hero_widget__title {
+		color: #fff !important
+	}
+}
+
+.hero_widget__calc {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex
+}
+
+@media(max-width:768px) {
+	.hero_widget__calc {
+		-webkit-box-pack: justify;
+		-ms-flex-pack: justify;
+		justify-content: space-between
+	}
+}
+
+.hero_widget__calc_desc_up {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+	width: 55%
+}
+
+@media(max-width:960px) {
+	.hero_widget__calc_desc_up {
+		color: #fff;
+		width: 100%;
+		margin-bottom: 25px
+	}
+}
+
+.hero_widget__item {
+	margin-right: 40px
+}
+
+@media(max-width:768px) {
+	.hero_widget__item {
+		margin-right: 0
+	}
+}
+
+.hero_widget__item:last-child {
+	margin-right: 0
+}
+
+.hero_widget__name {
+	margin: 0
+}
+
+.hero_widget__form {
+	position: relative;
+	-webkit-box-sizing: border-box;
+	box-sizing: border-box;
+	padding: 53px 44px;
+	min-width: 336px;
+	background-color: rgba(255, 255, 255, 0.3);
+	border-radius: 33px;
+	-webkit-box-shadow: 0 2px 27px 0 rgba(0, 0, 0, 0.12);
+	box-shadow: 0 2px 27px 0 rgba(0, 0, 0, 0.12);
+	max-width: 140px
+}
+
+@media(max-width:960px) {
+	.hero_widget__form {
+		margin: 0 auto;
+		padding: 0;
+		width: 388px;
+		background-color: unset;
+		-webkit-box-shadow: unset;
+		box-shadow: unset
+	}
+}
+
+@media(max-width:768px) {
+	.hero_widget__form {
+		width: 100%;
+	}
+}
+
+.hero_widget__fields {
+	margin-bottom: 20px
+}

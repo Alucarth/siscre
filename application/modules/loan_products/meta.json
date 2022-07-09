@@ -1,0 +1,14 @@
+{
+    "plugin": {	
+        "name":"loan_products",
+		"description":"Loan products plugin enables you to predefined terms and interest rate etc.",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-table'></i>",
+			"sub_menus":{"New Product":"view/-1","Product List":"index"},
+			"label":"Loan Products"
+		}  
+    }
+}

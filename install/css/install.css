@@ -1,0 +1,39 @@
+body {
+    font-size: 75%;
+    font-family: Helvetica,Arial,sans-serif;
+    width: 300px;
+    margin: 0 auto;
+}
+input, label {
+    display: block;
+    font-size: 18px;
+    margin: 0;
+    padding: 10px;
+    border-radius:10px;
+}
+label {
+    margin-top: 20px;
+}
+input.input_text {
+    width: 270px;
+}
+input#submit {
+    margin: 25px auto 0;
+    font-size: 25px;
+}
+fieldset {
+    padding: 15px;
+    border-radius:10px;
+}
+legend {
+    font-size: 18px;
+    font-weight: bold;
+}
+.error {
+    background: #ffd1d1;
+    border: 1px solid #ff5858;
+    padding: 4px;
+}
+#div_install_dependencies {
+    display: none;
+}

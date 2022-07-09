@@ -1,0 +1,23 @@
+<?php 
+$lang["plugins_update"] = "Complemento de actualización";
+$lang["plugins_delete"] = "Desactivar complemento";
+$lang["plugins_manage"] = "Ajustes";
+$lang["plugins_activate"] = "Activar complemento";
+$lang["plugins_new"] = "Nuevo complemento";
+$lang["plugins_none_selected"] = "No ha seleccionado ningún complemento";
+$lang["plugins_successful_adding"] = "Ha agregado correctamente el complemento";
+$lang["plugins_successful_updating"] = "Ha actualizado correctamente el complemento";
+$lang["plugins_error_adding_updating"] = "Error al agregar/actualizar complemento";
+$lang["plugins_successful_deleted"] = "Ha desactivado con éxito";
+$lang["plugins_confirm_delete"] = "¿Está seguro de que desea desactivar los complementos seleccionados?";
+$lang["plugins_one_or_multiple"] = "Complemento(s)";
+$lang["plugins_cannot_be_deleted"] = "No se pudo eliminar el/los complemento(s)";
+$lang["plugins_name_required"] = "El nombre es un campo obligatorio";
+$lang["info"] = "Información del complemento";
+$lang["module_plugins"] = "Complementos";
+$lang["module_plugins_desc"] = "Agregar, actualizar, eliminar y buscar complementos";
+$lang["plugin_id"] = "ID";
+$lang["module_name"] = "Nombre del módulo";
+$lang["module_desc"] = "Descripción";
+$lang["module_files"] = "Archivos";
+$lang["status_flag"] = "Estado";

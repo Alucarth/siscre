@@ -1,0 +1,11 @@
+{
+    "plugin": {	
+        "name":"klanguage",
+		"description":"This plugin translate text to any languages",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : false
+		}  
+    }
+}
