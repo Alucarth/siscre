@@ -42,7 +42,7 @@
         
         <div id="div_ineterest_type_label">
             <span id="sp-interest-type-label">
-            <?php echo isset($interest_types[$loan_info->interest_type]) ? $interest_types[$loan_info->interest_type] : 'Tarifa plana'; ?>
+            <?php echo isset($interest_types[$loan_info->interest_type]) ? $interest_types[$loan_info->interest_type] : 'Elija una opción'; ?>
             </span>
             (<a href="javascript:void(0)" id="btn-change-interest-type">Cambiar</a>)
         </div>
@@ -176,6 +176,7 @@
     </label>
     <div class="col-lg-2">
         <div class="input-group">
+            
             <input type="text" name="operating_expenses" id="operating_expenses" class="form-control" value="<?= $operative_expenses > 0 ? $operative_expenses : 0?>" />
             <span class="input-group-addon input-group-append"><span class="input-group-text">%</span></span>
         </div>

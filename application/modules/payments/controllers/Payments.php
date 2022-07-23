@@ -214,7 +214,8 @@ class Payments extends Secure_area implements iData_controller {
         $data['count'] = $payment->loan_payment_id;
         $data['client'] = ucwords($customer->first_name." ".$customer->last_name);
         $data['account'] = $loan->account;
-        $data['loan'] = to_currency($loan->loan_amount);
+        //$data['loan'] = to_currency($loan->loan_amount);
+        $data['loan'] = to_currency($loan->apply_amount);
         // $data['interest'] = to_currency($loan->interest_rate);
         $data['balance'] = to_currency($loan->loan_balance);
         $data['paid'] = to_currency($payment->paid_amount);
@@ -230,6 +231,7 @@ class Payments extends Secure_area implements iData_controller {
         $number = 0;
         $size = sizeof($json_objects);
         $data["size"] = $size;
+   
         foreach($json_objects as $object)
         {
             $number++;
@@ -244,11 +246,14 @@ class Payments extends Secure_area implements iData_controller {
             {
                 $data['number'] = $number;
                 $data["object"] = $object;
-                $data['capital'] =  to_currency($object->payment_amount_capital - $object->interest); // el payment_amount_capital tiene el interes sumando por lo cual se esta restando el interes revisar donde se guarda el valor o tener encuenta este datos siempre al momento de hacer consultas
+                $data['capital'] =  to_currency($object->payment_amount_capital);
+                //$data['capital'] =  to_currency($object->payment_amount_capital - $object->interest); // el payment_amount_capital tiene el interes sumando por lo cual se esta restando el interes revisar donde se guarda el valor o tener encuenta este datos siempre al momento de hacer consultas
                 $data['interest'] = to_currency($object->interest);
                 $data['operating_expenses_amount'] = to_currency($object->operating_expenses_amount);
-                $data['total'] = to_currency($object->payment_amount_capital+$object->operating_expenses_amount);// ense caso como se asume que esta el interes se le adiciona los gastos operativos
-                $data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->operating_expenses_amount), 2, '.', '')," Bs"); //mismo caso que la linea de arriba
+                $data['total'] = to_currency($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount);
+                $data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount), 2, '.', '')," Bs");
+                //$data['total'] = to_currency($object->payment_amount_capital+$object->operating_expenses_amount);// ense caso como se asume que esta el interes se le adiciona los gastos operativos
+                //$data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->operating_expenses_amount), 2, '.', '')," Bs"); //mismo caso que la linea de arriba
                 $has_nextpay = true;
             }
         }

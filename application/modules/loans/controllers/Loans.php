@@ -387,7 +387,7 @@ class Loans extends Secure_area implements iData_controller
         
         $this->set_dt_collateral($this->datatablelib->datatable(), $loan_id);
         $data["tbl_collateral"] = $this->datatablelib->render();
-         
+        
         $operative_expenses = 0;
         $loan_info_exp =  $this->Loan->get_info($loan_id);
         if(isset($loan_info_exp->periodic_loan_table))
@@ -397,6 +397,7 @@ class Loans extends Secure_area implements iData_controller
             $operative_expenses = ($row-> operating_expenses_amount / $loan_info_exp->apply_amount )*100;
         }
         $data["operative_expenses"]=$operative_expenses;
+
         $this->load->view("loans/form", $data);
     }
     

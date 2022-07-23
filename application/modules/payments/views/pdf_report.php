@@ -75,10 +75,9 @@
                                         <td>Transacción No. <?= $count; ?> </td>
                                     </tr>
                                     <tr>
-                                        <td></td>
-                                        <td>Nro. Cuota <?= $number; ?> de <?= $size; ?>  </td>
+                                        <td align="left">Fecha: <?= $trans_date; ?></td>    
+                                        <td>Nro. Cuota <?= $number; ?> de <?= $size; ?></td>
                                     </tr>
-                                    
                 
                                     <tr>
                                         <td colspan="2">Cliente: <?= $client; ?></td>
@@ -90,7 +89,7 @@
                                     </tr>
                 
                                     <tr>
-                                        <td align="left" > <strong>Monto Desemboloso:</strong> </td>
+                                        <td align="left" > <strong>Monto Desembolso:</strong> </td>
                                         <td align="left"><?= $loan; ?></td>
                                     </tr>
                 

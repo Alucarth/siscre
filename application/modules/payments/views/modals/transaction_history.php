@@ -33,6 +33,7 @@
                 <td style="text-align: center;"><?=isset($sched["grace_period"]) ? $sched["grace_period"] : '';?></td>
                 <td style="text-align: right;"><?=to_currency($sched["payment_amount"]);?></td>
                 <td style="text-align: right;"><?=to_currency($sched["penalty_amount"]);?></td>
+                <!--<td style="text-align: right;"><?=to_currency($sched["payment_amount"] - $sched["interest"]); ?></td>-->
                 <td style="text-align: right;"><?=to_currency($sched["payment_amount"] - $sched["interest"] -$sched["operating_expenses_amount"]); ?></td>
                 <td style="text-align: right;"><?=to_currency($sched["interest"])?></td>
                 <td style="text-align: right;"><?=to_currency($sched["operating_expenses_amount"])?></td>

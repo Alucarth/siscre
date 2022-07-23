@@ -60,8 +60,8 @@
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </td>
-                    <td>Taza de interés:</td>
-                    <td><?= $rate; ?>%</td>
+                    <!--<td>Taza de interés:</td>
+                    <td><?= $rate; ?>%</td>-->
                 </tr>
                 <tr>
                     <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
@@ -155,6 +155,7 @@
                     <tr>
                         <td>&nbsp;&nbsp;<?=$schedule->payment_date;?></td>
                         <!--<td style="text-align: center;"><?=isset($schedule->grace_period) ? $schedule->grace_period : '';?></td>-->
+                        <!--<td align="right"><?= to_currency(($schedule->payment_amount - $schedule->interest), 1, 2);?></td>-->
                         <td align="right"><?= to_currency(($schedule->payment_amount - $schedule->interest - $schedule->operating_expenses_amount), 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->interest, 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->operating_expenses_amount, 1, 2);?></td>
@@ -197,8 +198,8 @@
                             <?php endif; ?>
                         <?php endforeach; ?>
                         </td>
-                    <td>Taza de interés:</td>
-                    <td><?= $rate; ?>%</td>
+                    <!--<td>Taza de interés:</td>
+                    <td><?= $rate; ?>%</td>-->
                 </tr>
                 <tr>
                     <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
@@ -292,7 +293,8 @@
                 <?php foreach ( $schedules as $schedule ):?>
                     <tr>
                         <td>&nbsp;&nbsp;<?=$schedule->payment_date;?></td>
-                        <!--<td style="text-align: center;"><?=isset($schedule->grace_period) ? $schedule->grace_period : '';?></td>-->
+                        <!--<td style="text-align: center;"><?=isset($schedule->grace_period) ? $schedule->grace_period : '';?></td>
+                        <td align="right"><?= to_currency(($schedule->payment_amount - $schedule->interest), 1, 2);?></td>-->
                         <td align="right"><?= to_currency(($schedule->payment_amount - $schedule->interest - $schedule->operating_expenses_amount), 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->interest, 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->operating_expenses_amount, 1, 2);?></td>

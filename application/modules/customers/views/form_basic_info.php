@@ -256,12 +256,13 @@
 
                     <?php foreach ( $m_statuses as $key => $name ): ?>
 
-                        <option value="<?=$key?>" <?=$key==$person_info->marital_status?'selected="selected"':''?> ><?=$name;?></option>
+                        <!--<option value="<?=$key?>" <?=$key==$person_info->marital_status?'selected="selected"':''?> ><?=$name;?></option>-->
+                        <option value="<?=$key?>" <?=$key==$person_info->id_type?'selected="selected"':''?> ><?=$name;?></option>
 
                     <?php endforeach; ?>
 
                 </select>
-
+                
             </div>
 
         </div>

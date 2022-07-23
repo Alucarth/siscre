@@ -31,27 +31,27 @@
 
         <table class="table">
             <tr>
-                <td><?= $this->lang->line("common_full_name"); ?></td>
-                <td><?= $customer_name; ?></td>
-                <td><?= $this->lang->line("common_address_present"); ?></td>
-                <td colspan="3"><?= $customer_address; ?></td>
+                <td width="25%"><?= $this->lang->line("common_full_name").":"; ?></td>
+                <td width="25%"><?= $customer_name; ?></td>
+                <td width="25%"><?= $this->lang->line("common_address_present").":"; ?></td>
+                <td colspan="3" width="25%"><?= $customer_address; ?></td>
             </tr>
 
             <tr>
-                <td><?= $this->lang->line("loans_type"); ?></td>
+                <td><?= $this->lang->line("loans_type").":"; ?></td>
                 <td><?= str_replace("_", " ", $loan->interest_type); ?></td>
-                <td><?= $this->lang->line("loan_type_term"); ?></td>
+                <td><?= $this->lang->line("loan_type_term").":"; ?></td>
                 <td><?= $term . " " . $term_period; ?></td>
-                <td>Interest Rate</td>
-                <td><?= $rate ?>%</td>
+                <!--<td>Interest Rate</td>
+                <td><?= $rate ?>%</td>-->
             </tr>
             <tr>
-                <td><?= $this->lang->line("loans_apply_date"); ?></td>
+                <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>
-                <td><?= $this->lang->line("loans_payment_date"); ?></td>
+                <td><?= $this->lang->line("loans_payment_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_payment_date); ?></td>
-                <td><?= $this->lang->line("loan_type_penalty"); ?></td>
-                <td>__</td>
+                <!--<td><?= $this->lang->line("loan_type_penalty"); ?></td>
+                <td>__</td>-->
             </tr>
         </table>
 
