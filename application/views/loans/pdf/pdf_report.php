@@ -16,17 +16,21 @@
         </style>
     </head>
     <body>
-        <div class="loans_pdf_company_name">
-            <img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("/uploads/logo/" . $this->config->item('logo')) : base_url("/uploads/common/no_img.png"); ?>" style="height:99px" />
-            <h3><?= $company_name; ?></h3>
-            <h4>
-                <?= $company_address; ?><br/>
-                <?= "Tel. No. " . $phone . " Fax " . $fax . " Email " . $email; ?>
-            </h4>
-        </div>
-
-        <div class="loans_pdf_title">
-            <h4><?= $this->lang->line("loans_disclosure_title"); ?></h4>
+        <div>
+            <table class="table">
+                <tr>
+                    <td width="30%">
+                        <div class="loans_pdf_company_name">
+                            <img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("/uploads/logo/" . $this->config->item('logo')) : base_url("/uploads/common/no_img.png"); ?>" style="height:50px" />
+                        </div>
+                    </td>
+                    <td width="70%">
+                        <div class="loans_pdf_title">
+                            <h4>COMPROBANTE DE DESEMBOLSO</h4>
+                        </div>
+                    </td>
+                </tr>    
+            </table>
         </div>
 
         <table class="table">

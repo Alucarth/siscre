@@ -112,3 +112,5 @@ $lang["_gastos_operativos"] = "Gastos operativos";
 $lang["_print_save_changes"] = "Imprimir y guardar cambios";
 $lang["_trans__id"] = "Trans. ID#";
 $lang["_print_receipt"] = "Imprimir recibo";
+$lang["_ahorro_obligado"] = "Ahorro obligado";
+$lang["_ahorro_obligatorio"] = "Ahorro obligatorio";
