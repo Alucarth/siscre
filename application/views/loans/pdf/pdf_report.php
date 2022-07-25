@@ -9,7 +9,11 @@
                 width: 40%;
                 text-decoration: none;
             }
-
+            .custom_table td {
+                border: 2px solid black;
+                vertical-align: top;
+                padding: 5px;
+            }
             .loans_pdf_company_name, .loans_pdf_title{
                 text-align: center;
             }
@@ -35,30 +39,39 @@
 
         <table class="table">
             <tr>
+                <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
+                <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>
                 <td width="25%"><?= $this->lang->line("common_full_name").":"; ?></td>
+                <!--<td width="25%"><?= $customer_id; ?></td>-->
                 <td width="25%"><?= $customer_name; ?></td>
-                <td width="25%"><?= $this->lang->line("common_address_present").":"; ?></td>
-                <td colspan="3" width="25%"><?= $customer_address; ?></td>
+                <!--<td width="25%"><?= $this->lang->line("common_address_present").":"; ?></td>
+                <td colspan="3" width="25%"><?= $customer_address; ?></td>-->
             </tr>
 
             <tr>
-                <td><?= $this->lang->line("loans_type").":"; ?></td>
-                <td><?= str_replace("_", " ", $loan->interest_type); ?></td>
-                <td><?= $this->lang->line("loan_type_term").":"; ?></td>
-                <td><?= $term . " " . $term_period; ?></td>
+                <td>Agencia:</td>
+                <td>1</td>
+                <td><?=ktranslate2("Loan Interest")?>:</td>
+                <td style="text-align: left"><?=$loan->interest_rate . "%";?></td>
+                <!--<td><?= $this->lang->line("loans_type").":"; ?></td>
+                <td><?= str_replace("_", " ", $loan->interest_type); ?></td>-->
+                <!--<td><?= $this->lang->line("loan_type_term").":"; ?></td>
+                <td><?= $term . " " . $term_period; ?></td>-->
                 <!--<td>Interest Rate</td>
                 <td><?= $rate ?>%</td>-->
             </tr>
             <tr>
-                <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
-                <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>
-                <td><?= $this->lang->line("loans_payment_date").":"; ?></td>
-                <td><?= date($this->config->item('date_format'), $loan->loan_payment_date); ?></td>
+                <td>Asesor:</td>
+                <td>1</td>
+                <!--<td><?= $this->lang->line("loans_apply_date").":"; ?></td>
+                <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>-->
+                <!--<td><?= $this->lang->line("loans_payment_date").":"; ?></td>
+                <td><?= date($this->config->item('date_format'), $loan->loan_payment_date); ?></td>-->
                 <!--<td><?= $this->lang->line("loan_type_penalty"); ?></td>
                 <td>__</td>-->
             </tr>
         </table>
-
+        <!--
         <div>
             <label><?= strtoupper($this->lang->line("loan_type_payment_sched")); ?></label>
             <ul class="checkbox-grid">
@@ -71,82 +84,41 @@
                 <?php endforeach; ?>
             </ul>
         </div>
-
-        <table class="table loans_pdf_loan_amount">
-            <tr>
-                <td><?= ktranslate2("PAYABLE AMOUNT")?>:</td>
-                <td style="text-align: right"><?= $payable; ?></td>
-            </tr>
-            <tr>
-                <td><strong><?= ktranslate2("APPLIED AMOUNT")?></strong></td>
-                <td style="text-align: right"><?= $loan_amount; ?></td>
-            </tr>
-            <tr>
-                <td colspan="2"><?= $this->lang->line("loan_type_less_charge") ?>:</td>
-            </tr>
-
-            <?php foreach ($misc_fees as $misc_fee): ?>
-                <tr>
-                    <td><?= $misc_fee[0]; ?></td>
-                    <td style="text-align: right"><?= $misc_fee[1]; ?></td>
-                </tr>
-            <?php endforeach; ?>
-                
-            <?php if ($loan->interest_type == 'loan_deduction'): ?>
-            <tr>
-                <td><?=ktranslate2("Loan Interest")?>:</td>
-                <td style="text-align: right"><?=$loan_deduction_interest;?></td>
-            </tr>
-            <?php endif; ?>
-                
-            <tr>
-                <td><?= strtoupper($this->lang->line("loan_type_total_deduction")) ?></td>
-                <td style="text-align: right"><?= $total_deductions; ?></td>
-            </tr>
-            <tr>
-                <td><?= strtoupper($this->lang->line("loan_type_net_proceed")) ?></td>
-                <td style="text-align: right"><?= $net_loan; ?></td>
-            </tr>
-            
-            <?php if ( count($add_fees) > 0 ): ?>
-            <tr>
-                <td><strong><?=ktranslate2("Additional Fees")?></strong></td>
-            </tr>
-            <?php endif ?>
-            
-            <?php foreach( $add_fees as $desc => $amount ): ?>
-                <tr>
-                    <td><?=$desc?></td>
-                    <td style="text-align: right"><?= to_currency($amount); ?></td>
-                </tr>
-            <?php endforeach; ?>
-            
-        </table>
-           
-
+                    -->
         <div>
-            <?= strtoupper($this->lang->line("loan_type_acknowledgment")); ?>
-
-            <table class="table">
-                <tr>
-                    <td style="height: 200px"><?= $this->lang->line("loan_type_prepared_by") ?>:</td>
-                    <td>&nbsp;</td>
-                    <td><?= $this->lang->line("loan_type_checked_by") ?>:</td>
-                    <td>&nbsp;</td>
-                    <td><?= $this->lang->line("loan_type_approved_by") ?>:</td>
-                    <td>&nbsp;</td>
-                </tr>
-                <tr>
-                    <td><?= $this->lang->line("loan_type_noted_by") ?>:</td>
-                    <td>&nbsp;</td>
-                    <td><?= $this->lang->line("loan_type_received_by") ?>:</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                </tr>
-            </table>
+            <?= $this->lang->line("loan_type_acknowledgment"); ?>
         </div>
-
+        <table class="custom_table" width="100%">
+            <tr>
+                <td width="50%" vertical-align="top"><strong>NOMBRE</strong></td>
+                <td width="20%"><strong>CI</strong></td>
+                <td width="30%"><strong>FIRMA(S) CLIENTE(S)</strong></td>
+            </tr>
+            <tr>
+                <td rowspan="2" vertical-align="top"><?= $customer_name; ?></td>
+                <td height="100"></td>
+                <td height="100"></td>
+            </tr>
+            <tr>
+                <!--<td height="100">Garante</td>-->
+                <td height="100"></td>
+                <td height="100"></td>
+            </tr>
+            <tr>
+                <td width="50%"><strong><?= ktranslate2("APPLIED AMOUNT")?>:</strong></td>
+                <td width="20%"><strong><?= $loan_amount; ?></strong></td>
+                <td width="30%"><strong>FIRMA(S) AUTORIZADA(S)</strong></td>        
+            </tr>
+            <tr>
+                <td rowspan="2"></td>
+                <td height="100"></td>
+                <td height="100"></td>
+            </tr>
+            <tr>
+                <!--<td height="100">Garante</td>-->
+                <td height="100"></td>
+                <td height="100"></td>
+            </tr>
+        </table>
     </body>
-
 </html>

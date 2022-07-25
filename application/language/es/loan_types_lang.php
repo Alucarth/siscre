@@ -45,8 +45,10 @@ $lang['loan_type_checked_by']='Revisado por';
 $lang['loan_type_approved_by']='Aprobado por';
 $lang['loan_type_noted_by']='Conocido por';
 $lang['loan_type_received_by']='Recibido por';
-$lang['loan_type_acknowledgment']='Me acusó recibo de una copia de la declaración antes del cierre de este préstamo
-             TRANSACCIONES Y QUE ENTIENDEN Y TOTALMENTE DE ACUERDO CON LOS TÉRMINOS Y CONDICIONES AL RESPECTO.';
+//$lang['loan_type_acknowledgment']='Me acusó recibo de una copia de la declaración antes del cierre de este préstamo
+//             TRANSACCIONES Y QUE ENTIENDEN Y TOTALMENTE DE ACUERDO CON LOS TÉRMINOS Y CONDICIONES AL RESPECTO.';
+$lang['loan_type_acknowledgment']='En consecuencia de haber recibido el monto desembolsado indicado en el presente documento, 
+             así como cópia del contrato de préstamo que originó dicho desembolso y su plan de pagos, suscrito y firmo a continuación:';
 $lang['loan_type_interest_rate']='Tasa de interés';
 $lang['loan_type_schedules']='Horarios';
 $lang['loan_type_schedule']='Programar';

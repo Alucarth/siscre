@@ -40,8 +40,8 @@ $lang["loan_type_checked_by"] = "Revisado por";
 $lang["loan_type_approved_by"] = "Aprobado por";
 $lang["loan_type_noted_by"] = "Notado por";
 $lang["loan_type_received_by"] = "Recibido por";
-$lang["loan_type_acknowledgment"] = "ACUSE DE RECIBO DE UNA COPIA DEL ESTADO DE CUENTA ANTERIOR A LA CONSUMACIÓN DE ESTE PRÉSTAMO
-            TRANSACCIONES Y QUE ENTIENDEN Y ACEPTAN TOTALMENTE LOS TÉRMINOS Y CONDICIONES DE LAS MISMAS.";
+$lang["loan_type_acknowledgment"] = "En consecuencia de haber recibido el monto desembolsado indicado en el presente documento, 
+ así como cópia del contrato de préstamo que originó dicho desembolso y su plan de pagos, suscrito y firmo a continuación:";
 $lang["loan_type_schedules"] = "Horarios";
 $lang["loan_type_schedule"] = "Calendario";
 $lang["loan_type_balance"] = "Balance";

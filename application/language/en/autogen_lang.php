@@ -114,3 +114,4 @@ $lang["_trans__id"] = "Trans. ID#";
 $lang["_print_receipt"] = "Imprimir recibo";
 $lang["_ahorro_obligado"] = "Ahorro obligado";
 $lang["_ahorro_obligatorio"] = "Ahorro obligatorio";
+$lang["_loan_interest"] = "Interés";
