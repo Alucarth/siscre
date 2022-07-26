@@ -209,6 +209,16 @@ class Customer extends Person {
 
         return $query->result();
     }
+
+    function get_lead($customer_id)
+    {
+        $this->db->from('leads');
+        $this->db->where('customer_id', $customer_id);
+        $query = $this->db->get();
+
+        return $query->result();
+    }
+    
     
     function get_documents($customer_id)
     {

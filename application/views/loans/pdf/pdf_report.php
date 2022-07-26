@@ -96,7 +96,7 @@
             </tr>
             <tr>
                 <td rowspan="2" vertical-align="top"><?= $customer_name; ?></td>
-                <td height="100"></td>
+                <td height="100"> <?= $document_number; ?></td>
                 <td height="100"></td>
             </tr>
             <tr>

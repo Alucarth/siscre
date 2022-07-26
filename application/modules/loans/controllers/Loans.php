@@ -1075,6 +1075,7 @@ class Loans extends Secure_area implements iData_controller
         $loan = $this->Loan->get_info($loan_id);
         $loan_type = $this->Loan_type->get_info($loan->loan_type_id);
         $customer = $this->Customer->get_info($loan->customer_id);
+        $leads = (object)  $this->Customer->get_lead($loan->customer_id)[0];
 
         if ($loan_type->term_period_type === "year")
         {
@@ -1094,6 +1095,7 @@ class Loans extends Secure_area implements iData_controller
 
         $data['company_name'] = $this->config->item("company"); // company name
         $data['company_address'] = $this->config->item("address"); // company address
+      
         $data['phone'] = $this->config->item("phone"); // company address
         $data['fax'] = $this->config->item("fax"); // company address
         $data['email'] = $this->config->item("email"); // company address
@@ -1142,6 +1144,7 @@ class Loans extends Secure_area implements iData_controller
         $data["loan_deduction_interest"] = to_currency($loan_deduction_interest);
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
         $data['customer_address'] = ucwords($customer->address_1);
+        $data['document_number'] =   $leads->id_no;
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->apply_amount - $total_deductions);
         
