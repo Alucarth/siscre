@@ -96,13 +96,13 @@
             </tr>
             <tr>
                 <td rowspan="2" vertical-align="top"><?= $customer_name; ?></td>
-                <td height="100"> <?= $document_number; ?></td>
-                <td height="100"></td>
+                <td height="50"> <?= $document_number; ?></td>
+                <td height="50"></td>
             </tr>
             <tr>
                 <!--<td height="100">Garante</td>-->
-                <td height="100"></td>
-                <td height="100"></td>
+                <td height="50"></td>
+                <td height="50"></td>
             </tr>
             <tr>
                 <td width="50%"><strong><?= ktranslate2("APPLIED AMOUNT")?>:</strong></td>
@@ -111,13 +111,13 @@
             </tr>
             <tr>
                 <td rowspan="2"></td>
-                <td height="100"></td>
-                <td height="100"></td>
+                <td height="50"></td>
+                <td height="50"></td>
             </tr>
             <tr>
                 <!--<td height="100">Garante</td>-->
-                <td height="100"></td>
-                <td height="100"></td>
+                <td height="50"></td>
+                <td height="50"></td>
             </tr>
         </table>
     </body>
