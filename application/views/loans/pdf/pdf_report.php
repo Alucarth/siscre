@@ -110,13 +110,13 @@
                 <td width="30%"><strong>FIRMA(S) AUTORIZADA(S)</strong></td>        
             </tr>
             <tr>
-                <td rowspan="2"></td>
-                <td height="50"></td>
+                <td colspan="2" rowspan="2"></td>
+                <!--<td height="50"></td>-->
                 <td height="50"></td>
             </tr>
             <tr>
                 <!--<td height="100">Garante</td>-->
-                <td height="50"></td>
+                <!--<td height="50"></td>-->
                 <td height="50"></td>
             </tr>
         </table>
