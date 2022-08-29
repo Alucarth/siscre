@@ -92,7 +92,7 @@
 
                                     <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-documents">Verificación de documentos</a></li>
 
-                                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-bank">Métodos de pago</a></li>
+                                    <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-bank">Típo de desembolso</a></li>
 
                                     <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#sectionB"><?= $this->lang->line("customers_financial_information"); ?></a></li>
 

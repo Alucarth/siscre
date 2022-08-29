@@ -94,9 +94,9 @@
 
                                                 <th style="text-align: center; width: 1%"></th>
 
-                                                <th style="text-align: center">Apellido</th>
+                                                <th style="text-align: center">Apellidos</th>
 
-                                                <th style="text-align: center">Nombre</th>
+                                                <th style="text-align: center">Nombres</th>
 
                                                 <th style="text-align: center">Nombre del banco</th>
 

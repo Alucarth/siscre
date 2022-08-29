@@ -123,12 +123,12 @@
         </div>
 
     </div>
-
+<!-- corregir -->
     <div class="form-group row">
 
         <label class="control-label col-sm-3 text-xs-right">
 
-            Número de teléfono personal:
+            Dirección del trabajo/oficina:
 
         </label>
 
@@ -139,7 +139,7 @@
         </div>
 
     </div>
-
+<!-- corregir -->
 </div>
 
 

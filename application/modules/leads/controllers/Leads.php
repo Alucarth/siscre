@@ -1199,6 +1199,7 @@ class Leads extends Secure_area implements iData_controller
         $birth_date = $this->input->post("date_of_birth");
         $password = $this->input->post("password");
         $receive_promo_notifications = $this->input->post("receive_promo_notifications");
+        $marital_status = $this->input->post("marital_status");
         
         $first_name = $this->input->post("application_first_name");
         $middle_name = $this->input->post("application_middle_name");
@@ -1224,7 +1225,7 @@ class Leads extends Secure_area implements iData_controller
         $data['password'] = $password;
         $data['receive_promo_notifications'] = $receive_promo_notifications;
         $data['nationality'] = $this->input->post("nationality");
-        $data['marital_status'] = $this->input->post("marital_status");
+        $data['marital_status'] = $marital_status;
         $data['completed_step'] = 1;
         $data['active_step'] = 2;
         if ($this->leads_model->save($leads_id, $data))
