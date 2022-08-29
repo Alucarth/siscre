@@ -3,11 +3,9 @@
 require_once ("Person_controller.php");
 
 class Customers extends Person_controller {
-
     function __construct()
     {
         parent::__construct('customers');
-        
         $this->load->library('DataTableLib');
     }
 
@@ -15,20 +13,15 @@ class Customers extends Person_controller {
     {
         $res = $this->Employee->getLowerLevels();
         $data['staffs'] = $res;
-
         $data['controller_name'] = strtolower(get_class());
-        
         $data["extra_fields"] = $this->Customer->get_extra_fields();
-        
         if ( is_plugin_active('branches') )
         {
             $this->load->model('branches/Branch_model');
             $data["branches"] = $this->Branch_model->get_branches();
         }
-        
         $this->set_dt_borrowers($this->datatablelib->datatable());
         $data["tbl_borrowers"] = $this->datatablelib->render();        
-        
         $this->load->view('customers/list', $data);
     }
     
