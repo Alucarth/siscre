@@ -115,3 +115,4 @@ $lang["_print_receipt"] = "Imprimir recibo";
 $lang["_ahorro_obligado"] = "Ahorro obligado";
 $lang["_ahorro_obligatorio"] = "Ahorro obligatorio";
 $lang["_loan_interest"] = "Interés";
+$lang["_i_cant_save_data"] = "i cant save data";

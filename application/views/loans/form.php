@@ -88,6 +88,7 @@
                                     <?php if ( $loan_info->loan_id > 0 ): ?>
                                         <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-loan-documents"><?=ktranslate2("Documents")?></a></li>
                                         <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-collateral"><?= $this->lang->line('guarantee') ?></a></li>
+                                        <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-garante">Garantes</a></li>
                                     <?php endif; ?>
                                 </ul>
                                 <div class="tab-content">
@@ -439,6 +440,106 @@
                                         <div class="clearfix"></div>
                                     </div>
 
+                                    <!-- tab garante -->
+                                    <div id="tab-garante" class="tab-pane fade in">
+                                        <div id="div-garante">
+                                            <?=$valores;?>
+                                            <button class="btn btn-primary tbl_garante_dt-custom-button" data-id="" type="button" id="btn-add-garante">Agregar Garante</button>
+                                            <table class="table table-hover table-bordered" id="tbl_garante">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="text-align: center; width: 1%"></th>
+                                                        <th style="text-align: center;">Nombre</th>
+                                                        <th style="text-align: center;">CI</th>
+                                                        <th style="text-align: center;">Telefono</th>
+                                                        <th style="text-align: center;">Celular</th>
+                                                        <th style="text-align: center;">Dir. Hogar</th>
+                                                        <th style="text-align: center;">Dir. Trabajo</th>
+                                                        <th style="text-align: center;">Email</th>
+                                                    </tr>
+                                                </thead>
+                                            </table>
+                                            <?=$tbl_garante;?>
+                                            
+                                        </div>
+                                        <script>
+                                            function load_garante_info(id)
+                                            {
+                                                $("a[href='#tab-garante-info']").parent().addClass("active");
+                                                $("a[href='#tab-garante-info']").addClass("active");
+                                                $("#tab-garante-info").addClass("active show");
+                                                
+                                                $("a[href='#tab-garante-docs']").removeClass("active");
+                                                $("#tab-garante-docs").removeClass("active");
+                                                
+                                                if (id > 0)
+                                                {
+                                                    $("a[href='#tab-garante-docs']").show();
+                                                }
+                                                else
+                                                {
+                                                    $("a[href='#tab-garante-docs']").hide();
+                                                }
+                                                
+                                                var url = '<?=site_url('loans/ajax')?>';
+                                                console.log(url);
+                                                var params = {
+                                                    ajax_type:15,
+                                                    id: id,
+                                                    softtoken:$("input[name='softtoken']").val()
+                                                };
+                                                $.post(url, params, function(data){
+                                                    if ( data.status == "OK" )
+                                                    {
+                                                       
+                                                        $("#md-garante input[name='id']").val(data.info.garante_id);
+                                                        $("#md-garante input[name='nombre']").val(data.info.nombre);
+                                                        $("#md-garante input[name='ci']").val(data.info.ci);
+                                                        $("#md-garante input[name='phone']").val(data.info.phone);
+                                                        $("#md-garante input[name='cellphone']").val(data.info.cellphone);
+                                                        $("#md-garante input[name='direccion_hogar']").val(data.info.direccion_hogar);
+                                                        $("#md-garante input[name='direccion_trabajo']").val(data.info.direccion_trabajo);
+                                                        $("#md-garante input[name='email']").val(data.info.email);
+                                                        
+                                                        // load_garante_doc_list();
+                                                        
+                                                        $("#md-garante").modal("show");
+                                                    }
+                                                }, "json");
+                                            }
+                                            
+                                            $(document).ready(function(){
+                                                $("a[href='#tab-garante']").click(function(){
+                                                    console.log('cargando informacion del garante');
+                                                    $("#tbl_garante").DataTable().ajax.reload();
+                                                });
+                                                $(document).on("click", ".btn-edit-garante, #btn-add-garante", function(){
+                                                    var id = $(this).attr("data-id");
+                                                    
+                                                    load_garante_info(id);                                                    
+                                                }); 
+                                                $(document).on("click", ".btn-delete-garante", function(){
+                                                    var id = $(this).attr("data-id");
+                                                    alertify.confirm("<?=ktranslate2("Are you sure you wish to delete this data?")?>", function(){
+                                                        var url = '<?=site_url('loans/ajax')?>';
+                                                        var params = {
+                                                            ajax_type:13,
+                                                            id:id,
+                                                            softtoken:$("input[name='softtoken']").val()
+                                                        };
+                                                        $.post(url, params, function(data){
+                                                            if ( data.status == "OK" )
+                                                            {
+                                                                $("#tbl_garante").DataTable().ajax.reload();
+                                                            }
+                                                        }, "json");
+                                                    });
+                                                });
+                                            });
+                                        </script>
+                                        <div class="clearfix"></div>
+                                    </div>
+                                    <!-- end tab garante -->
 
                                     <div id="sectionF" class="tab-pane fade in">
                                         <?php $this->load->view('loans/tabs/calculator'); ?>
@@ -571,6 +672,62 @@
 </div>
 <!-- /.modal -->
 
+
+<!-- Modal -->
+<div class="modal fade" id="md-garante" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+               Garante
+            </div>
+            <div class="modal-body">
+                <?php echo form_open_multipart(site_url('loans/save_garante'), ["id"=>"frmGarante"]); ?>
+                    <input type="hidden" name="loan_id" value="<?=$loan_info->loan_id;?>" />
+                   
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" />
+                    </div>
+                    <div class="form-group">
+                        <label>CI</label>
+                        <input type="text" class="form-control" id="ci" name="ci" />
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="text" class="form-control" id="phone" name="phone" />
+                    </div>
+                    <div class="form-group">
+                        <label>Celular</label>
+                        <input type="text" class="form-control" id="cellphone" name="cellphone" />
+                    </div>
+                    <div class="form-group">
+                        <label>Dir. Hogar</label>
+                        <input type="text" class="form-control" id="direccion_hogar" name="direccion_hogar" />
+                    </div>
+                    <div class="form-group">
+                        <label>Dir. Trabajo</label>
+                        <input type="text" class="form-control" id="direccion_trabajo" name="direccion_trabajo" />
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="text" class="form-control" id="email" name="email" />
+                    </div>
+
+                    <?php echo form_close();?>
+                
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal"><?=ktranslate2("Close")?></button>
+                <button type="button" class="btn btn-primary" id="btn-submit-garante">Guardar</button>
+            </div>
+        </div>
+        <!-- /.modal-content -->
+    </div>
+    <!-- /.modal-dialog -->
+</div>
+<!-- /.modal -->
+
+
 <!-- Modal -->
 <div class="modal fade" id="md-upload-document" role="dialog">
     <div class="modal-dialog">
@@ -655,7 +812,10 @@
     $("#btn-submit-upload-collateral").on("click", function(){
         $("#frmCollateralDocUpload").submit();
     });
-    
+  
+    $("#btn-submit-garante").on("click", function(){
+        $("#frmGarante").submit();
+    });
     $(document).on("click", ".btn-delete-collateral-doc", function(){
         var $this = $(this);
         alertify.confirm("<?= ktranslate2("Are you sure you wish to delete this document")?>?", function(){
@@ -701,6 +861,38 @@
                 }
                 
                 $("#btn-submit-upload-collateral").prop("disabled", false);
+            },
+            cache: false,
+            contentType: false,
+            processData: false
+        });
+    });
+    $("#frmGarante").on("submit", function(e){
+        e.preventDefault();
+        var $this = $(this);
+        var formData = new FormData( this );
+        
+        $("#btn-submit-garante").prop("disabled", true);
+        $.ajax({
+            url: $this.attr("action"),
+            type: 'POST',
+            data: formData,
+            success: function (data) {
+                var data = $.parseJSON(data);
+                if ( data.status == "OK" )
+                {
+                    $("#md-garante").modal("hide");
+                    $("#tbl_garante").DataTable().ajax.reload();
+                }
+                else
+                {
+                    alertify.alert("<?= ktranslate2("i cant save data")?>!");
+                }
+                
+                $("#btn-submit-garante").prop("disabled", false);
+            },
+            error: function(xhr, status, error){
+                alert("Error!" + xhr.status);
             },
             cache: false,
             contentType: false,

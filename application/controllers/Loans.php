@@ -388,6 +388,13 @@ class Loans extends Secure_area implements iData_controller
         $this->set_dt_collateral($this->datatablelib->datatable(), $loan_id);
         $data["tbl_collateral"] = $this->datatablelib->render();
         
+        /** Datatable garantes */
+        $this->set_dt_garantes($this->datatablelib->datatable(), $loan_id);
+        $data["tbl_garante"] = $this->datatablelib->render();
+      
+
+        
+
         $this->load->view("loans/form", $data);
     }
     
@@ -1559,6 +1566,9 @@ class Loans extends Secure_area implements iData_controller
         $ajax_type = $this->input->post('ajax_type');
         switch ($ajax_type)
         {
+            case 0: 
+                $this->_dt_garante(); 
+                break;
             case 1: // Calculator
                 $this->_handle_calculator();
                 break;
@@ -1583,6 +1593,7 @@ class Loans extends Secure_area implements iData_controller
             case 8:
                 $this->_handle_add_documents();
                 break;
+           
             case 9:
                 $this->_handle_delete_file();
             case 10:
@@ -1595,6 +1606,7 @@ class Loans extends Secure_area implements iData_controller
                 $this->_handle_delete_collateral_info();
             case 14:
                 $this->_handle_load_collateral_doc_list();
+            
         }
     }
     
@@ -2167,6 +2179,36 @@ class Loans extends Secure_area implements iData_controller
         $datatable->has_edit_dblclick = 0;
     }
 
+    function set_dt_garantes($datatable, $loan_id)
+    {
+        $params = [
+            $this->security->get_csrf_token_name() => $this->security->get_csrf_hash(), 
+            "ajax_type" => 0, 
+            "loan_id" => $loan_id
+        ];
+        $datatable->add_server_params('', '', $params);
+        $datatable->ajax_url = site_url('loans/ajax');
+
+        $datatable->add_column('actions', false);
+        $datatable->add_column('nombre', false);
+        $datatable->add_column('ci', false);
+        $datatable->add_column('phone', false);
+        $datatable->add_column('cellphone', false);
+        $datatable->add_column('direccion_hogar', false);
+        $datatable->add_column('direccion_casa', false);
+        $datatable->add_column('email', false);
+
+        $datatable->add_table_definition(["orderable" => false, "targets" => 0]);
+        $datatable->order = [[1, 'desc']];
+
+        $datatable->allow_search = true;
+        $datatable->no_expand_height = true;
+        
+        $datatable->table_id = "#tbl_garante";
+        $datatable->add_titles('Garantes');
+        $datatable->has_edit_dblclick = 0;
+    }
+
     function _dt_collateral()
     {
         $this->load->model("Document_model");
@@ -2219,6 +2261,62 @@ class Loans extends Secure_area implements iData_controller
 
         send($data);
     }
+
+    function _dt_garante()
+    {
+        $this->load->model("Garante");
+        
+        $loan_id = $this->input->post("loan_id");
+        // $doc_viewer = $this->input->post("doc_viewer");
+        $offset = $this->input->post("start");
+        $limit = $this->input->post("length");
+
+        $index = $this->input->post("order")[0]["column"];
+        $dir = $this->input->post("order")[0]["dir"];
+        $keywords = $this->input->post("search")["value"];
+
+        $order = array("index" => $index, "direction" => $dir);
+        
+        $user_info = $this->Employee->get_logged_in_employee_info();
+        
+        $tmp = array();
+        $count_all = 0;
+        
+        $filters = [];
+        $filters["loan_id"] = $loan_id;        
+        $result = $this->Garante->get_list($filters, $count_all);
+
+        foreach ($result as $row)
+        {
+            $actions = "<a href='javascript:void(0)' class='btn btn-xs btn-default btn-secondary btn-edit-collateral' data-id='". $row->garante_id ."' title='View'><span class='fa fa-pencil'></span></a> ";
+
+            if ( check_access($user_info->role_id, "loans", 'delete') )
+            {
+                $actions .= "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete-collateral btn' data-id='" . $row->garante_id . "' title='Delete'><span class='fa fa-trash'></span></a>";
+            }
+
+            $data_row = [];
+            $data_row["DT_RowId"] = $row->garante_id;
+            $data_row["actions"] = $actions;
+            
+            $data_row["nombre"] = $row->nombre;
+            $data_row["ci"] = $row->ci;
+            $data_row["phone"] = $row->phone;
+            $data_row["cellphone"] = $row->cellphone;
+            $data_row["direccion_hogar"] = $row->direccion_hogar;
+            $data_row["direccion_trabajo"] = $row->direccion_trabajo;
+            $data_row["email"] = $row->email;
+
+            $tmp[] = $data_row;
+        }
+
+        $data["data"] = $tmp;
+        $data["recordsTotal"] = $count_all;
+        $data["recordsFiltered"] = $count_all;
+
+        send($data);
+    }
+
     
     public function upload_collateral()
     {
