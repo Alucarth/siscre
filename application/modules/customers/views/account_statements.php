@@ -16,7 +16,7 @@
                                         <thead>
                                             <tr>
                                                 <th style="text-align: center; width: 1%"></th>
-                                                <th style="text-align: center">Description</th>                                                
+                                                <th style="text-align: center">Descripción</th>                                                
                                             </tr>
                                         </thead>
                                     </table>
