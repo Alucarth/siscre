@@ -78,14 +78,15 @@
                                                             <th style="text-align: center">Nombre del módulo</th>
                                                             <th style="text-align: center">Leer</th>
                                                             <th style="text-align: center">Añadir</th>
-                                                            <th style="text-align: center">Editar</th>
+                                                            <th style="text-align: center">Editar </th>
                                                             <th style="text-align: center">Eliminar</th>
                                                         </tr>
                                                     </thead>
+                                                    
                                                     <tbody>
                                                         <?php foreach ($all_modules->result() as $module) : ?>
                                                             <tr>
-                                                                <td><?= ucwords(str_replace("_", " ", $module->module_id)); ?></td>
+                                                                <td><?= ktranslate2(ucwords(str_replace("_", " ", $module->module_id))); ?></td>
                                                                 <td style="text-align: center">
                                                                     <input name="rights[]" value="<?= $module->module_id; ?>" <?= in_array($module->module_id, $module_ids) ? "checked='checked'" : ""; ?> type="checkbox" />
                                                                 </td>

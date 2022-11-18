@@ -85,6 +85,7 @@ $lang["common_approved"] = "Aprovado";
 $lang["common_paid"] = "Pagado";
 $lang["common_all"] = "Todo";
 $lang["common_home"] = "Inicio";
+$lang["home"] = "Inicio";
 $lang["common_help"] = "Ayuda";
 $lang["common_modules"] = "Módulos";
 $lang["common_select"] = "Seleccione";

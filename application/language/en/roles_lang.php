@@ -17,3 +17,5 @@ $lang["low_level"] = "Personal";
 $lang["rights"] = "Permisos de acceso";
 $lang["added_by"] = "Añadido por";
 $lang["status_flag"] = "Estado";
+$lang["home"] = "Inicio";
+?>

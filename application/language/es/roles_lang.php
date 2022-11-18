@@ -22,4 +22,5 @@ $lang['low_level'] = 'Staff';
 $lang['rights'] = 'Becas de Acceso';
 $lang['added_by'] = 'Añadido por';
 $lang['status_flag'] = 'Estado';
+$lang["home"] = "Inicio";
 ?>
