@@ -75,25 +75,25 @@ class Customers extends Person_controller {
         
         if ( !$customer_id )
         {
-            $return["msg"] = "You don't have permission to update this record!";
+            $return["msg"] = "¡No tienes permiso para actualizar este registro!";
             send($return);
         }
         
         if ( trim($password) == '' )
         {
-            $return["msg"] = "Password is a required field!";
+            $return["msg"] = "¡La contraseña es un campo requerido!";
             send($return);
         }
         
         if ( trim($repassword) == '' )
         {
-            $return["msg"] = "Password Confirm is a required field!";
+            $return["msg"] = "¡Confirmar contraseña es un campo obligatorio!";
             send($return);
         }
         
         if ( $password != $repassword )
         {
-            $return["msg"] = "Password don't match!";
+            $return["msg"] = "¡La contraseña no coincide!";
             send($return);
         }
         
@@ -119,14 +119,14 @@ class Customers extends Person_controller {
         $email = $customer->email;
             
         $html = "
-        Dear " . $customer->first_name . ",<br/><br/>
-        Your new login details to the portal are as follows: <br/><br/>
+        Querido/a " . $customer->first_name . ",<br/><br/>
+        Sus nuevos datos de inicio de sesión en el portal son los siguientes: <br/><br/>
 
         " . site_url('leads') . " <br/><br/>
-        Email: " . $email . " <br/>
-        Password: $password <br/><br/>
+        Correo: " . $email . " <br/>
+        Contraseña: $password <br/><br/>
 
-        Regards,<br/><br/>
+        Saludos,<br/><br/>
 
             ";
 
@@ -134,7 +134,7 @@ class Customers extends Person_controller {
         $email_data["from_name"] = 'noreply';
         $email_data["from_email"] = 'noreply@support.com';
         $email_data["to_email"] = $email;
-        $email_data["subject"] = "Password Reset";
+        $email_data["subject"] = "Restablecimiento de contraseña";
         $email_data["html"] = $html;
 
         custom_send_email($email_data);
@@ -225,10 +225,11 @@ class Customers extends Person_controller {
         $datatable->ajax_url = site_url('customers/ajax');
 
         $datatable->add_column('actions', false);
-        $datatable->add_column('last_name', false);
-        $datatable->add_column('first_name', false);
-        $datatable->add_column('bank_name', false);
-        $datatable->add_column('bank_account_num', false);
+        $datatable->add_column('id', false);
+        $datatable->add_column('full_name', false);
+        /*$datatable->add_column('first_name', false);*/
+        $datatable->add_column('id_no', false);
+        $datatable->add_column('address_1', false);
         $datatable->add_column('email', false);
         $datatable->add_column('phone_number', false);
         if ( is_plugin_active('branches') )
@@ -298,10 +299,12 @@ class Customers extends Person_controller {
             $data_row["DT_RowId"] = $person->person_id;
             $data_row["actions"] = $actions;
             
-            $data_row["last_name"] = $person->last_name;
-            $data_row["first_name"] = $person->first_name;
-            $data_row["bank_name"] = $person->bank_name;
-            $data_row["bank_account_num"] = $person->bank_account_num;
+            $data_row["id"] = $person->person_id;
+            $data_row["full_name"] = $person->first_name." ".$person->last_name;
+            /*$data_row["last_name"] = $person->last_name;
+            $data_row["first_name"] = $person->first_name;*/
+            $data_row["id_no"] = $person->person_id;
+            $data_row["address_1"] = $person->address_1;
             $data_row["email"] = $person->email;
             $data_row["phone_number"] = $person->phone_number;
             if ( is_plugin_active('branches') )

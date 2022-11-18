@@ -26,11 +26,14 @@ class Printing extends CI_Controller {
         $html = '<div style="width:100%;text-align:left;padding-bottom:10px">
                     <table style="width:100%">
                         <tr>
-                            <td style="width:12%">
+                            <!--<td style="width:12%">-->
+                            <td>
                                 <img id="img-pic" style="max-height:80px; width:100%" src="'. ((trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png")) .'" />
                             </td>
+                        </tr>
+                        <tr>
                             <td>
-                                ' . ucwords($this->config->item('company')) . ' <br/>
+                                <!--' . ucwords($this->config->item('company')) . ' <br/>-->
                                 ' . ucwords($this->config->item('address')) . ' <br/>
                                 ' . $this->config->item('phone') . ' <br/>
                             </td>
