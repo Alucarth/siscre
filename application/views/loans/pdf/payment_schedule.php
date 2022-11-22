@@ -90,8 +90,8 @@
                 <tr>
                     <!--<td><?= $this->lang->line("loans_type").":"; ?></td>
                     <td><?=$loan->interest_type?></td>-->
-                    <!--<td>CI:</td>
-                    <td></td>-->
+                    <td>CI:</td>
+                    <td><?= $document_number; ?></td>
                 </tr>
                 <!--<tr>
                     <td><?= $this->lang->line("loans_payment_date").":"; ?></td>

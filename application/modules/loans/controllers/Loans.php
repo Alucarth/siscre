@@ -917,6 +917,7 @@ class Loans extends Secure_area implements iData_controller
         $loan = $this->Loan->get_info($loan_id);
         $loan_type = $this->Loan_type->get_info($loan->loan_type_id);
         $customer = $this->Customer->get_info($loan->customer_id);
+        $leads = (object)  $this->Customer->get_lead($loan->customer_id)[0];
 
         $filename = "schedule" . time();
         // As PDF creation takes a bit of memory, we're saving the created file in /downloads/reports/
@@ -940,6 +941,7 @@ class Loans extends Secure_area implements iData_controller
         $data['schedules'] = json_decode($loan->periodic_loan_table);
         $data['term_schedules'] = $this->Payment_schedule->get_schedules();
 
+        $data['document_number'] =   $leads->id_no;
         $data['misc_fees'] = array();
 
         $misc_fees = json_decode($loan->misc_fees, true);
@@ -989,7 +991,7 @@ class Loans extends Secure_area implements iData_controller
         $loan = $this->Loan->get_info($loan_id);
         $loan_type = $this->Loan_type->get_info($loan->loan_type_id);
         $customer = $this->Customer->get_info($loan->customer_id);
-
+        $leads = (object)  $this->Customer->get_lead($loan->customer_id)[0];
         if ($loan_type->term_period_type === "year")
         {
             $period = $this->_get_period($loan_type->payment_schedule);
@@ -1020,6 +1022,8 @@ class Loans extends Secure_area implements iData_controller
         $data['loan_type'] = $loan_type;
         $data['period_type'] = $loan_type->payment_schedule;
         $data['schedules'] = $this->Payment_schedule->get_schedules();
+
+        $data['document_number'] =   $leads->id_no;
 
         $data['misc_fees'] = array();
 
@@ -1081,7 +1085,7 @@ class Loans extends Secure_area implements iData_controller
         $loan_type = $this->Loan_type->get_info($loan->loan_type_id);
         $customer = $this->Customer->get_info($loan->customer_id);
         $leads = (object)  $this->Customer->get_lead($loan->customer_id)[0];
-
+        $employee = $this->Employee->get_logged_in_employee_info();
         if ($loan_type->term_period_type === "year")
         {
             $period = $this->_get_period($loan_type->payment_schedule);
@@ -1148,7 +1152,11 @@ class Loans extends Secure_area implements iData_controller
 
         $data["loan_deduction_interest"] = to_currency($loan_deduction_interest);
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['employee_user'] = ucwords($employee->first_name . " " . $employee->last_name);
+        // $data['employee_user'] = ucwords( json_encode($employee));
+        $data['employee_id'] = ucwords($employee->person_id );
         $data['customer_address'] = ucwords($customer->address_1);
+        $data['customer_id'] = ucwords($loan->customer_id);
         $data['document_number'] =   $leads->id_no;
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->apply_amount - $total_deductions);

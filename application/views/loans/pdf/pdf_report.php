@@ -41,9 +41,10 @@
             <tr>
                 <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>
-                <td width="25%"><?= $this->lang->line("common_full_name").":"; ?></td>
-                <!--<td width="25%"><?= $customer_id; ?></td>-->
-                <td width="25%"><?= $customer_name; ?></td>
+                <!-- <td width="25%"><?= $this->lang->line("common_full_name").":"; ?> </td> -->
+                <td width="25%">Cod. Cliente: </td>
+                <td width="25%"><?= $customer_id; ?></td>
+                <!-- <td width="25%"><?= $customer_name; ?></td> -->
                 <!--<td width="25%"><?= $this->lang->line("common_address_present").":"; ?></td>
                 <td colspan="3" width="25%"><?= $customer_address; ?></td>-->
             </tr>
@@ -62,7 +63,9 @@
             </tr>
             <tr>
                 <td>Asesor:</td>
-                <td>1</td>
+                <td><?=  $employee_user; ?></td>
+                <td>Cod Asesor:</td>
+                <td><?=  $employee_id; ?></td>
                 <!--<td><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>-->
                 <!--<td><?= $this->lang->line("loans_payment_date").":"; ?></td>
