@@ -230,7 +230,7 @@
             </div>
         </div>
         <div class="hr-line-dashed"></div>
-        <!--
+        
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
                 Calle/Puerta/Dpto. No:
@@ -286,7 +286,7 @@
                 ?>
             </div>
         </div>
-            -->
+            
     </div>
 
     <div class="col-lg-6">
