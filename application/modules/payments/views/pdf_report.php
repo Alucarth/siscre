@@ -49,7 +49,7 @@
                 <td>Fecha: <?= $trans_date; ?></td>    
             </tr>
             <tr>
-                <td>Usuario:</td>
+                <td>Usuario: <?= $teller; ?></td>
             </tr>
             <tr>
                 <td colspan="2"><hr></td>
@@ -116,7 +116,7 @@
                     <td align="left"></td>
                 </tr>
                 <tr>
-                    <td align="left">Ahorro obligatorio:</td>
+                    <td align="left">Gastos operativos:</td>
                     <td align="left"></td>
                     <td align="left"><?= $operating_expenses_amount; ?></td>
                     <td align="left"></td>
