@@ -74,11 +74,11 @@
                     <td align="left" > <strong>Monto de Desembolso:</strong> </td>
                     <td align="left"><?= $loan; ?></td>
                     <td align="left"><strong>Asesor:</strong></td>
-                    <td align="left"></td>
+                    <td align="left"><?= $loan_agent; ?></td>
                 </tr>
                 <tr>
                     <td align="left" > <strong>Fecha de Desembolso:</strong> </td>
-                    <td align="left"></td>
+                    <td align="left"><?= $loan_approved_date; ?></td>
                     <td align="left"><strong>Moneda:</strong></td>
                     <td align="left">Bolivianos</td>
                 </tr>
