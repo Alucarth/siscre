@@ -377,6 +377,7 @@
                                                         <select class="form-control" name="date_format">
                                                             <option value="d/m/Y" <?= $this->config->item('date_format') == 'd/m/Y' ? 'selected="selected"' : '' ?>><?= date('d/m/Y') ?> (día/mes/Año)</option>
                                                             <option value="m/d/Y" <?= $this->config->item('date_format') == 'm/d/Y' ? 'selected="selected"' : '' ?>><?= date('m/d/Y') ?> (mes/día/Año)</option>
+                                                            <option value="d/m/Y" <?= $this->config->item('date_format') == 'd/m/Y' ? 'selected="selected"' : '' ?>><?= date('d/m/Y H:i:s') ?> (día/mes/Año Hora:minuto:segundo)</option>
                                                         </select>
                                                     </div>
                                                 </div>
