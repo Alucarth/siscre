@@ -46,7 +46,7 @@
             </tr>
             <tr>
                 <!--<td>Nro. Cuota <?= $number; ?> de <?= $size; ?></td>-->
-                <td>Fecha: <?= $trans_date; ?></td>    
+                <td>Fecha: <?= $trans_date; ?> <?= $time_date; ?> </td>    
             </tr>
             <tr>
                 <td>Usuario: <?= $teller; ?></td>

@@ -224,6 +224,7 @@ class Payments extends Secure_area implements iData_controller {
         $data['balance'] = to_currency($loan->loan_balance);
         $data['paid'] = to_currency($payment->paid_amount);
         $data['trans_date'] = date($this->config->item('date_format'), $payment->date_paid);
+        $data['time_date'] = date("h:i:sa");
         $data['payment_due']= date($this->config->item('date_format'), $payment->payment_due);
         $data['teller'] = $person->first_name . " " . $person->last_name;
         // $data['capital'] =  to_currency($payment->paid_amount - $loan->interest_rate );
