@@ -227,6 +227,7 @@ class Payments extends Secure_area implements iData_controller {
         $data['time_date'] = date("h:i:sa");
         $data['payment_due']= date($this->config->item('date_format'), $payment->payment_due);
         $data['teller'] = $person->first_name . " " . $person->last_name;
+        //$data['user'] = $person->username;
         // $data['capital'] =  to_currency($payment->paid_amount - $loan->interest_rate );
         $data["customer"] = $customer;
         $data["json_objetcs"] = $loan->periodic_loan_table;
