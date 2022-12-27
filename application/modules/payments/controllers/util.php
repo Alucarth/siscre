@@ -76,7 +76,7 @@ class Util
 
         if(sizeof($decimal)>1)
         {
-            return $numf." con ".$decimal[1]."/100 ".$currency;
+            return $numf." CON ".$decimal[1]."/100 ".$currency;
         }
         return $numf." ".$currency;
     }
