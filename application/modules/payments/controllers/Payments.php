@@ -257,7 +257,7 @@ class Payments extends Secure_area implements iData_controller {
                 $data['interest'] = to_currency($object->interest);
                 $data['operating_expenses_amount'] = to_currency($object->operating_expenses_amount);
                 $data['total'] = to_currency($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount);
-                $data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount), 2, '.', '')," Bs");
+                $data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount), 2, '.', '')," BOLIVIANOS");
                 //$data['total'] = to_currency($object->payment_amount_capital+$object->operating_expenses_amount);// ense caso como se asume que esta el interes se le adiciona los gastos operativos
                 //$data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->operating_expenses_amount), 2, '.', '')," Bs"); //mismo caso que la linea de arriba
                 $has_nextpay = true;
