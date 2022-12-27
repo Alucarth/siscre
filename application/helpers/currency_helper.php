@@ -23,14 +23,14 @@ function to_currency($number, $use_comma = false, $dec = 2)
             if ($CI->config->item('currency_side') !== 'currency_side')
                 return $currency_symbol . number_format($number, $dec, $dec_separator, $thousand_separator);
             else
-                return number_format($number, $dec, $dec_separator, $thousand_separator) . $currency_symbol;
+                return number_format($number, $dec, $dec_separator, $thousand_separator) . " " . $currency_symbol;
         }
         else
         {
             if ($CI->config->item('currency_side') !== 'currency_side')
                 return '-' . $currency_symbol . number_format(abs($number), $dec, $dec_separator, $thousand_separator);
             else
-                return '-' . number_format(abs($number), $dec, $dec_separator, $thousand_separator) . $currency_symbol;
+                return '-' . number_format(abs($number), $dec, $dec_separator, $thousand_separator) . " " . $currency_symbol;
         }
     }
     else
