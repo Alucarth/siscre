@@ -1,3 +1,5 @@
+<?php require_once (APPPATH . "controllers/phpqrcode/qrlib.php"); ?>
+
 <html>
     <head>
         <title>Vista previa de impresión</title>
@@ -150,8 +152,39 @@
                 </tr>
             </tbody>
         </table>
-        <br><br>
         <table width="100%">
+            <tr>
+                <td>&nbsp;</td>
+                <td align="right" width="75%" rowspan="5">
+                <?php
+            	    //Declaramos una carpeta temporal para guardar la imágenes generadas
+	                $dir = 'temp/';
+	
+	                //Si no existe la carpeta la creamos
+	                if (!file_exists($dir))
+                        mkdir($dir);
+	
+                    //Declaramos la ruta y nombre del archivo a generar
+	                $filename = $dir.'test.png';
+
+                    //Parámetros de Configuración
+	
+	                $tamaño = 3; //Tamaño de Pixel
+	                $level = 'M'; //Precisión L = Baja, M = Mediana, Q = Alta, H= Máxima
+	                $framSize = 1; //Tamaño en blanco
+	                $contenido = " ID Tran: " . $count . "\n Cliente: " . $account . "\n Cuota: " . $number . " de " . $size . "\n Total: " . $total; //Texto
+	
+                    //Enviamos los parámetros a la Función para generar código QR 
+	                QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
+	
+                    //Mostramos la imagen generada
+	                echo '<img src="'.$dir.basename($filename).'" />';  
+                ?>
+                </td>
+            </tr>
+            <tr>
+                <td align="left">&nbsp;</td>
+            </tr>
             <tr>
                 <td align="left">Firma cliente: ....................&nbsp;</td>
             </tr>
