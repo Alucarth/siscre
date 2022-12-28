@@ -116,9 +116,9 @@
                     <td align="left"></td>
                 </tr>
                 <tr>
-                    <td align="left">Interes penal:</td>
+                    <td align="left">Sanción por pago tardío:</td>
                     <td align="left"></td>
-                    <td align="left">0,00</td>
+                    <td align="left"><?= $lpp; ?></td>
                     <td align="left"></td>
                 </tr>
                 <tr>
