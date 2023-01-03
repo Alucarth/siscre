@@ -126,7 +126,19 @@
                                             Pago tardío <br/>sanciones (Total):
                                         </label>
                                         <div class="col-sm-10">
-                                            <input type="text" id="hid-penalty-amount-total" class="form-control" name="lpp_amount" value="0" />
+                                            <!--<input type="text" id="hid-penalty-amount-total" class="form-control" name="lpp_amount" value="0" />-->
+                                            <?php
+                                            echo form_input(
+                                                    array(
+                                                        'name' => 'lpp_amount',
+                                                        'id' => 'lpp_amount',
+                                                        'value' => $payment_info->lpp_amount,
+                                                        'class' => 'form-control',
+                                                        'type' => 'number',
+                                                        'step' => 'any',
+                                                    )
+                                            );
+                                            ?>
                                         </div>
                                     </div>
                                     <div class="hr-line-dashed"></div>
