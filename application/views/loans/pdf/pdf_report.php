@@ -1,3 +1,6 @@
+<?php
+require_once (APPPATH . "modules/payments/controllers/util.php");
+?>
 <html>
     <head>
         <link rel="stylesheet" rev="stylesheet" href="<?php echo base_url(); ?>bootstrap3/css/bootstrap.css" />
@@ -39,10 +42,10 @@
 
         <table class="table">
             <tr>
-                <td><?= $this->lang->line("loans_apply_date").":"; ?></td>
+                <td style="background-color: #BFBDBD"><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>
                 <!-- <td width="25%"><?= $this->lang->line("common_full_name").":"; ?> </td> -->
-                <td width="25%">Cod. Cliente: </td>
+                <td style="background-color: #BFBDBD" width="25%">Cod. Cliente: </td>
                 <td width="25%"><?= $customer_id; ?></td>
                 <!-- <td width="25%"><?= $customer_name; ?></td> -->
                 <!--<td width="25%"><?= $this->lang->line("common_address_present").":"; ?></td>
@@ -50,9 +53,9 @@
             </tr>
 
             <tr>
-                <td>Agencia:</td>
+                <td style="background-color: #BFBDBD">Agencia:</td>
                 <td>1</td>
-                <td><?=ktranslate2("Loan Interest")?>:</td>
+                <td style="background-color: #BFBDBD"><?=ktranslate2("Loan Interest")?>:</td>
                 <td style="text-align: left"><?=$loan->interest_rate . "%";?></td>
                 <!--<td><?= $this->lang->line("loans_type").":"; ?></td>
                 <td><?= str_replace("_", " ", $loan->interest_type); ?></td>-->
@@ -62,9 +65,9 @@
                 <td><?= $rate ?>%</td>-->
             </tr>
             <tr>
-                <td>Asesor:</td>
+                <td style="background-color: #BFBDBD">Asesor:</td>
                 <td><?=  $employee_user; ?></td>
-                <td>Cod Asesor:</td>
+                <td style="background-color: #BFBDBD">Cod Asesor:</td>
                 <td><?=  $employee_id; ?></td>
                 <!--<td><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>-->
@@ -92,7 +95,7 @@
             <?= $this->lang->line("loan_type_acknowledgment"); ?>
         </div>
         <table class="custom_table" width="100%">
-            <tr>
+            <tr style="background-color: #BFBDBD">
                 <td width="50%" vertical-align="top"><strong>NOMBRE</strong></td>
                 <td width="20%"><strong>CI</strong></td>
                 <td width="30%"><strong>FIRMA(S) CLIENTE(S)</strong></td>
@@ -108,14 +111,18 @@
                 <td height="50"></td>
             </tr>
             <tr>
-                <td width="50%"><strong><?= ktranslate2("APPLIED AMOUNT")?>:</strong></td>
+                <td style="background-color: #BFBDBD" width="50%"><strong><?= ktranslate2("APPLIED AMOUNT")?>:</strong></td>
                 <td width="20%"><strong><?= $loan_amount; ?></strong></td>
-                <td width="30%"><strong>FIRMA(S) AUTORIZADA(S)</strong></td>        
+                <td style="background-color: #BFBDBD" width="30%"><strong>FIRMA(S) AUTORIZADA(S)</strong></td>        
             </tr>
             <tr>
-                <td colspan="2" rowspan="2"></td>
-                <!--<td height="50"></td>-->
+                <td colspan="2" rowspan="2">SON: 
+                    <?=    
+                        Util::convertirNumeroLetra(number_format((float)($loan_amount), 2, '.', '')," BOLIVIANOS");
+                    ?>
+                </td>
                 <td height="50"></td>
+                <!--<td height="50"></td>-->
             </tr>
             <tr>
                 <!--<td height="100">Garante</td>-->
