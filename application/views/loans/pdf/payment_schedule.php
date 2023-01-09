@@ -60,7 +60,7 @@
                 </tr>
                 <tr>
                     <td>Cliente:</td>
-                    <td><?=$loan->loan_id?>&nbsp;-&nbsp;<?= $customer_name; ?></td>
+                    <td><?=$loan->customer_id?>&nbsp;-&nbsp;<?= $customer_name; ?></td>
                     <td><strong><?= ktranslate2("APPLIED AMOUNT").":";?></strong></td>
                     <td><strong><?= $loan_amount; ?></strong></td>
                 </tr>
