@@ -300,7 +300,8 @@ class Message extends CI_Model {
         $this->db->from('loans l');
         $this->db->join("people as p", 'p.person_id = l.customer_id', "LEFT");
         $this->db->join("customers as c", 'c.person_id = l.customer_id', "LEFT");
-        $this->db->where("l.loan_agent_id", $user_id);
+        //$this->db->where("l.loan_agent_id", $user_id);
+        //$this->db->where("p.role_id", '17'); para administrador
         $this->db->where("l.loan_status", 'pending');
         $this->db->where("l.notify_off", 0);
         $this->db->where("p.person_id >", 0);
