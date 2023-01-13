@@ -634,7 +634,12 @@ class Customers extends Person_controller {
             // Save/Update photo URL
             $this->_update_photo_url($customer_data['person_id']);
             
-            $middle_name = $this->input->post("middle_name");
+            // $myfile = fopen("php_error_logs.txt", "w") or die("Unable to open file!");
+            // $txt = $customer_data['person_id']."\n";
+          
+
+            // $middle_name = $this->input->post("middle_name"); //este campo no esta en el formulario y estaba generando error
+            $middle_name = ' ';
             
             $lead_data = [];
             $lead_data["full_name"] = $person_data["first_name"] . " " . $middle_name . " " . $person_data["last_name"];
@@ -680,6 +685,11 @@ class Customers extends Person_controller {
             $lead_data["business_payroll_date"] = $this->input->post("business_payroll_date");
             $lead_data["business_total_employees"] = $this->input->post("business_total_employees");
             $lead_data["business_agent_record"] = $this->input->post("business_agent_record");            
+
+            // fwrite($myfile, $txt);
+            // $txt = json_encode($lead_data)."\n";
+            // fwrite($myfile, $txt);
+            // fclose($myfile);
 
             $this->leads_model->save_customer($lead_data);
             

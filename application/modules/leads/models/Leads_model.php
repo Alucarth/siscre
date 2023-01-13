@@ -483,10 +483,16 @@ class Leads_model extends CI_Model {
     function save_customer($lead_data)
     {
         $customer_id = $lead_data["customer_id"];
-        
+        // $myfile = fopen("php_error_logs_save.txt", "w") or die("Unable to open file!");
+        // $txt =$customer_id."\n";
         $this->db->where("customer_id", $customer_id);
         $query = $this->db->get("leads");
-        
+        // fwrite($myfile, $txt);
+        // $txt = json_encode($lead_data)."\n";
+        // fwrite($myfile, $txt);
+        // fclose($myfile);
+
+
         if ( $query && $query->num_rows() > 0 )
         {
             $this->db->where("customer_id", $customer_id);
