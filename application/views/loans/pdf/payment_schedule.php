@@ -47,10 +47,10 @@
         <div height="50%">
             <table class="table">
                 <tr>
-                    <td width="30%"></td>
-                    <td width="30%"></td>
-                    <td width="20%"><h4>SUCURSAL:</h4></td>
-                    <td width="20%"><h4>La Paz</h4></td>
+                    <td width="18%"></td>
+                    <td width="40%"></td>
+                    <td width="22%"><h4>SUCURSAL:</h4></td>
+                    <td width="20%"><h4>Puente Vela</h4></td>
                 </tr>
                 <tr>
                     <td>Tipo de operación: </td>
@@ -87,13 +87,14 @@
                     <!--<td>Cuota:</td>
                     <td></td>-->
                 </tr>
+                <!--
                 <tr>
-                    <!--<td><?= $this->lang->line("loans_type").":"; ?></td>
-                    <td><?=$loan->interest_type?></td>-->
+                    <td><?= $this->lang->line("loans_type").":"; ?></td>
+                    <td><?=$loan->interest_type?></td>
                     <td>CI:</td>
                     <td><?= $document_number; ?></td>
                 </tr>
-                <!--<tr>
+                <tr>
                     <td><?= $this->lang->line("loans_payment_date").":"; ?></td>
                     <td><?= $loan->loan_payment_date > 0 ? date($this->config->item('date_format'), $loan->loan_payment_date) : ''; ?></td>
                 </tr>

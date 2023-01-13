@@ -42,11 +42,11 @@ require_once (APPPATH . "modules/payments/controllers/util.php");
 
         <table class="table">
             <tr>
-                <td style="background-color: #BFBDBD" width="25%"><?= $this->lang->line("loans_apply_date").":"; ?></td>
+                <td style="background-color: #BFBDBD" width="20%"><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td width="25%"><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>
                 <!-- <td width="25%"><?= $this->lang->line("common_full_name").":"; ?> </td> -->
-                <td width="20%"></td>
-                <td style="background-color: #BFBDBD" width="20%">Cod. Cliente: </td>
+                <td width="33%"></td>
+                <td style="background-color: #BFBDBD" width="12%">Cod. Cliente: </td>
                 <td style="text-align:right" width="10%"><?= $customer_id; ?></td>
                 <!-- <td width="25%"><?= $customer_name; ?></td> -->
                 <!--<td width="25%"><?= $this->lang->line("common_address_present").":"; ?></td>
@@ -70,7 +70,7 @@ require_once (APPPATH . "modules/payments/controllers/util.php");
                 <td style="background-color: #BFBDBD">Asesor:</td>
                 <td><?=  $employee_user; ?></td>
                 <td width="20%"></td>
-                <td style="background-color: #BFBDBD">Cod Asesor:</td>
+                <td style="background-color: #BFBDBD">Cod. Asesor:</td>
                 <td style="text-align:right"><?=  $employee_id; ?></td>
                 <!--<td><?= $this->lang->line("loans_apply_date").":"; ?></td>
                 <td><?= date($this->config->item('date_format'), $loan->loan_applied_date); ?></td>-->
@@ -99,23 +99,23 @@ require_once (APPPATH . "modules/payments/controllers/util.php");
         </div>
         <table class="custom_table" width="100%">
             <tr style="background-color: #BFBDBD">
-                <td style="border-right-style: none" width="50%" vertical-align="top"><strong>NOMBRE PRESTATARIO</strong></td>
+                <td style="border-right-style: none" width="50%" vertical-align="top"><strong>PRESTATARIO/GARANTE</strong></td>
                 <td style="text-align: center; border-left-style: none" width="20%"><strong>CI</strong></td>
-                <td width="30%"><strong>FIRMA(S) CLIENTE(S)</strong></td>
+                <td width="30%"><strong>FIRMA(S)</strong></td>
             </tr>
             <tr>
-                <td style="border-right-style: none" vertical-align="top"><?= $customer_name; ?></td>
-                <td style="border-left-style: none" height="50"> <?= $document_number; ?></td>
+                <td style="border-right-style: none; border-bottom-style: none" vertical-align="top" height="100"><?= $customer_name; ?></td>
+                <td style="border-left-style: none; border-bottom-style: none"> <?= $document_number; ?></td>
                 <td height="50"></td>
             </tr>
-            <tr style="background-color: #BFBDBD">
+            <!--<tr style="background-color: #BFBDBD">
                 <td style="border-right-style: none" width="50%" vertical-align="top"><strong>NOMBRE GARANTE</strong></td>
                 <td style="text-align: center; border-left-style: none" width="20%"><strong>CI</strong></td>
                 <td width="30%"><strong>FIRMA(S) CLIENTE(S)</strong></td>
-            </tr>
+            </tr>-->
             <tr>
-                <td style="border-right-style: none;" height="100">Garante</td>
-                <td style="border-left-style: none" height="50"></td>
+                <td style="border-right-style: none; border-top-style: none" vertical-align="top" height="100">Garante</td>
+                <td style="border-left-style: none; border-top-style: none"></td>
                 <td height="50"></td>
             </tr>
             <tr>
@@ -129,13 +129,13 @@ require_once (APPPATH . "modules/payments/controllers/util.php");
                         Util::convertirNumeroLetra(number_format((float)($loan_amount), 2, '.', '')," BOLIVIANOS");
                     ?>
                 </td>
-                <td height="50"></td>
+                <td height="100"></td>
                 <!--<td height="50"></td>-->
             </tr>
             <tr>
                 <!--<td height="100">Garante</td>-->
                 <!--<td height="50"></td>-->
-                <td height="50"></td>
+                <td height="100"></td>
             </tr>
         </table>
     </body>
