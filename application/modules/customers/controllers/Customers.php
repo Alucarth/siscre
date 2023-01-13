@@ -654,6 +654,7 @@ class Customers extends Person_controller {
             $lead_data["id_type"] = $this->input->post("id_type");
             $lead_data["id_no"] = $this->input->post("id_no");
             $lead_data["gender"] = $this->input->post("gender");
+            $lead_data["marital_status"] = $this->input->post("marital_status");
             $lead_data["birth_date"] = $this->input->post("date_of_birth");
             $lead_data["street_no"] = $this->input->post("street_no");
             $lead_data["occupation"] = $this->input->post("occupation");

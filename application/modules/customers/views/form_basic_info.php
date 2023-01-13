@@ -116,7 +116,6 @@
                 </select>
             </div>
         </div>
-        <!--
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
                 Estado civil
@@ -130,7 +129,6 @@
                 </select>
             </div>
         </div>
-                    -->
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
                 <?php echo form_label($this->lang->line('common_email') . ':', 'email'); ?>
