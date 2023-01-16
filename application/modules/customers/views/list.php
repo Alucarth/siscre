@@ -40,7 +40,7 @@
                                                 <th style="text-align: center; width: 1%"></th>
                                                 <th style="text-align: center">Código</th>
                                                 <th style="text-align: center">Nombre completo</th>
-                                                <th style="text-align: center">CI</th>
+                                                <th style="text-align: center">Documento</th>
                                                 <th style="text-align: center">Domicilio</th>
                                                 <th style="text-align: center">Email</th>
                                                 <th style="text-align: center">Número de telefóno</th>
@@ -199,7 +199,7 @@
             });
             if ( ids.length == 0 )
             {
-                alertify.alert("Please select row");
+                alertify.alert("Por favor selecione un campo");
                 return false;
             }
             alertify.confirm("¿Está seguro de que desea eliminar los campos seleccionados y sus datos? esto no se puede deshacer", function(){

@@ -303,7 +303,7 @@ class Customers extends Person_controller {
             $data_row["full_name"] = $person->first_name." ".$person->last_name;
             /*$data_row["last_name"] = $person->last_name;
             $data_row["first_name"] = $person->first_name;*/
-            $data_row["id_no"] = $person->person_id;
+            $data_row["id_no"] = $person->id_no;
             $data_row["address_1"] = $person->address_1;
             $data_row["email"] = $person->email;
             $data_row["phone_number"] = $person->phone_number;

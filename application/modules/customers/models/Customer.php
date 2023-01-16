@@ -36,7 +36,7 @@ class Customer extends Person {
             }
         }
         
-        $select = "c.*, p.*, l.bank_name, l.account_number bank_account_num";
+        $select = "c.*, p.*, l.id_no, l.bank_name, l.account_number bank_account_num";
         if ( is_plugin_active('branches') )
         {
             $select .= ", br.*";            
