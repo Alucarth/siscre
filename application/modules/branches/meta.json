@@ -1,0 +1,14 @@
+{
+    "plugin": {	
+        "name":"branches",
+		"description":"Branches plugin enables you to add branches for your store or company.",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-th-list'></i>",
+			"sub_menus":{"New Branch":"view/-1","Branch List":"index"},
+			"label":"Branches"
+		}  
+    }
+}

@@ -1,0 +1,2 @@
+ALTER TABLE `c19_customers`
+	ADD COLUMN `branch_id` INT NULL DEFAULT NULL;
