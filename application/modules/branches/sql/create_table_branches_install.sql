@@ -1,6 +1,8 @@
 CREATE TABLE `c19_branches` (
 	`id` INT(11) NOT NULL AUTO_INCREMENT,
 	`branch_name` VARCHAR(200) NOT NULL COLLATE 'latin1_swedish_ci',
+	`branch_phone` VARCHAR(200) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
+	`branch_address` VARCHAR(200) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
 	`descriptions` VARCHAR(5000) NULL DEFAULT NULL COLLATE 'latin1_swedish_ci',
 	`created_date` DATETIME NULL DEFAULT NULL,
 	`created_by` INT(11) NULL DEFAULT NULL,
