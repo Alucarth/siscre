@@ -22,8 +22,16 @@ class Garante extends CI_Model {
     {
         $this->db->from('garantes');
         $this->db->where('loan_id', $loan_id);
-
+        
         $query = $this->db->get();
+        
+        //en caso de no existir datos en la base de datos devolver null
+        if ($query->num_rows() == 0)
+        {
+            return null;
+        }
+        
+        //var_dump($query);die;
 
         if ($query->num_rows() == 1)
         {

@@ -1080,12 +1080,16 @@ class Loans extends Secure_area implements iData_controller
     function print_disclosure($loan_id)
     {
         ini_set('memory_limit', '1024M');
-        
+        $this->load->model("Garante");
+     
         $loan = $this->Loan->get_info($loan_id);
         $loan_type = $this->Loan_type->get_info($loan->loan_type_id);
         $customer = $this->Customer->get_info($loan->customer_id);
         $leads = (object)  $this->Customer->get_lead($loan->customer_id)[0];
         $employee = $this->Employee->get_logged_in_employee_info();
+        $garante = (object) $this->Garante->get_info($loan->loan_id);
+        
+        
         if ($loan_type->term_period_type === "year")
         {
             $period = $this->_get_period($loan_type->payment_schedule);
@@ -1158,6 +1162,9 @@ class Loans extends Secure_area implements iData_controller
         $data['customer_address'] = ucwords($customer->address_1);
         $data['customer_id'] = ucwords($loan->customer_id);
         $data['document_number'] =   $leads->id_no;
+        $data['prueba_garante'] = $garante;
+        $data['garante_name'] = ucwords($garante->nombre);
+        $data['garante_id'] = $garante->ci;
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->apply_amount - $total_deductions);
         
