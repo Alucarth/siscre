@@ -50,10 +50,10 @@ class Garante extends CI_Model {
       Inserts or updates a payment
      */
 
-    function save(&$garante_data, $loan_id = false)
+    function save(&$garante_data, $garante_id = false)
     {
-        $garante_data["loan_id"] = $loan_id;
-        if (!$loan_id or ! $this->exists($loan_id))
+        $garante_data["garante_id"] = $garante_id;
+        if (!$garante_id or ! $this->exists($garante_id))
         {
             if ($this->db->insert('garantes', $garante_data))
             {
@@ -63,7 +63,7 @@ class Garante extends CI_Model {
             return false;
         }
 
-        $this->db->where('loan_id', $loan_id);
+        $this->db->where('garante_id', $garante_id);
         return $this->db->update('garantes', $garante_data);
     }
     

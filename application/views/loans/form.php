@@ -444,7 +444,7 @@
                                     <div id="tab-garante" class="tab-pane fade in">
                                         <div id="div-garante">
                                             <?=$valores;?>
-                                            <button class="btn btn-primary tbl_garante_dt-custom-button" data-id="" type="button" id="btn-add-garante">Agregar Garante</button>
+                                            <button class="btn btn-primary tbl_garante_dt-custom-button" data-garante_id="0" type="button" id="btn-add-garante">Agregar Garante</button>
                                             <table class="table table-hover table-bordered" id="tbl_garante">
                                                 <thead>
                                                     <tr>
@@ -492,7 +492,7 @@
                                                     if ( data.status == "OK" )
                                                     {
                                                        
-                                                        $("#md-garante input[name='id']").val(data.info.garante_id);
+                                                        $("#md-garante input[name='garante_id']").val(data.info.garante_id);
                                                         $("#md-garante input[name='nombre']").val(data.info.nombre);
                                                         $("#md-garante input[name='ci']").val(data.info.ci);
                                                         $("#md-garante input[name='phone']").val(data.info.phone);
@@ -520,10 +520,11 @@
                                                 }); 
                                                 $(document).on("click", ".btn-delete-garante", function(){
                                                     var id = $(this).attr("data-id");
+                                                    console.log(id);
                                                     alertify.confirm("<?=ktranslate2("Are you sure you wish to delete this data?")?>", function(){
-                                                        var url = '<?=site_url('loans/ajax')?>';
+                                                        var url = '<?=site_url('loans/ajax')?>'; // funcion para eliminar el garante
                                                         var params = {
-                                                            ajax_type:13,
+                                                            ajax_type:13, 
                                                             id:id,
                                                             softtoken:$("input[name='softtoken']").val()
                                                         };
@@ -682,8 +683,8 @@
             </div>
             <div class="modal-body">
                 <?php echo form_open_multipart(site_url('loans/save_garante'), ["id"=>"frmGarante"]); ?>
-                    <input type="hidden" name="loan_id" value="<?=$loan_info->loan_id;?>" />
-                   
+                    <input type="text" name="loan_id" value="<?=$loan_info->loan_id;?>" />
+                    <input type="text" name="garante_id" value="" />
                     <div class="form-group">
                         <label>Nombre</label>
                         <input type="text" class="form-control" id="nombre" name="nombre" />

@@ -1617,6 +1617,8 @@ class Loans extends Secure_area implements iData_controller
             case 15: // Get documents table
                 $this->_handle_load_garante_info();
                 break;
+            case 13:
+                    $this->_delete_garante();
             case 8:
                 $this->_handle_add_documents();
                 break;
@@ -1628,8 +1630,7 @@ class Loans extends Secure_area implements iData_controller
                 $this->_handle_save_collateral_info();
             case 12:
                 $this->_handle_load_collateral_info();
-            case 13:
-                $this->_handle_delete_collateral_info();
+           
             case 14:
                 $this->_handle_load_collateral_doc_list();
         }
@@ -1643,13 +1644,22 @@ class Loans extends Secure_area implements iData_controller
         $this->load->view("loans/tabs/collateral/documents/list", $data);
     }
     
-    private function _handle_delete_collateral_info()
+    private function _delete_garante()
     {
+        //TODO:se encuentra funcional sin embargo hay que revisar la implementacion del datatable
         $id = $this->input->post("id");
-        
-        $this->db->where("guarantee_id", $id)->delete("guarantee");
-        
+        // $myfile = fopen("garante.txt", "w") or die("Unable to open file!"); 
+     
+        $this->db->from('garantes');
+        $this->db->where('garante_id', $id)->delete();
+                
         $return["status"] = "OK";
+        // $txt = "id: ".$id." status:".json_encode($return);
+        // fwrite($myfile, $txt);
+        fclose($myfile);
+
+      
+        
         send($return);
     }
     
@@ -2404,6 +2414,7 @@ class Loans extends Secure_area implements iData_controller
     {
         $this->load->model("Garante");
         $loan_id = $this->input->post("loan_id");
+        $garante_id = $this->input->post("garante_id");
                
         $garante_data = [];
         $garante_data["nombre"] = $this->input->post('nombre');
@@ -2415,10 +2426,14 @@ class Loans extends Secure_area implements iData_controller
         $garante_data["direccion_trabajo"] = $this->input->post('direccion_trabajo');
         $garante_data["email"] = $this->input->post('email');
         
-        $garante_id = $this->Garante->save( $garante_data ,$loan_id);
+        // $this->db->insert('guarantee', $data);
+        $garante_id = $this->Garante->save( $garante_data ,$garante_id);
+        // $garante_id = $this->Garante->save( $garante_data);
 
         $return["status"] = "OK";
         $return["garante_id"] = $garante_id;
+        
+        
         
         send($return);
     }
