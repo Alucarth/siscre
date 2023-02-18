@@ -114,8 +114,8 @@ require_once (APPPATH . "modules/payments/controllers/util.php");
                 <td width="30%"><strong>FIRMA(S) CLIENTE(S)</strong></td>
             </tr>-->
             <tr>
-                <td style="border-right-style: none; border-top-style: none" vertical-align="top" height="100">Garante</td>
-                <td style="border-left-style: none; border-top-style: none"></td>
+                <td style="border-right-style: none; border-top-style: none" vertical-align="top" height="100"><?= $garante_name; ?></td>
+                <td style="border-left-style: none; border-top-style: none"> <?= $garante_id; ?></td>
                 <td height="50"></td>
             </tr>
             <tr>
