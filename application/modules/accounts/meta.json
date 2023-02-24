@@ -1,0 +1,14 @@
+{
+    "plugin": {	
+        "name":"accounts",
+		"description":"Accounts plugin allows your user to make deposit, withdraw to a pre-defined accounts on your Loan System.",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-list-alt'></i>",
+			"sub_menus":{"New Account":"view/-1","Account List":"index", "Deposit":"deposit", "Withdraw":"withdraw", "My Transactions":"transactions"},
+			"label":"Accounts"
+		}  
+    }
+}
