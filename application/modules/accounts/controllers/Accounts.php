@@ -522,13 +522,13 @@ class Accounts extends Secure_area implements iData_controller
         
         if ( !is_numeric($amount) || trim($amount) == '' ) 
         {
-            $return["message"] = "Amount must be valid numeric value";
+            $return["message"] = "La cantidad debe ser un valor numérico válido";
             send($return);
         }
         
         if ( $this->has_current_loans( $client_id ) && $trans_type == 'withdraw' )
         {
-            $return["message"] = "Sorry the selected client is not allowed to withdraw until he fully paid the loan";
+            $return["message"] = "Lo sentimos, el cliente seleccionado no puede retirar dinero hasta que haya pagado el préstamo en su totalidad.";
             send($return);
         }
         
@@ -586,11 +586,11 @@ class Accounts extends Secure_area implements iData_controller
     private function get_account_types()
     {
         $tmp = [
-            "asset" => "Asset",
-            "equity" => "Equity",
-            "expenses" => "Expenses",
-            "income" => "Revenue",
-            "liability" => "Liability",
+            "asset" => "Activo",
+            "equity" => "Equidad",
+            "expenses" => "Gastos",
+            "income" => "Ingresos",
+            "liability" => "Responsabilidad",
         ];
         
         return $tmp;
@@ -604,7 +604,7 @@ class Accounts extends Secure_area implements iData_controller
         
         if ( trim($account_name) == '' ) 
         {
-            $return["message"] = "Account name is a required field";
+            $return["message"] = "El nombre de la cuenta es un campo requerido";
             send($return);
         }
             

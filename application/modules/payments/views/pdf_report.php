@@ -42,7 +42,8 @@
     <body>
         <table width="100%">
             <tr>
-                <td width="75%" rowspan="4"><img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px"/></td>
+                <td width="75%" rowspan="4"></td>
+                <!--<td width="75%" rowspan="4"><img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px"/></td>-->
                 <!--<td align="right">Transacción No. <?= $count; ?> </td>-->
                 <td></td>
                 <td></td>
