@@ -358,7 +358,7 @@ class Accounts extends Secure_area implements iData_controller
         $datatable->add_column('trans_date', false);
         $datatable->add_column('added_by_name', false);
         $datatable->add_column('created_by_name', false);
-        
+        $datatable->add_column('actions', false);
         $datatable->add_table_definition(["orderable" => false, "targets" => 0]);
         $datatable->order = [[5, 'desc']];
 
@@ -405,10 +405,11 @@ class Accounts extends Secure_area implements iData_controller
                 $data_row["account_name"] = ucwords($row->account_name);
                 $data_row["amount"] = to_currency($row->amount);
                 $data_row["description"] = truncate_html($row->description, 250);
-                $data_row["trans_type"] = $row->trans_type;
+                $data_row["trans_type"] = $row->trans_type == "deposit"? 'deposito': 'retiro';
                 $data_row["trans_date"] = date($this->config->item('date_format'), strtotime($row->trans_date));
                 $data_row["added_by_name"] = $row->added_by_name;
                 $data_row["created_by_name"] = $row->created_by_name;
+                $data_row["actions"] = '<a href="'.site_url('accounts/receipt/' . $row->id. '/'.$row->trans_type).'" target="_blank" >ver detalle</a>'; //se adiciono boton manualmente reenderiza html por lo del datatable
 
                 $tmp[] = $data_row;
             }
