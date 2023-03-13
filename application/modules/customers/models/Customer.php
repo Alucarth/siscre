@@ -98,10 +98,10 @@ class Customer extends Person {
             $this->db->where($or_where);
         }
         
-        if (is_plugin_active("branches"))
-        {
-            $this->db->where("branch_id", $this->session->userdata('branch_id'));        
-        }
+        // if (is_plugin_active("branches"))
+        // {
+        //     $this->db->where("branch_id", $this->session->userdata('branch_id'));        
+        // }
 
         if (isset($order['index']) && count($order) > 0 && $order['index'] < count($sorter))
         {

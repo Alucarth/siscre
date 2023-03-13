@@ -131,3 +131,5 @@ $lang["_payments"] = "Payments";
 $lang["_employees"] = "Employees";
 $lang["_plugins"] = "Plugins";
 $lang["_config"] = "Config";
+$lang["_accounts"] = "Accounts";
+$lang["_branches"] = "Branches";
