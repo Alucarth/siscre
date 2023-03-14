@@ -461,10 +461,10 @@ class Customer extends Person {
 		CONCAT(`first_name`,' ',`last_name`) LIKE '%" . $this->db->escape_like_str($search) . "%') and deleted=0
                     " . $add_where . "
                     ");
-        if (is_plugin_active("branches"))
-        {
-            $this->db->where("branch_id", $this->session->userdata('branch_id'));        
-        }
+        // if (is_plugin_active("branches"))
+        // {
+        //     $this->db->where("branch_id", $this->session->userdata('branch_id'));        
+        // }
         
         $this->db->order_by("last_name", "asc");
         $by_name = $this->db->get();
@@ -478,10 +478,10 @@ class Customer extends Person {
         $this->db->join('people', 'customers.person_id=people.person_id');
         $this->db->where('deleted', 0);
         
-        if (is_plugin_active("branches"))
-        {
-            $this->db->where("branch_id", $this->session->userdata('branch_id'));        
-        }
+        // if (is_plugin_active("branches"))
+        // {
+        //     $this->db->where("branch_id", $this->session->userdata('branch_id'));        
+        // }
         
         $this->db->like("account_number", $search);
         $this->db->order_by("account_number", "asc");
