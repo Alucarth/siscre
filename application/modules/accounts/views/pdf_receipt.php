@@ -17,56 +17,172 @@
         </style>
     </head>
     <body>
-
+        <table width="100%">
+            <tr>
+                <td width="50%">
         <div>
-
-            <table width="100%">
+            <table width="90%", style= "border: 1px solid #ccc; background-color: #d5d8dc; margin:auto">
                 <tr>
-                    <td align="center">
-                        <img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:99px" /><br/>
-                        <?= ucwords($this->config->item('company')); ?><br/>
-                        <?= ucwords($this->config->item('address')); ?><br/>
-                        <?= $this->config->item('phone') . " " . $this->config->item('rnc'); ?><br/>
-                    </td>
-                </tr>
-            </table>
-
-            <table class="table">
-                <tr>
-                    <td colspan="2"><hr/></td>
-                </tr>
-                <tr>
-                    <td>Nombre del cliente:</td>
-                    <td style="text-align:right;"><?php echo ucwords($customer); ?></td>
-                </tr>
-                <tr>
-                    <td>
-                        <?=($trans_type == 'deposit' ? 'Monto depósito' : 'Monto retiro')?> :
+                    <td style="text-align: left; padding: 20px;">
+                        <h4><b><?= ucwords($this->config->item('company')); ?></b></h4>
                     </td>
                     <td style="text-align: right">
+                        <img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px" /><br/>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <p></p>
+        <div>
+            <table width="90%", style= "border: 1px solid #ccc; margin:auto">
+                <tr>
+                    <td colspan="4", style="padding-left: 10px; padding-right: 10px; padding-top: 10px; text-align: center">
+                        <h4>
+                            <b><?=($trans_type == 'deposit' ? '*** Depósito en cuenta ***' : '*** Retiro de cuenta ***')?></b>
+                        </h4>
+                    </td>
+                </tr>
+                <hr/>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Fecha:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?= date($this->config->item("date_format")) . " " . date("h:i:s"); ?><br/></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Transaccion:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ($transaction_id); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Cuenta:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ($account_id); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Cliente:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($customer); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <!--
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Por cuenta de:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($customer); ?></td>
+                    <td width="2%"></td>
+                </tr>
+        -->
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;">
+                        <b><?=($trans_type == 'deposit' ? 'Monto depósito' : 'Monto retiro')?></b> :
+                    </td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;">
                         <?=to_currency($amount);?>
                     </td>
+                    <td width="2%"></td>
                 </tr>
                 <tr>
-                    <td colspan="2"><hr/></td>
-                </tr>
-            </table>
-
-            <br/>
-            <br/>
-            <br/>
-
-            <table width="100%">
-                <tr>
-                    <td align="center">
-                        <h3>¡Gracias!</h3>
+                    <td height="150p", colspan="4", style="color: #ccd1d1; padding-left: 10px; padding-right: 10px; padding-top: 10px; text-align: center">
+                        <h1><b>Sello autorizado</b></h1>
                     </td>
                 </tr>
             </table>
-
-
+            <table width="90%", style= "border: 1px solid #ccc; background-color: #d5d8dc; margin:auto">
+                <tr>
+                    <td style="color: #7f8c8d; text-align: center; padding: 20px;">
+                        <h5><b>ORIGINAL</b></h5>
+                    </td>
+                </tr>
+            </table>
         </div>
-
+        </td>
+        <!--<hr border-top="3px dashed #bbb">-->
+        <td width="50%">
+        <div>
+            <table width="90%", style= "border: 1px solid #ccc; background-color: #d5d8dc; margin:auto">
+                <tr>
+                    <td style="text-align: left; padding: 20px;">
+                        <h4><b><?= ucwords($this->config->item('company')); ?></b></h4>
+                    </td>
+                    <td style="text-align: right">
+                        <img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px" /><br/>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <p></p>
+        <div>
+            <table width="90%", style= "border: 1px solid #ccc; margin:auto">
+                <tr>
+                    <td colspan="4", style="padding-left: 10px; padding-right: 10px; padding-top: 10px; text-align: center">
+                        <h4>
+                            <b><?=($trans_type == 'deposit' ? '*** Depósito en cuenta ***' : '*** Retiro de cuenta ***')?></b>
+                        </h4>
+                    </td>
+                </tr>
+                <hr/>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Fecha:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?= date($this->config->item("date_format")) . " " . date("h:i:s"); ?><br/></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Transaccion:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ($transaction_id); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Cuenta:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ($account_id); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Cliente:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($customer); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <!--
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Por cuenta de:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($customer); ?></td>
+                    <td width="2%"></td>
+                </tr>
+        -->
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;">
+                        <b><?=($trans_type == 'deposit' ? 'Monto depósito' : 'Monto retiro')?></b> :
+                    </td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;">
+                        <?=to_currency($amount);?>
+                    </td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td height="150p", colspan="4", style="color: #ccd1d1; padding-left: 10px; padding-right: 10px; padding-top: 10px; text-align: center">
+                        <h1><b>Sello autorizado</b></h1>
+                    </td>
+                </tr>
+            </table>
+            <table width="90%", style= "border: 1px solid #ccc; background-color: #d5d8dc; margin:auto">
+                <tr>
+                    <td style="color: #7f8c8d; text-align: center; padding: 20px;">
+                        <h5><b>COPIA CLIENTE</b></h5>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        </td>
+        </tr>
+        </table>
     </body>
-
 </html>
