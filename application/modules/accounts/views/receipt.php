@@ -83,6 +83,9 @@
                 customer: '<?=$customer;?>',
                 trans_type: '<?=$trans_type;?>',
                 amount: '<?=$amount;?>',
+                trans_id: '<?=$trans_id;?>',
+                account_id: '<?=$account_id;?>',
+                trans_date: '<?=$trans_date;?>'
             };
             blockElement("#btn-print-receipt");
             $.post(url, params, function(data){
@@ -96,4 +99,4 @@
     });
 </script>
 
-<?php $this->load->view("partial/footer"); ?>
+<!--<?php $this->load->view("partial/footer"); ?>-->

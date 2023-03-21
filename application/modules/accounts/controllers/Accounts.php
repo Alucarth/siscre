@@ -446,11 +446,17 @@ class Accounts extends Secure_area implements iData_controller
         $transaction = $this->account_model->get_transaction_info($transaction_id, $trans_type);
         $user_info = $this->Employee->get_info($transaction->added_by);
         $amount = $transaction->amount;
+        $trans_id = $transaction->id;
+        $account_id = $transaction->account_id;
+        $trans_date = $transaction->trans_date;
         
         $data["customer"] = $transaction->customer_name;
         $data["user_info"] = $user_info;
         $data["amount"] = $amount;
         $data["trans_type"] = $trans_type;
+        $data["trans_id"] = $trans_id;
+        $data["account_id"] = $account_id;
+        $data["trans_date"] = $trans_date;
         $this->load->view("accounts/receipt", $data);
     }
     
@@ -489,6 +495,8 @@ class Accounts extends Secure_area implements iData_controller
         $data["user_info"] = $user_info;
         $data["deposit_info"] = $deposit_info;
         $data["accounts"] = $accounts;
+        $data["trans_id"] = $trans_id;
+        $data["account_id"] = $account_id;
         //$data["clients"] = $clients;
         
         $this->load->view("accounts/deposit", $data);
@@ -509,6 +517,8 @@ class Accounts extends Secure_area implements iData_controller
         $data["user_info"] = $user_info;
         $data["withdraw_info"] = $withdraw_info;
         $data["accounts"] = $accounts;
+        $data["trans_id"] = $trans_id;
+        $data["account_id"] = $account_id;
         
         $this->load->view("accounts/withdraw", $data);
     }
@@ -653,6 +663,8 @@ class Accounts extends Secure_area implements iData_controller
         $data["customer"] = $this->input->post("customer");
         $data["trans_type"] = $this->input->post("trans_type");
         $data["amount"] = $this->input->post("amount");
+        $data["trans_id"] = $this->input->post("trans_id");
+        $data["account_id"] = $this->input->post("account_id");
         
         $html = $this->load->view('accounts/pdf_receipt', $data, true);
         
