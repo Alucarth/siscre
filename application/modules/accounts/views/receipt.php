@@ -50,6 +50,21 @@
                                 </table>
 
                             </div>
+                            <div>
+                                <table class="table">
+                                    <tr>
+                                        <td>Sucursal:</td>
+                                        <td style="text-align:right;"><?php echo ucwords($branch->branch_name); ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            Cajero :
+                                        </td>
+                                        <td style="text-align:right;"><?php echo ucwords($person->first_name." ".$person->last_name); ?></td>
+                                    </tr>
+                                </table>
+
+                            </div>
                             <hr/>
                             <div style="text-align: center">
                                 ¡GRACIAS!
@@ -85,7 +100,10 @@
                 amount: '<?=$amount;?>',
                 trans_id: '<?=$trans_id;?>',
                 account_id: '<?=$account_id;?>',
-                trans_date: '<?=$trans_date;?>'
+                trans_date: '<?=$trans_date;?>',
+                branch_name: '<?=$branch->branch_name;?>',
+                person_name: '<?=$person->first_name." ".$person->last_name;?>'
+                
             };
             blockElement("#btn-print-receipt");
             $.post(url, params, function(data){

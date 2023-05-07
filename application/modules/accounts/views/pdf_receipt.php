@@ -45,6 +45,18 @@
                 <hr/>
                 <tr>
                     <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Sucursal:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($branch_name); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Cajero:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($person_name); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
                     <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Fecha:</b></td>
                     <!--<td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ($trans_date); ?><br/></td>-->
                     <td style="border-bottom: 1px solid #ccc;text-align:right;"><?= date($this->config->item("date_format")); ?><br/></td>
@@ -68,6 +80,7 @@
                     <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($customer); ?></td>
                     <td width="2%"></td>
                 </tr>
+              
                 <!--
                 <tr>
                     <td width="2%"></td>
@@ -126,6 +139,18 @@
                     </td>
                 </tr>
                 <hr/>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Sucursal:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($branch_name); ?></td>
+                    <td width="2%"></td>
+                </tr>
+                <tr>
+                    <td width="2%"></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Cajero:</b></td>
+                    <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo ucwords($person_name); ?></td>
+                    <td width="2%"></td>
+                </tr>
                 <tr>
                     <td width="2%"></td>
                     <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Fecha:</b></td>

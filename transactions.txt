@@ -1,0 +1,1 @@
+{"account_name":"nadi","customer_name":"Nadia chiquimia","id":"17","added_by":"141","modified_by":"1","account_id":"2","amount":"3.00","description":"xasdasdas","trans_type":"deposit","trans_date":"2023-05-07 11:38:49","date_modified":"0000-00-00 00:00:00","branch_id":"1","person_id":"1"}

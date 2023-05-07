@@ -391,6 +391,72 @@ class Account_model extends CI_Model
         
         return [];
     }
+    public function get_branch($id)
+    {
+        $this->db->where("id", $id);
+        $query = $this->db->get("branches");
+        
+        if ( $query && $query->num_rows() > 0 )
+        {
+            $branch_info = $query->row();
+        }
+        else
+        {
+            $branch_info = new stdClass();
+            $fields = $this->db->list_fields('branches');
+
+            foreach ($fields as $field)
+            {
+                $branch_info->$field = "";
+            }
+        }   
+        
+        if (is_plugin_active('activity_log'))
+        {
+            if ( $id > 0 )
+            {
+                $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
+                track_action($user_id, "Branches", "Viewed loan product details #" . $id);
+            }
+        }
+        
+        return $branch_info;
+    }
+
+    function get_person($person_id)
+    {
+
+        $query = $this->db->get_where('people', array('person_id' => $person_id), 1);
+
+
+
+        if ($query->num_rows() == 1)
+        {
+
+            return $query->row();
+        }
+        else
+        {
+
+            //create object with empty properties.
+
+            $fields = $this->db->list_fields('people');
+
+            $person_obj = new stdClass;
+
+
+
+            foreach ($fields as $field)
+            {
+
+                $person_obj->$field = '';
+            }
+
+
+
+            return $person_obj;
+        }
+    }
     
     function get_customer_search_suggestions($search, $limit = 25)
     {

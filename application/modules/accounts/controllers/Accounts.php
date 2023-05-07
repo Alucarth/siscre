@@ -449,6 +449,14 @@ class Accounts extends Secure_area implements iData_controller
         $trans_id = $transaction->id;
         $account_id = $transaction->account_id;
         $trans_date = $transaction->trans_date;
+
+        $branch = $this->account_model->get_branch($transaction->branch_id);
+        $person = $this->account_model->get_person($transaction->person_id);
+        // $person = $this->Person->get_info($transaction->person_id);
+        // $myfile = fopen("transactions.txt", "w") or die("Unable to open file!");
+        // $txt = json_encode($transaction);
+        // fwrite($myfile, $txt);
+        // fclose($myfile);
         
         $data["customer"] = $transaction->customer_name;
         $data["user_info"] = $user_info;
@@ -457,6 +465,8 @@ class Accounts extends Secure_area implements iData_controller
         $data["trans_id"] = $trans_id;
         $data["account_id"] = $account_id;
         $data["trans_date"] = $trans_date;
+        $data["branch"] = $branch;
+        $data["person"] = $person;
         $this->load->view("accounts/receipt", $data);
     }
     
@@ -530,6 +540,8 @@ class Accounts extends Secure_area implements iData_controller
         $description = $this->input->post("description");
         $trans_type = $this->input->post("trans_type");
         $client_id = $this->input->post("client_id");
+      
+        //$this->session->userdata();
         
         if ( !is_numeric($amount) || trim($amount) == '' ) 
         {
@@ -547,6 +559,8 @@ class Accounts extends Secure_area implements iData_controller
         $data["amount"] = $amount;
         $data["description"] = $description;
         $data["trans_type"] = $trans_type;
+        $data["branch_id"] = $this->session->userdata()['branch_id'];
+        $data["person_id"] = $this->session->userdata()['person_id'];
         
         if ( $id < 0 )
         {
@@ -665,6 +679,8 @@ class Accounts extends Secure_area implements iData_controller
         $data["amount"] = $this->input->post("amount");
         $data["trans_id"] = $this->input->post("trans_id");
         $data["account_id"] = $this->input->post("account_id");
+        $data["branch_name"] = $this->input->post("branch_name");
+        $data["person_name"] = $this->input->post("person_name");
         
         $html = $this->load->view('accounts/pdf_receipt', $data, true);
         

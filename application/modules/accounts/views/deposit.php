@@ -59,7 +59,6 @@
 
                 <div class="card-block">
 
-
                     <div class="inqbox float-e-margins">            
                         <div class="inqbox-content">
                             <div>
