@@ -3739,7 +3739,7 @@ class Loan extends CI_Model {
 
         $data_scheds = [];
         $interest_rate = ($interest_rate / 100);
-		$operating_expenses = ($operating_expenses / 100);
+		//$operating_expenses = ($operating_expenses / 100);
         $balance_owed = $apply_amount;
                 
         $i = 0;
@@ -3750,7 +3750,8 @@ class Loan extends CI_Model {
             $deno = 1 - 1 / pow((1 + $interest_rate), $pay_term);
             $deno = $deno > 0 ? $deno : 1;
 
-            $operating_expenses_amount = $apply_amount * $operating_expenses;
+            //$operating_expenses_amount = $apply_amount * $operating_expenses;
+            $operating_expenses_amount = $operating_expenses;
             $term_pay = ($apply_amount * $interest_rate) / $deno;
 			$payment_amount = $term_pay + $operating_expenses_amount;
             $interest = $apply_amount * $interest_rate;
@@ -3874,7 +3875,8 @@ class Loan extends CI_Model {
 
         $loan_amount = $apply_amount;
         $interest_amount = ($loan_amount * ($interest_rate/100));
-        $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
+        //$operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
+        $operating_expenses_amount = $operating_expenses;
         $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
         $payment_amount_fees = $payment_amount + $operating_expenses_amount;
         $data_scheds = [];
@@ -3937,7 +3939,7 @@ class Loan extends CI_Model {
             $data_scheds[] = $tmp;
             $loan_amount = $balance_owed;
             $interest_amount = ($loan_amount * ($interest_rate/100));
-            $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
+            //$operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
             $payment_amount_fees = $payment_amount + $operating_expenses_amount;
             //$principal_amount = $payment_amount_fees - $interest_amount - $adicional_fees_amount;
             $no_of_days++;
@@ -3993,9 +3995,10 @@ class Loan extends CI_Model {
 
         $data_scheds = [];
         $interest_rate = ($interest_rate / 100);
-		$operating_expenses = ($operating_expenses / 100);
+		//$operating_expenses = ($operating_expenses / 100);
         $balance_owed = $apply_amount;
-        $operating_expenses_amount = $apply_amount * $operating_expenses;        
+        //$operating_expenses_amount = $apply_amount * $operating_expenses;        
+        $operating_expenses_amount = $operating_expenses;
 
         $i = 0;
         $y = 1;

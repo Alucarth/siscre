@@ -175,7 +175,7 @@
                         <!--<td align="center"><strong><?= ktranslate2("Grace Period");?></strong></td>-->
                         <td width="16%" align="center"><strong><?= ktranslate2("Principal<br/> Amount");?></strong></td>
                         <td width="16%" align="center"><strong><?= ktranslate2("Interest");?> (<?=$this->config->item("currency_symbol");?>)</strong></td>
-                        <td width="16%" align="center"><strong><?= ktranslate2("Gastos Operativos");?></strong></td>
+                        <td width="16%" align="center"><strong><?= ktranslate2("Ahorro");?></strong></td>
                         <td width="16%" align="center"><strong><?= ktranslate2("Amount to Pay");?></strong></td>
                         <!--<td align="center"><strong><?= ktranslate2("Penalty");?></strong></td>-->
                         <td width="17%" align="center"><strong><?= ktranslate2("Balance");?></strong></td>

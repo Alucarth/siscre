@@ -172,13 +172,13 @@
 <!--<//?php if ( $loan_info->interest_type == 'pago_excel' ): ?>-->
 <div class="form-group row">
     <label class="col-lg-2 control-label text-xs-right">
-        G.O.G.C.: <br> <h6>Reposicion de Gastos Operativos y Gestiones Cobranza</h6>
+        Ahorro:
     </label>
     <div class="col-lg-2">
         <div class="input-group">
             
             <input type="text" name="operating_expenses" id="operating_expenses" class="form-control" value="<?= $operative_expenses > 0 ? $operative_expenses : 0?>" />
-            <span class="input-group-addon input-group-append"><span class="input-group-text">%</span></span>
+            <span class="input-group-addon input-group-append"><span class="input-group-text">Bs.</span></span>
         </div>
     </div>
 </div>

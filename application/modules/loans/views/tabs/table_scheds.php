@@ -6,7 +6,7 @@
             <th style="text-align: center">Monto a pagar</th>
             <th style="text-align: center">Capital</th>
             <th style="text-align: center">Interés (<?=$this->config->item("currency_symbol");?>)</th>
-            <th style="text-align: center">Gastos operativos</th>
+            <th style="text-align: center">Ahorro</th>
             <th style="text-align: center">Penalidad</th>
             <!--<th style="text-align: center">Capital + Cuota</th>-->
             <th style="text-align: center">Balance</th>

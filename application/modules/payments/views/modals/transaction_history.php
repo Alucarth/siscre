@@ -7,7 +7,7 @@
             <th style="text-align: center">Penalidad</th>
             <th style="text-align: center">Capital</th>
             <th style="text-align: center">Interés (<?=$this->config->item("currency_symbol");?>)</th>
-            <th style="text-align: center">Gastos operativos</th>
+            <th style="text-align: center">Ahorro</th>
             <th style="text-align: center">Balance</th>
             <th style="text-align: center">Estado</th>
         </tr>

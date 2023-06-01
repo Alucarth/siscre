@@ -123,7 +123,7 @@
                     <td align="left"></td>
                 </tr>
                 <tr>
-                    <td align="left">Gastos operativos:</td>
+                    <td align="left">Ahorro:</td>
                     <td align="left"></td>
                     <td align="left"><?= $operating_expenses_amount; ?></td>
                     <td align="left"></td>
