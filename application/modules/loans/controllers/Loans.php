@@ -398,7 +398,8 @@ class Loans extends Secure_area implements iData_controller
         {
             $rows = json_decode($loan_info_exp->periodic_loan_table);
             $row = $rows[0];
-            $operative_expenses = ($row-> operating_expenses_amount / $loan_info_exp->apply_amount )*100;
+            //$operative_expenses = ($row-> operating_expenses_amount / $loan_info_exp->apply_amount )*100;
+            $operative_expenses = ($row-> operating_expenses_amount);
         }
         $data["operative_expenses"]=$operative_expenses;
         
