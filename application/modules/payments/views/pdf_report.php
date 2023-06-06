@@ -90,8 +90,8 @@
                     <td align="left">Bolivianos</td>
                 </tr>
                 <tr>
-                    <td align="left"></td>
-                    <td align="left"></td>
+                    <td align="left"> <strong>Nro de Crédito:</strong> </td>
+                    <td align="left"><?= $loan_id; ?></td>
                     <td align="left"><strong>Nro. Cuota:</strong></td>
                     <td align="left"><?= $number; ?> de <?= $size; ?></td>
                 </tr>

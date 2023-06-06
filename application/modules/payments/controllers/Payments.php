@@ -217,6 +217,7 @@ class Payments extends Secure_area implements iData_controller {
         $data['account'] = $loan->account;
         //$data['loan'] = to_currency($loan->loan_amount);
         $data['loan'] = to_currency($loan->apply_amount);
+        $data['loan_id'] = $payment->loan_id;
         //campos añadidos gabo
         $data['loan_agent'] = $loan_agent->first_name . " " . $loan_agent->last_name;
         $data['loan_approved_date'] = date($this->config->item('date_format'), $loan->loan_approved_date);
