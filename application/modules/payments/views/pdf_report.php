@@ -40,7 +40,7 @@
         </style>
     </head>
     <body>
-        <table width="100%">
+        <table width="73%">
             <tr>
                 <td width="75%" rowspan="4"></td>
                 <!--<td width="75%" rowspan="4"><img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px"/></td>-->
@@ -50,31 +50,32 @@
             </tr>
             <tr>
                 <!--<td>Nro. Cuota <?= $number; ?> de <?= $size; ?></td>-->
-                <td>Fecha: <?= $trans_date; ?> </td>    
+                <td width="25%"><small>Fecha: <?= $trans_date; ?></small></td>    
             </tr>
             <tr>
-                <td>Hora: <?= $time_date; ?> </td>    
+                <td><small>Hora: <?= $time_date; ?></small></td>    
             </tr>
             <tr>
-                <td>Usuario: <?= $teller; ?> </td>
+                <td><small>Usuario: <?= $teller; ?></small></td>
             </tr>
             <tr>
-                <td colspan="2"><hr></td>
+                <td colspan="2"><br></td>
             </tr>
         </table>
-        <table width="100%">
+        <table width="73%">
             <tr>
-                <td align="center">
-                    <H4><b>LIQUIDACIÓN DE AMORTIZACIÓN DE CREDITO</b></H4>  
+                <td align="center" style="line-height: 0.5">
+                    <H6><b>LIQUIDACIÓN DE AMORTIZACIÓN DE CREDITO</b></H6>  
                 </td>
             </tr>
         </table>
-        <table width="100%" align="center">
+        <br>
+        <table width="73%" style="font-size: 12px;">
             <tbody>
                 <tr>
-                    <td width="25%" align="left"><strong>Transacción No.:</strong></td>
-                    <td width="25%" align="left"><?= $count; ?></td>
-                    <td width="25%" align="left"><strong>Cliente:</strong></td>
+                    <td width="35%" align="left"><strong>Transacción No.:</strong></td>
+                    <td width="20%" align="left"><?= $count; ?></td>
+                    <td width="20%" align="left"><strong>Cliente:</strong></td>
                     <td width="25%" align="left"><?= $client; ?></td>
                 </tr>
                 <tr>
@@ -99,33 +100,33 @@
                     <td colspan="4"><hr></td>
                 </tr>
                 <tr>
-                    <td align="left"><strong>Concepto de liquidación.</strong></td>
-                    <td align="left"></td>
-                    <td align="left">Monto:</td>
-                    <td align="left"></td>
+                    <th align="left">Concepto de liquidación.</th>
+                    <th align="left"></th>
+                    <th align="left">Monto:</th>
+                    <th align="left"></th>
                 </tr>
                 <tr>
                     <td align="left">Capital:</td>
                     <td align="left"></td>
-                    <td align="left"><?= $capital; ?></td>
+                    <td align="left">&nbsp;<?= $capital; ?></td>
                     <td align="left"></td>
                 </tr>
                 <tr>
                     <td align="left">Interes:</td>
                     <td align="left"></td>
-                    <td align="left"><?= $interest; ?></td>
+                    <td align="left">&nbsp;<?= $interest; ?></td>
                     <td align="left"></td>
                 </tr>
                 <tr>
                     <td align="left">Sanción por pago tardío:</td>
                     <td align="left"></td>
-                    <td align="left"><?= $lpp; ?></td>
+                    <td align="left">&nbsp;<?= $lpp; ?></td>
                     <td align="left"></td>
                 </tr>
                 <tr>
                     <td align="left">Ahorro:</td>
                     <td align="left"></td>
-                    <td align="left"><?= $operating_expenses_amount; ?></td>
+                    <td align="left">&nbsp;<?= $operating_expenses_amount; ?></td>
                     <td align="left"></td>
                 </tr>
                 <tr>
@@ -149,14 +150,14 @@
                     <td colspan="2"><hr></td>
                 </tr>-->
                 <tr>
-                    <td colspan="4"><hr></td>
+                    <td colspan="4"></td>
                 </tr>
             </tbody>
         </table>
-        <table width="100%">
+        <table width="73%" style="font-size: 12px;">
             <tr>
                 <td>&nbsp;</td>
-                <td align="right" width="75%" rowspan="5">
+                <td align="right" width="65%" rowspan="5">
                 <?php
             	    //Declaramos una carpeta temporal para guardar la imágenes generadas
 	                $dir = 'temp/';
@@ -170,7 +171,7 @@
 
                     //Parámetros de Configuración
 	
-	                $tamaño = 3; //Tamaño de Pixel
+	                $tamaño = 2; //Tamaño de Pixel
 	                $level = 'M'; //Precisión L = Baja, M = Mediana, Q = Alta, H= Máxima
 	                $framSize = 1; //Tamaño en blanco
 	                $contenido = " ID Tran: " . $count . "\n Cliente: " . $account . "\n Cuota: " . $number . " de " . $size . "\n Total: " . $total; //Texto
@@ -184,9 +185,6 @@
                 </td>
             </tr>
             <tr>
-                <td align="left">&nbsp;</td>
-            </tr>
-            <tr>
                 <td align="left">Firma cliente: ....................&nbsp;</td>
             </tr>
             <tr>
@@ -195,8 +193,11 @@
             <tr>
                 <td align="left">Nombre: <?= $client; ?></td>
             </tr>
+            <tr>
+                <td align="left">&nbsp;</td>
+            </tr>
         </table>
-        <br><br>
-        <strong>NOTA: Este documento no tiene valor sin la firma y sello del cajero.</strong>
+        <br>
+        <small><strong>NOTA: Este documento no tiene valor sin la firma y sello del cajero.</strong></small>
     </body>
 </html>
