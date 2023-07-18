@@ -134,7 +134,8 @@
                                         Monto:
                                     </label>
                                     <div class="col-lg-10">
-                                        <input type="number" class="form-control" id="amount" name="amount" value="<?= $deposit_info->amount; ?>" placeholder="Ingrese el monto en bolivianos aquí" autocomplete="not" />
+                                        <input type="number" class="form-control" id="amount" name="amount" placeholder="Ingrese el monto en bolivianos aquí" autocomplete="not" />
+                                        <!-- <input type="number" class="form-control" id="amount" name="amount" value="<?= $deposit_info->amount; ?>" placeholder="Ingrese el monto en bolivianos aquí" autocomplete="not" />  Se elimina el 0 del formulario -->
                                     </div>
                                 </div>
 
