@@ -80,7 +80,7 @@ class Account_model extends CI_Model
     
     public function get_transaction_info($id, $trans_type = 'deposit')
     {
-        $this->db->select("a.account_name, CONCAT(p.first_name, ' ', p.last_name) customer_name, at.*");
+        $this->db->select("a.account_name, CONCAT(p.first_name, ' ', p.last_name) customer_name, p.photo_url, at.*");
         $this->db->where("at.id", $id);
         $this->db->where("at.trans_type", $trans_type);
         $this->db->from("account_transactions at");
@@ -102,6 +102,7 @@ class Account_model extends CI_Model
             $info->description = "";
             $info->account_name = "";
             $info->customer_name = "";
+            //$info->customer_photo = "";
         }
         
         if (is_plugin_active('activity_log'))
@@ -493,7 +494,7 @@ class Account_model extends CI_Model
     
     function get_customers()
     {
-        $sql = "SELECT p.person_id, p.first_name, p.last_name 
+        $sql = "SELECT p.person_id, p.first_name, p.last_name, p.photo_url 
                 FROM c19_account_transactions t
                 LEFT JOIN c19_people p ON p.person_id = t.added_by
                 GROUP BY t.added_by";

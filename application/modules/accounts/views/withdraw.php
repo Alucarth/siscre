@@ -176,7 +176,8 @@
                                         Monto:
                                     </label>
                                     <div class="col-lg-10">
-                                        <input type="number" class="form-control" id="amount" name="amount" value="<?= $withdraw_info->amount; ?>" placeholder="Ingrese el monto aquí" autocomplete="not" />
+                                        <input type="number" class="form-control" id="amount" name="amount" placeholder="Ingrese el monto aquí" autocomplete="not" />
+                                        <!-- <input type="number" class="form-control" id="amount" name="amount" value="<?= $withdraw_info->amount; ?>" placeholder="Ingrese el monto aquí" autocomplete="not" /> Se elimina el 0 del formulario -->
                                     </div>
                                 </div>
 
