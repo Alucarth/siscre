@@ -220,8 +220,11 @@ class Loans extends Secure_area implements iData_controller
             $tbl_net_proceeds += $net_proceeds;
             $tbl_proceeds += $loan->loan_amount;
             $tbl_balance += $loan->loan_balance;
-
-            $tmp[] = $data_row;
+            //se requiere reparar URGENTE
+            if($loan->loan_status == 'approved')
+            {
+                $tmp[] = $data_row;
+            }
         }
 
         $this->session->set_userdata("tbl_net_proceeds", $tbl_net_proceeds);

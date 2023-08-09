@@ -33,9 +33,11 @@ class Printing extends CI_Controller {
                         </tr>
                         <tr>
                             <td>
-                                <!--' . ucwords($this->config->item('company')) . ' <br/>-->
+                            <!--
+                                ' . ucwords($this->config->item('company')) . ' <br/>
                                 ' . ucwords($this->config->item('address')) . ' <br/>
                                 ' . $this->config->item('phone') . ' <br/>
+                            -->
                             </td>
                             <td style="text-align:right">
                             <h1>' . $title . '</h1>
@@ -53,9 +55,11 @@ class Printing extends CI_Controller {
                                     <img id="img-pic" style="max-height:80px; width:100%" src="'. ((trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png")) .'" />
                                 </td>
                                 <td>
+                                <!--
                                     ' . ucwords($this->config->item('company')) . ' <br/>
                                     ' . ucwords($this->config->item('address')) . ' <br/>
                                     ' . $this->config->item('phone') . ' <br/>
+                                -->
                                 </td>
                                 <td style="text-align:right">
                                 ' . $html_title . '
@@ -102,9 +106,11 @@ class Printing extends CI_Controller {
                                 <img id="img-pic" style="max-height:80px; width:100%" src="'. ((trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png")) .'" />
                             </td>
                             <td>
+                            <!--
                                 ' . ucwords($this->config->item('company')) . ' <br/>
                                 ' . ucwords($this->config->item('address')) . ' <br/>
                                 ' . $this->config->item('phone') . ' <br/>
+                            -->
                             </td>
                             <td style="text-align:right">
                             <h1>' . $title . '</h1>
@@ -122,9 +128,11 @@ class Printing extends CI_Controller {
                                     <img id="img-pic" style="max-height:80px; width:100%" src="'. ((trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png")) .'" />
                                 </td>
                                 <td>
+                                <!--
                                     ' . ucwords($this->config->item('company')) . ' <br/>
                                     ' . ucwords($this->config->item('address')) . ' <br/>
                                     ' . $this->config->item('phone') . ' <br/>
+                                -->
                                 </td>
                                 <td style="text-align:right">
                                 ' . $html_title . '

@@ -114,7 +114,7 @@
                                                 <th style="text-align: center"><?= $this->lang->line('common_trans_id') ?></th>
                                                 <th style="text-align: center"><?= $this->lang->line('loans_customer') ?></th>
                                                 <th style="text-align: center"><?= $this->lang->line('payments_loan') ?></th>
-                                                <th style="text-align: center">Monto de pago</th>
+                                                <th style="text-align: center">Cuota</th>
                                                 <th style="text-align: center"><?= $this->lang->line('loans_balance') ?></th>                    
                                                 <th style="text-align: center"><?= $this->lang->line('payments_date_paid') ?></th>
                                                 <th style="text-align: center"><?= $this->lang->line('payments_teller') ?></th>
@@ -215,7 +215,7 @@
             var url = '<?=site_url('printing/payment_list/payment.pdf');?>';
             var params = {
                 softtoken:$("input[name='softtoken']").val(),
-                title: 'Payment Transaction Report',
+                title: 'Reporte de pagos',
                 date_from:$("#filter_from_date").val(),
                 date_to:$("#filter_to_date").val(),
                 loan_status:$("#filter_loan_status").val(),

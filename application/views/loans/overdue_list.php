@@ -237,7 +237,7 @@
             var url = '<?=site_url('printing/print_list/overdue.pdf');?>';
             var params = {
                 softtoken:$("input[name='softtoken']").val(),
-                title: 'Accounts Receivable',
+                title: 'Cuentas por cobrar',
                 html: clone.html()
             };
             blockElement("#btn-export-pdf");

@@ -35,7 +35,7 @@ class Payment extends CI_Model {
             $html .= "<td align='center' width='5%'><strong>" . $this->lang->line('common_trans_id') . "</strong></td>";
             $html .= "<td align='center'><strong>" . $this->lang->line('loans_customer') . "</strong></td>";
             $html .= "<td align='center'><strong>" . $this->lang->line('payments_loan') . "</strong></td>";
-            $html .= "<td align='center'><strong>Paid amount</strong></td>";
+            $html .= "<td align='center'><strong>Cuota</strong></td>";
             $html .= "<td align='center'><strong>" . $this->lang->line('loans_balance') . "</strong></td>";
             $html .= "<td align='center'><strong>" . $this->lang->line('payments_date_paid') . "</strong></td>";
             $html .= "<td align='center'><strong>" . $this->lang->line('payments_teller') . "</strong></td>";
@@ -61,7 +61,7 @@ class Payment extends CI_Model {
             $html .= "<br/>";
             $html .= "<table width='100%'>";
             $html .= "<tr>";            
-            $html .= "<td><h3>Grand Total (Paid Amount):</h3></td>";            
+            $html .= "<td><h3>Total (Monto pagado):</h3></td>";            
             $html .= "<td><h3>" . to_currency($grand_total) . "</h3></td>";            
             $html .= "</tr>";            
             $html .= "</table>";
