@@ -142,7 +142,7 @@
                                                     serviceUrl: '<?php echo site_url("accounts/customer_search"); ?>',
                                                     onSelect: function (suggestion) {
                                                         $("#client_id").val(suggestion.data);
-                                                        $("#sp-customer").html(suggestion.value + ' <span><a href="javascript:void(0)" title="Remove Customer" class="btn-remove-row"><i class="fa fa-times"></i></a></span>');
+                                                        $("#sp-customer").html(suggestion.value + ' <span><a href="javascript:void(0)" title="Limpiar" class="btn-remove-row"><i class="fa fa-times"></i></a></span>');
                                                         $("#sp-customer").show();
                                                         $("#inp-customer").hide();
                                                         load_balance();

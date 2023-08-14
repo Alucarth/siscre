@@ -548,12 +548,12 @@ class Accounts extends Secure_area implements iData_controller
             $return["message"] = "La cantidad debe ser un valor numérico válido";
             send($return);
         }
-        
-        if ( $this->has_current_loans( $client_id ) && $trans_type == 'withdraw' )
-        {
-            $return["message"] = "Lo sentimos, el cliente seleccionado no puede retirar dinero hasta que haya pagado el préstamo en su totalidad.";
-            send($return);
-        }
+    
+        //if ( $this->has_current_loans( $client_id ) && $trans_type == 'withdraw' )
+        //{
+        //    $return["message"] = "Lo sentimos, el cliente seleccionado no puede retirar dinero hasta que haya pagado el préstamo en su totalidad.";
+        //    send($return);
+        //}
         
         $data["account_id"] = $account_id;
         $data["amount"] = $amount;
