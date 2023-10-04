@@ -180,6 +180,7 @@
                                                 <th style="text-align: center; width: 1%"></th>
                                                 <th style="text-align: center"><?= ktranslate("loans_trans_id")?></th>
                                                 <th style="text-align: center"><?=ktranslate("loans_borrower")?></th>
+                                                <th style="text-align: center"><?=Teléfono;?></th><!--teléfono del cliente-->
                                                 <th style="text-align: center"><?=ktranslate("loans_product")?></th>
                                                 <th style="text-align: center"><?=ktranslate("loans_description")?></th>
                                                 <th style="text-align: center"><?=ktranslate("loans_loan_amount")?></th>

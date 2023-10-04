@@ -42,7 +42,8 @@ class Loans extends Secure_area implements iData_controller
     {
         $sql = "SELECT  a.person_id, 
                         b.first_name, 
-                        b.last_name 
+                        b.last_name,
+                        b.phone_number 
                 FROM c19_customers a 
                 LEFT JOIN c19_people b ON b.person_id = a.person_id
                 WHERE a.deleted = 0
@@ -66,6 +67,7 @@ class Loans extends Secure_area implements iData_controller
         $datatable->add_column('actions', false);
         $datatable->add_column('id', false);
         $datatable->add_column('customer', false);
+        $datatable->add_column('customer_phone', false);//tlefono del cliente
         $datatable->add_column('loan_product', false);
         $datatable->add_column('description', false);
         $datatable->add_column('loan_amount', false);
@@ -92,32 +94,24 @@ class Loans extends Secure_area implements iData_controller
     function _dt_transactions()
     {
         $selected_user = $this->input->post("employee_id");
-        
         $due_from_date = $this->input->post("due_from_date");
         $due_to_date = $this->input->post("due_to_date");
         $applied_from_date = $this->input->post("applied_from_date");
         $applied_to_date = $this->input->post("applied_to_date");
         $approved_from_date = $this->input->post("approved_from_date");
         $approved_to_date = $this->input->post("approved_to_date");
-        
         $customer_id = $this->input->post("customer_id");
-        
         $status = $this->input->post("status");
         $no_delete = $this->input->post("no_delete");
-
         $offset = $this->input->post("start");
         $limit = $this->input->post("length");
-
         $index = $this->input->post("order")[0]["column"];
         $dir = $this->input->post("order")[0]["dir"];
         $keywords = $this->input->post("search")["value"];
-
         $order = array("index" => $index, "direction" => $dir);
-        
         $filters = [
             "customer_id" => $customer_id
         ];
-        
         if ( $due_from_date != '' )
         {
             $filters["due_from_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($due_from_date)) : strtotime($due_from_date);
@@ -126,44 +120,34 @@ class Loans extends Secure_area implements iData_controller
         {
             $filters["due_to_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($due_to_date) . " 23:00:00") : strtotime($due_to_date . " 23:00:00");
         }
-        
         if ( $applied_from_date != '' )
         {
             $filters["applied_from_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($applied_from_date)) : strtotime($applied_from_date);
         }
-        
         if( $applied_to_date != '' )
         {
             $filters["applied_to_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($applied_to_date) . " 23:00:00") : strtotime($applied_to_date . " 23:00:00");
         }
-        
         if ( $approved_from_date != '' )
         {
             $filters["approved_from_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($approved_from_date)) : strtotime($approved_from_date);
         }
-        
         if( $approved_to_date != '' )
         {
             $filters["approved_to_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($approved_to_date) . " 23:00:00") : strtotime($approved_to_date . " 23:00:00");
         }
-        
         if (is_plugin_active("branches") )
         {
             $filters["branch_id"] = $this->input->post("branch_id");
         }
-        
         $loans = $this->Loan->get_all($limit, $offset, $keywords, $order, $status, $selected_user, $filters);
         $count_all = $this->Loan->get_all($limit, $offset, $keywords, $order, $status, $selected_user, $filters, 1);
-        
         $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
         $user_info = $this->Employee->get_info($user_id);
-
         $tmp = array();
-
         $tbl_net_proceeds = 0;
         $tbl_proceeds = 0;
         $tbl_balance = 0;
-        
         foreach ($loans->result() as $loan)
         {
             $loan_status = $loan->loan_status;
@@ -171,9 +155,7 @@ class Loans extends Secure_area implements iData_controller
             {
                 $loan_status = "Paid";
             }
-            
             $actions = "<a href='" . site_url('loans/view/' . $loan->loan_id) . "' class='btn-xs btn-default btn btn-secondary' title='View'><span class='fa fa-eye'></span></a> ";
-            
             if ( !$no_delete )
             {
                 if ( check_access($user_info->role_id, "loans", 'delete') )
@@ -181,12 +163,9 @@ class Loans extends Secure_area implements iData_controller
                     $actions .= "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-loan-id='" . $loan->loan_id . "' title='Delete'><span class='fa fa-trash'></span></a>";
                 }
             }
-            
             $scheds = json_decode($loan->periodic_loan_table);
             $next_payment_date = sync_payment_date( $loan->due_paid, $scheds);
-            
             $fees = json_decode($loan->misc_fees, true);
-            
             $total_fees = 0;
             if ( is_array($fees) && count($fees) > 0 )
             {
@@ -198,9 +177,7 @@ class Loans extends Secure_area implements iData_controller
 		    }
                 }
             }
-            
             $net_proceeds = $loan->net_proceeds > 0 ? ($loan->net_proceeds) : ($loan->apply_amount - $total_fees);
-
             $data_row = [];
             $data_row["DT_RowId"] = $loan->loan_id;
             $data_row["actions"] = $actions;
@@ -211,6 +188,7 @@ class Loans extends Secure_area implements iData_controller
             $data_row["loan_amount"] = to_currency($loan->loan_amount);
             $data_row["loan_balance"] = to_currency($loan->loan_balance);
             $data_row["customer"] = $loan->customer_name;
+            $data_row["customer_phone"] = $loan->customer_phone;//telefono cliente
             $data_row["agent"] = $loan->agent_name;
             $data_row["approved_by"] = $loan->approver_name;
             $data_row["formatted_loan_approved_date"] = $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '';
@@ -851,6 +829,7 @@ class Loans extends Secure_area implements iData_controller
                 to_currency($loan->loan_amount),
                 to_currency($loan->loan_balance),
                 ucwords($loan->customer_name),
+                $loan->customer_phone,//telefono cliente
                 ucwords($loan->agent_name),
                 ucwords($loan->approver_name),
                 $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '',
@@ -873,11 +852,8 @@ class Loans extends Secure_area implements iData_controller
     function overdues()
     {
         $order = array("index" => $_GET['order'][0]['column'], "direction" => $_GET['order'][0]['dir']);
-
         $loans = $this->Loan->get_all($_GET['length'], $_GET['start'], $_GET['search']['value'], $order, "overdue");
-
         $format_result = array();
-
         foreach ($loans->result() as $loan)
         {
             $loan_status = $loan->loan_status;
@@ -885,7 +861,6 @@ class Loans extends Secure_area implements iData_controller
             {
                 $loan_status = "Paid";
             }
-
             $format_result[] = array(
                 "<input type='checkbox' name='chk[]' id='loan_$loan->loan_id' value='" . $loan->loan_id . "'/>",
                 $loan->loan_id,
@@ -895,6 +870,7 @@ class Loans extends Secure_area implements iData_controller
                 to_currency($loan->loan_amount),
                 to_currency($loan->loan_balance),
                 ucwords($loan->customer_name),
+                $loan->customer_phone,//telefono en la lista de cuentas por cobrar
                 ucwords($loan->agent_name),
                 ucwords($loan->approver_name),
                 date($this->config->item('date_format'), $loan->loan_applied_date),
@@ -974,6 +950,7 @@ class Loans extends Secure_area implements iData_controller
 
         $data['loan_deduction_interest'] = to_currency($loan_deduction_interest);
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;//telefono cliente
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->apply_amount - $total_deductions);
@@ -1048,6 +1025,7 @@ class Loans extends Secure_area implements iData_controller
         }
 
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;//telefono cliente
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = to_currency($loan->loan_amount - $total_deductions);

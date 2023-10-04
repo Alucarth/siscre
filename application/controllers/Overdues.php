@@ -54,6 +54,7 @@ class Overdues extends Secure_area implements iData_controller {
         $datatable->add_column('actions', false);
         $datatable->add_column('id', false);
         $datatable->add_column('customer', false);
+        $datatable->add_column('customer_phone', false);//telefono cliente
         $datatable->add_column('description', false);
         $datatable->add_column('loan_amount', false);
         $datatable->add_column('loan_balance', false);

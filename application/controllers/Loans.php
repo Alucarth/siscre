@@ -211,6 +211,7 @@ class Loans extends Secure_area implements iData_controller
             $data_row["loan_amount"] = to_currency($loan->loan_amount);
             $data_row["loan_balance"] = to_currency($loan->loan_balance);
             $data_row["customer"] = $loan->customer_name;
+            $data_row["customer_phone"] = $loan->customer_phone;//telefono cliente
             $data_row["agent"] = $loan->agent_name;
             $data_row["approved_by"] = $loan->approver_name;
             $data_row["formatted_loan_approved_date"] = $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '';
@@ -835,6 +836,7 @@ class Loans extends Secure_area implements iData_controller
                 to_currency($loan->loan_amount),
                 to_currency($loan->loan_balance),
                 ucwords($loan->customer_name),
+                $loan->customer_phone,//telefono cliente
                 ucwords($loan->agent_name),
                 ucwords($loan->approver_name),
                 $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '',
@@ -879,6 +881,7 @@ class Loans extends Secure_area implements iData_controller
                 to_currency($loan->loan_amount),
                 to_currency($loan->loan_balance),
                 ucwords($loan->customer_name),
+                $loan->customer_phone,//telefono cliente
                 ucwords($loan->agent_name),
                 ucwords($loan->approver_name),
                 date($this->config->item('date_format'), $loan->loan_applied_date),
@@ -956,6 +959,7 @@ class Loans extends Secure_area implements iData_controller
 
         $data['loan_deduction_interest'] = to_currency($loan_deduction_interest);
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->apply_amount - $total_deductions);
@@ -1028,6 +1032,7 @@ class Loans extends Secure_area implements iData_controller
         }
 
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = to_currency($loan->loan_amount - $total_deductions);
@@ -1134,6 +1139,7 @@ class Loans extends Secure_area implements iData_controller
 
         $data["loan_deduction_interest"] = to_currency($loan_deduction_interest);
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->apply_amount - $total_deductions);
@@ -1208,6 +1214,7 @@ class Loans extends Secure_area implements iData_controller
         }
 
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = to_currency($loan->loan_amount - $total_deductions);
@@ -2077,6 +2084,7 @@ class Loans extends Secure_area implements iData_controller
         $data['loan_deduction_interest'] = to_currency($loan_deduction_interest);
         $data['total_add_fees'] = $total_add_fees;
         $data['customer_name'] = ucwords($customer->first_name . " " . $customer->last_name);
+        $data['customer_phone'] = $customer->customer_phone;
         $data['customer_address'] = ucwords($customer->address_1);
         $data['total_deductions'] = to_currency($total_deductions);
         $data['net_loan'] = $loan->net_proceeds > 0 ? to_currency($loan->net_proceeds) : to_currency($loan->loan_amount - $total_deductions);

@@ -31,511 +31,229 @@ class Loan extends CI_Model {
 
 
     function get_all($limit = 10000, $offset = 0, $search = "", $order = array(), $status = "", $sel_user = false, $filters = [], $count_only = false)
-
     {
-
         $user_id = $this->Employee->get_logged_in_employee_info() ? $this->Employee->get_logged_in_employee_info()->person_id : 0;
-
         $this->Employee->getLowerLevels($low_levels);
-
-
-
         $sorter = array(
-
             "",
-
             "loan_id",
-
             "loan_type",
-
             "description",
-
             "loan_amount",
-
             "loan_balance",
-
             "customer.first_name",
-
             "agent.first_name",
-
             "approver.first_name",
-
             "loan_applied_date",
-
             "loan_payment_date",
-
             "loan_status",
-
         );
-
-        
-
         if ( isset($filters["sorter"]) && is_array($filters["sorter"]) )
-
         {
-
             $sorter = $filters["sorter"];
-
         }
-
-
-
         $select = " l.*, 
-
                     IF( (SELECT (l.loan_amount - sum(paid_amount)) loan_balance FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.balance_amount LIMIT 1) > 0, (SELECT (l.loan_amount - sum(paid_amount)) loan_balance FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.balance_amount LIMIT 1), l.loan_balance ) AS loan_balance,
-
-                    (SELECT a.date_paid FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.date_paid DESC LIMIT 1) due_paid, 
-
+                    (SELECT a.date_paid FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.date_paid DESC LIMIT 1) due_paid, customer.phone_number as customer_phone,
                     CONCAT(customer.first_name, ' ', customer.last_name) as customer_name, 
-
                     CONCAT(agent.first_name, ' ',agent.last_name) as agent_name, 
-
                     CONCAT(approver.first_name, ' ', approver.last_name) as approver_name";
-
-        
-
         if (is_plugin_active('loan_products'))
-
         {
-
             $select .= ",                   
-
                     IF (
-
                          l.loan_product_id = 0,
-
                          'Flexible',
-
                          lt.product_name
-
                     ) AS loan_type";
-
         }
-
         else
-
         {
-
             $select .= ",                   
-
                     IF (
-
                          l.loan_type_id = 0,
-
                          'Flexible',
-
                          lt.name
-
                     ) AS loan_type";
-
         }
-
-
-
         $this->db->select($select, FALSE);
-
         $this->db->from('loans l');
-
         $this->db->join('people as customer', 'customer.person_id = l.customer_id', 'LEFT');
-
         $this->db->join('people as agent', 'agent.person_id = l.loan_agent_id', 'LEFT');
-
         $this->db->join('people as approver', 'approver.person_id = l.loan_approved_by_id', 'LEFT');
-
-        
-
         if (is_plugin_active('loan_products'))
-
         {
-
             $this->db->join('loan_products lt', 'lt.id = l.loan_product_id', 'LEFT');
-
         }
-
         else
-
         {
-
             $this->db->join('loan_types lt', 'lt.loan_type_id = l.loan_type_id', 'LEFT');
-
         }
-
-        
-
         $this->db->join('customers as my_customer', 'my_customer.person_id = l.customer_id', 'LEFT');
-
-
-
         if ( $sel_user > 0 )
-
         {
-
             $user_id = ($sel_user) ? $sel_user : $user_id;
-
             $this->db->where('loan_agent_id', $user_id);
-
         }
-
         else
-
         {
-
             if ( is_array($low_levels) && count($low_levels) > 0 )
-
             {
-
                 $low_levels[] = $user_id;
-
                 $this->db->where('( agent.role_id IN (' . implode(",", $low_levels) . ') OR loan_agent_id = \'' . $user_id . '\' )');
-
             }
-
             else
-
             {
-
                 if ( $user_id > 0 )
-
                 {
-
                     $this->db->where('loan_agent_id', $user_id);
-
                 }
-
             }
-
         }
-
-        
-
         if (is_plugin_active("branches"))
-
         {
-
             if ( isset($filters["branch_id"]) && $filters["branch_id"] > 0 )
-
             {
-
                 $this->db->where("my_customer.branch_id", $filters["branch_id"]);
-
             }
-
-        
-
             $this->db->where("my_customer.branch_id", $this->session->userdata('branch_id'));        
-
         }
-
-
-
         if ( isset($filters["applied_from_date"]) && trim($filters["applied_from_date"]) != '' )
-
         {
-
             $this->db->where("loan_applied_date >=", $filters["applied_from_date"]);
-
         }
-
-        
-
         if ( isset($filters["applied_to_date"]) && trim($filters["applied_to_date"]) != '' )
-
         {
-
             $this->db->where("loan_applied_date <=", $filters["applied_to_date"]);
-
         }
-
-        
-
         if ( isset($filters["approved_from_date"]) && trim($filters["approved_from_date"]) != '' )
-
         {
-
             $this->db->where("loan_approved_date >=", $filters["approved_from_date"]);
-
         }
-
-        
-
         if ( isset($filters["approved_to_date"]) && trim($filters["approved_to_date"]) != '' )
-
         {
-
             $this->db->where("loan_approved_date <=", $filters["approved_to_date"]);
-
         }
-
-        
-
         if ( isset($filters["due_from_date"]) && trim($filters["due_from_date"]) != '' )
-
         {
-
             $this->db->where("loan_payment_date >=", $filters["due_from_date"]);
-
         }
-
-        
-
         if ( isset($filters["due_to_date"]) && trim($filters["due_to_date"]) != '' )
-
         {
-
             $this->db->where("loan_payment_date <=", $filters["due_to_date"]);
-
         }
-
-        
-
         if ( isset($filters["customer_id"]) && trim($filters["customer_id"]) > 0 )
-
         {
-
             $this->db->where("customer.person_id =", $filters["customer_id"]);
-
         }
-
-
-
         if ($search !== "")
-
         {
-
             if (is_plugin_active('loan_products'))
-
             {
-
                 $this->db->where("(
-
                     account LIKE '%" . $search . "%' OR
-
                     l.description LIKE '%" . $search . "%' OR
-
                     customer.first_name LIKE '%" . $search . "%' OR
-
                     customer.last_name LIKE '%" . $search . "%' OR
-
                     CONCAT(customer.first_name,' ', customer.last_name) LIKE '%" . $search . "%' OR
-
                     lt.product_name LIKE '%" . $search . "%' OR        
-
                     agent.first_name LIKE '%" . $search . "%' OR
-
                     agent.last_name LIKE '%" . $search . "%' OR 
-
                     CONCAT(agent.first_name, ' ', agent.last_name) LIKE '%" . $search . "%'
-
                     )");
-
             }
-
             else
-
             {
-
                 $this->db->where("(
-
                     account LIKE '%" . $search . "%' OR
-
                     l.description LIKE '%" . $search . "%' OR
-
                     customer.first_name LIKE '%" . $search . "%' OR
-
                     customer.last_name LIKE '%" . $search . "%' OR
-
                     CONCAT(customer.first_name,' ', customer.last_name) LIKE '%" . $search . "%' OR
-
                     lt.name LIKE '%" . $search . "%' OR        
-
                     agent.first_name LIKE '%" . $search . "%' OR
-
                     agent.last_name LIKE '%" . $search . "%' OR 
-
                     CONCAT(agent.first_name, ' ', agent.last_name) LIKE '%" . $search . "%'
-
                     )");
-
             }
-
         }
-
-
-
         if ( isset($order['index']) && count($order) > 0 && $order['index'] < count($sorter))
-
         {
-
             $this->db->order_by($sorter[$order['index']], $order['direction']);
-
         }
-
         else
-
         {
-
             $this->db->order_by("loan_id", "desc");
-
         }
-
-
-
         $this->db->where('delete_flag', 0);
-
         $this->db->where('my_customer.deleted', 0);
-
-
-
         if ($status !== "")
-
         {
-
             if ($status === "paid")
-
             {
-
                 $this->db->where("loan_balance", 0);
-
             }
-
             else if ($status === "unpaid")
-
             {
-
                 $this->db->where("loan_balance >", 0);
-
             }
-
             else if ($status === "overdue")
-
             {
-
                 if ( (isset($filters["due_from_date"]) && trim($filters["due_from_date"]) != '') || 
-
                         ( isset($filters["due_to_date"]) && trim($filters["due_to_date"]) != '' ) )
-
                 {
-
-                    
-
                 }
-
                 else
-
                 {
-
                     $this->db->where("loan_payment_date < UNIX_TIMESTAMP()");
-
                 }
-
                 $this->db->where("loan_status <>", 'pending');
-
                 $this->db->where("loan_balance > ", 0);
-
             }
-
             else
-
             {
-
                 if ( $status != 'all' )
-
                 {
-
                     $this->db->where("loan_status", $status);
-
                 }
-
             }
-
         }
-
-        
-
         if ( $count_only )
-
         {
-
             return $this->db->count_all_results();
-
         }
-
         else
-
         {
-
             $this->db->limit($limit);
-
             $this->db->offset($offset);
-
-
-
             $query = $this->db->get();
-
         }
-
-        
-
         if (is_plugin_active('activity_log'))
-
         {
-
             $user_id = $this->Employee->get_logged_in_employee_info() ? $this->Employee->get_logged_in_employee_info()->person_id : 1;
-
             track_action($user_id, "loans", "Viewed loan transactions");
-
         }
-
-        
-
         return $query;
-
     }
-
-
 
     function count_all()
-
     {
-
         $this->db->from('loans');
-
         $this->db->where("delete_flag", 0);
-
         return $this->db->count_all_results();
-
     }
 
-
-
     function count_overdues()
-
     {
-
         $employee_id = $this->Employee->get_logged_in_employee_info()->person_id;
-
-
-
         $this->db->where("loan_payment_date < UNIX_TIMESTAMP()");
-
         $this->db->from('loans');
-
         $this->db->where("delete_flag", 0);
-
-
-
         if ($employee_id > 1)
-
         {
-
             $this->db->where("loan_agent_id", $employee_id);
-
         }
-
-
-
         return $this->db->count_all_results();
-
     }
 
 
@@ -549,61 +267,31 @@ class Loan extends CI_Model {
 
 
     function get_info($loan_id)
-
     {
-
         if (is_plugin_active('activity_log'))
-
         {
-
             if ( $loan_id > 0 )
-
             {
-
                 $employee_id = $this->Employee->get_logged_in_employee_info()->person_id;
-
                 track_action($employee_id, "loans", "Viewed loan details #" . $loan_id );
-
             }
-
         }
-
-        
-
-        $select = "loans.*, CONCAT(customer.first_name, ' ', customer.last_name) as customer_name, 
-
+        $select = "loans.*, customer.phone_number as customer_phone,
+                   CONCAT(customer.first_name, ' ', customer.last_name) as customer_name, 
                    CONCAT(agent.first_name, ' ',agent.last_name) as agent_name, 
-
                    CONCAT(approver.first_name, ' ', approver.last_name) as approver_name";
-
         $this->db->select($select, FALSE);
-
         $this->db->from('loans');
-
         $this->db->join('people as customer', 'customer.person_id = loans.customer_id', 'LEFT');
-
         $this->db->join('people as agent', 'agent.person_id = loans.loan_agent_id', 'LEFT');
-
         $this->db->join('people as approver', 'approver.person_id = loans.loan_approved_by_id', 'LEFT');
-
         $this->db->where('loan_id', $loan_id);
-
-
-
         $query = $this->db->get();
-
-
-
         if ($query->num_rows() == 1)
-
         {
-
             return $query->row();
-
         }
-
         else
-
         {
 
             //Get empty base parent object, as $loan_id is NOT a loan
@@ -631,6 +319,8 @@ class Loan extends CI_Model {
             $loan_obj->loan_id = -1;
 
             $loan_obj->customer_name = '';
+
+            $loan_obj->customer_phone = '';//telefono cliente
 
             $loan_obj->loan_status = 'pending';
 
@@ -677,93 +367,42 @@ class Loan extends CI_Model {
 
 
     function save(&$loan_data, $loan_id = false, $has_payment = false)
-
     {
-
         if ($loan_data["loan_type_id"] > 0)
-
         {
-
             $loan_data['loan_payment_date'] = $this->_get_loan_payment_date($loan_data);
-
         }
-
-
-
         if (!$loan_id or ! $this->exists($loan_id))
-
         {
-
             $loan_data['loan_balance'] = $loan_data["loan_amount"];
-
-            
-
             if ($this->db->insert('loans', $loan_data))
-
             {
-
                 $loan_data['loan_id'] = $this->db->insert_id();
-
                 $this->move_attachments($loan_data);
-
-                
-
                 if (is_plugin_active('activity_log'))
-
                 {
-
                     $employee_id = $this->Employee->get_logged_in_employee_info()->person_id;
-
                     track_action($employee_id, "loans", "Added new loan #" . $loan_data['loan_id'] );
-
                 }
-
-                
-
                 return true;
-
             }
-
             return false;
-
         }
-
-        
 
         // Check if there's a change in loan_amount
 
         $loan_info = $this->get_info($loan_id);
-
-        
-
         if ( $loan_info->loan_amount != $loan_data["loan_amount"] )
-
         {
-
             $loan_data["loan_balance"] = $loan_data["loan_amount"];
-
         }
-
-
-
         $this->db->where('loan_id', $loan_id);
-
         $ret = $this->db->update('loans', $loan_data);
-
-        
-
         if (is_plugin_active('activity_log'))
-
         {
-
             $employee_id = $this->Employee->get_logged_in_employee_info()->person_id;
-
             track_action($employee_id, "loans", "Updated loan #" . $loan_id );
-
         }
-
-        
-
         return $ret;
 
     }

@@ -120,6 +120,7 @@
                                                 <th style="text-align: center; width: 1%"></th>
                                                 <th style="text-align: center"><?=ktranslate2("Trans. ID#");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Client /<br/>Borrower");?></th>
+                                                <th style="text-align: center">Teléfono</th><!--teléfono del cliente-->
                                                 <th style="text-align: center"><?=ktranslate2("Description");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Proceeds");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Balance");?></th>
