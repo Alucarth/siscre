@@ -395,6 +395,7 @@ class Accounts extends Secure_area implements iData_controller
         $user_info = $this->Employee->get_info($user_id);
 
         $tmp = array();
+        $amountt = 0;
 
         if ( $accounts )
         {
@@ -403,9 +404,18 @@ class Accounts extends Secure_area implements iData_controller
                 $data_row = [];
                 $data_row["DT_RowId"] = $row->id;
                 $data_row["account_name"] = ucwords($row->account_name);
-                $data_row["amount"] = to_currency($row->amount);
-                $data_row["description"] = truncate_html($row->description, 250);
                 $data_row["trans_type"] = $row->trans_type == "deposit"? 'deposito': 'retiro';
+                if ($row->trans_type != "deposit")
+                {
+                    $amountt = $row->amount * -1;
+                    $data_row["amount"] = to_currency($amountt);    
+                }
+                else{
+                    $data_row["amount"] = to_currency($row->amount);
+                }
+                
+                $data_row["description"] = truncate_html($row->description, 250);
+                
                 $data_row["trans_date"] = date($this->config->item('date_format'), strtotime($row->trans_date));
                 $data_row["added_by_name"] = $row->added_by_name;
                 $data_row["created_by_name"] = $row->created_by_name;
@@ -418,7 +428,6 @@ class Accounts extends Secure_area implements iData_controller
         $data["data"] = $tmp;
         $data["recordsTotal"] = $count_all;
         $data["recordsFiltered"] = $count_all;
-
         send($data);
     }
 
@@ -536,11 +545,15 @@ class Accounts extends Secure_area implements iData_controller
     function save_transaction($id = -1)
     {
         $account_id = $this->input->post("account_id");
-        $amount = $this->input->post("amount");
         $description = $this->input->post("description");
         $trans_type = $this->input->post("trans_type");
         $client_id = $this->input->post("client_id");
-      
+        if ($trans_type != "deposit"){
+            $amount = $this->input->post("amount") * -1;    
+        }
+        else{
+            $amount = $this->input->post("amount");
+        }
         //$this->session->userdata();
         
         if ( !is_numeric($amount) || trim($amount) == '' ) 

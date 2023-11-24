@@ -223,7 +223,7 @@ class Account_model extends CI_Model
             }
         }
         
-        return $deposit - $withdraw;
+        return $deposit + $withdraw;
     }
     
     function get_accounts_total($filters = [])

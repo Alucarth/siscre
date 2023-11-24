@@ -113,7 +113,7 @@
                                     <th style="text-align: center">Fecha</th>                                    
                                     <th style="text-align: center">Cliente</th>                                    
                                     <th style="text-align: center">Creado por</th> 
-                                    <th style="text-align: center"></th> 
+                                    <th style="text-align: center">Detalle</th> 
                                 </tr>
                             </thead>
                             <tfoot>
