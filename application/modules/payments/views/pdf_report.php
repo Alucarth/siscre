@@ -180,7 +180,7 @@
 	                // QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
 	
                     //Mostramos la imagen generada
-                    echo '<img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=http%3A%2F%2Fwww.google.com%2F&choe=UTF-8" title="'.$contenido.'" />'
+                    echo '<img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=http%3A%2F%2Fwww.google.com%2F&choe=UTF-8" title="'.$contenido.'" />';
 	                // echo '<img src="'.$dir.basename($filename).'" />';  
                 ?>
                 </td>
