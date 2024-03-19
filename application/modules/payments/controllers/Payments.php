@@ -209,12 +209,20 @@ class Payments extends Secure_area implements iData_controller {
         $loan_agent = $this->Person->get_info($loan->loan_agent_id);
         $customer = $this->Person->get_info($payment->customer_id);
         $collateral = $this->Guarantee->get_info($payment->loan_id);
+        $branch = $this->Payment->getBranch($payment->branch_id);
+
+        //para debugear
+        // $myfile = fopen("payment.txt", "w") or die("Unable to open file!");
+        // $txt = "".json_encode($branch);
+        // fwrite($myfile, $txt);
+        // fclose($myfile);
 
         // pdf viewer 
         $data['collateral'] = $collateral;
         $data['count'] = $payment->loan_payment_id;
         $data['client'] = ucwords($customer->first_name." ".$customer->last_name);
         $data['account'] = $loan->account;
+        $data['branch_name'] = $branch->branch_name;
         //$data['loan'] = to_currency($loan->loan_amount);
         $data['loan'] = to_currency($loan->apply_amount);
         $data['loan_id'] = $payment->loan_id;
@@ -301,6 +309,9 @@ class Payments extends Secure_area implements iData_controller {
 
     function save($payment_id = -1)
     {
+        $branch_name = $this->input->post('branch_name');
+        $branch = $this->Payment->getBranchByName($branch_name);
+
         $payment_data = array(
             'account' => $this->input->post('account'),
             'loan_id' => $this->input->post('loan_id'),
@@ -312,7 +323,8 @@ class Payments extends Secure_area implements iData_controller {
             'teller_id' => $this->input->post('teller'),
             'modified_by' => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
             'payment_due' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('payment_due'))) : strtotime($this->input->post('payment_due')),
-            'lpp_amount' => $this->input->post('lpp_amount')
+            'lpp_amount' => $this->input->post('lpp_amount'),
+            'branch_id' => $branch?$branch->id:null
         );
 
         if ($this->input->post("loan_payment_id") > 0)

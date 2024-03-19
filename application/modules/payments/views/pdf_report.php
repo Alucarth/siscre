@@ -42,7 +42,7 @@
     <body>
         <table width="73%">
             <tr>
-                <td width="75%" rowspan="4"></td>
+                <td width="75%" rowspan="5"></td>
                 <!--<td width="75%" rowspan="4"><img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px"/></td>-->
                 <!--<td align="right">Transacción No. <?= $count; ?> </td>-->
                 <td></td>
@@ -57,6 +57,9 @@
             </tr>
             <tr>
                 <td><small>Usuario: <?= $teller; ?></small></td>
+            </tr>
+            <tr>
+                <td><small>Sucursal: <?= $branch_name; ?></small></td>
             </tr>
             <tr>
                 <td colspan="2"><br></td>
