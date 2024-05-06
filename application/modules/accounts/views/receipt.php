@@ -29,7 +29,7 @@
                                 <h6>
                                     <?= $this->config->item("address"); ?><br/>
                                     <?= "Tel. No. " . $this->config->item("phone") . " Fax " . $this->config->item("fax") . " Email " . $this->config->item("email"); ?><br/>
-                                    <?= "Fecha: " . date($this->config->item("date_format")); ?><br/>
+                                    <?= ($trans_date == '' ? "Fecha: " . date($this->config->item("date_format")) : date("d/m/Y", strtotime($trans_date)))?><br/>
                                 </h6>
                             </div>
                             

@@ -100,6 +100,7 @@ class Account_model extends CI_Model
             $info->account_id = "";
             $info->amount = 0;
             $info->description = "";
+            $info->trans_date = "";
             $info->account_name = "";
             $info->customer_name = "";
             //$info->customer_photo = "";
