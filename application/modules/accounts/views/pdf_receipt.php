@@ -58,7 +58,7 @@
                             <tr>
                                 <td width="2%"></td>
                                 <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Fecha:</b></td>
-                                <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo date("d/m/Y", strtotime($trans_date)); ?><br/></td>
+                                <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo date("d/m/Y - H:i:s", strtotime($trans_date)); ?><br/></td>
                                 <td width="2%"></td>
                             </tr>
                             <tr>
@@ -157,7 +157,7 @@
                             <tr>
                                 <td width="2%"></td>
                                 <td style="border-bottom: 1px solid #ccc;text-align:left;"><b>Fecha:</b></td>
-                                <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo date("d/m/Y", strtotime($trans_date)); ?><br/></td>
+                                <td style="border-bottom: 1px solid #ccc;text-align:right;"><?php echo date("d/m/Y - H:i:s", strtotime($trans_date)); ?><br/></td>
                                 <td width="2%"></td>
                             </tr>
                             <tr>
