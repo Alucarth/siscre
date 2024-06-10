@@ -75,6 +75,8 @@ class Payments extends Secure_area implements iData_controller {
         $datatable->add_column('payable_amount', false);
         $datatable->add_column('loan_balance', false);
         $datatable->add_column('trans_date', false);
+        $datatable->add_column('payment_due', false);
+        //$datatable->add_column('overdue_days', false);
         $datatable->add_column('teller', false);
         
 
@@ -123,13 +125,13 @@ class Payments extends Secure_area implements iData_controller {
         $tbl_balance = 0;
         foreach ($payments->result() as $payment)
         {
-            $actions = "<a href='" . site_url('payments/view/' . $payment->loan_payment_id) . "' class='btn btn-xs btn-default btn-secondary' title='View'><span class='fa fa-eye'></span></a> ";
+            $actions = "<a href='" . site_url('payments/view/' . $payment->loan_payment_id) . "' class='btn btn-xs btn-default btn-secondary' title='Ver'><span class='fa fa-eye'></span></a> ";
             
             if ( check_access($user_info->role_id, "payments", 'delete') )
             {
-                $actions .= "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-payment-id='" . $payment->loan_payment_id . "' title='Delete'><span class='fa fa-trash'></span></a> ";
+                $actions .= "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-payment-id='" . $payment->loan_payment_id . "' title='Eliminar'><span class='fa fa-trash'></span></a> ";
             }
-            $actions .= "<a href='javascript:void(0)' data-url='".  site_url('payments/printIt/' . $payment->loan_payment_id) ."' class='btn-print-receipt btn btn-default'>Print</a>";
+            $actions .= "<a href='javascript:void(0)' data-url='".  site_url('payments/printIt/' . $payment->loan_payment_id) ."' class='btn-print-receipt btn btn-default'>Imprimir</a>";
 
             $data_row = [];
             $data_row["DT_RowId"] = $payment->loan_payment_id;
@@ -137,10 +139,16 @@ class Payments extends Secure_area implements iData_controller {
             
             $data_row["trans_id"] = $payment->loan_payment_id;
             $data_row["customer"] = ucwords($payment->customer_name);
-            $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Flexible") . " (" . to_currency($payment->loan_amount) . ")";
+            $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Individual") . " (" . to_currency($payment->loan_amount) . ")";
             $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
             $data_row["payable_amount"] = to_currency($payment->paid_amount);
             $data_row["trans_date"] = date($this->config->item('date_format'), $payment->date_paid);
+            $data_row["payment_due"] = date($this->config->item('date_format'), $payment->payment_due);
+            // Calcula la diferencia
+            //$diferencia = $payment->payment_due->diff($payment->date_paid);
+            // Obtiene el número de días de diferencia
+            //$overdue_days = $diferencia->days;
+            //$data_row["overdue_days"] = $payment->payment_due->diff($payment->date_paid);
             $data_row["teller"] = ucwords($payment->teller_name);
             
             $tbl_balance += $payment->paid_amount;
@@ -439,6 +447,7 @@ class Payments extends Secure_area implements iData_controller {
                 to_currency($payment->balance_amount),
                 to_currency($payment->paid_amount),
                 date($this->config->item('date_format'), $payment->date_paid),
+                date($this->config->item('date_format'), $payment->payment_due),
                 ucwords($payment->teller_name),
                 $actions
             );
