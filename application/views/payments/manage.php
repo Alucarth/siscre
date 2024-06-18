@@ -117,6 +117,8 @@
                                                 <th style="text-align: center">Cuota</th>
                                                 <th style="text-align: center"><?= $this->lang->line('loans_balance') ?></th>                    
                                                 <th style="text-align: center"><?= $this->lang->line('payments_date_paid') ?></th>
+                                                <th style="text-align: center">Fecha de pago programada</th>
+                                                <!--<th style="text-align: center">Días en mora</th>-->
                                                 <th style="text-align: center"><?= $this->lang->line('payments_teller') ?></th>
                                             </tr>
                                         </thead>

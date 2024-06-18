@@ -75,6 +75,8 @@ class Payments extends Secure_area implements iData_controller {
         $datatable->add_column('payable_amount', false);
         $datatable->add_column('loan_balance', false);
         $datatable->add_column('trans_date', false);
+        $datatable->add_column('payment_due', false);
+        //$datatable->add_column('overdue_days', false);
         $datatable->add_column('teller', false);
         
 
@@ -123,13 +125,13 @@ class Payments extends Secure_area implements iData_controller {
         $tbl_balance = 0;
         foreach ($payments->result() as $payment)
         {
-            $actions = "<a href='" . site_url('payments/view/' . $payment->loan_payment_id) . "' class='btn btn-xs btn-default btn-secondary' title='View'><span class='fa fa-eye'></span></a> ";
+            $actions = "<a href='" . site_url('payments/view/' . $payment->loan_payment_id) . "' class='btn btn-xs btn-default btn-secondary' title='Ver'><span class='fa fa-eye'></span></a> ";
             
             if ( check_access($user_info->role_id, "payments", 'delete') )
             {
-                $actions .= "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-payment-id='" . $payment->loan_payment_id . "' title='Delete'><span class='fa fa-trash'></span></a> ";
+                $actions .= "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-payment-id='" . $payment->loan_payment_id . "' title='Eliminar'><span class='fa fa-trash'></span></a> ";
             }
-            $actions .= "<a href='javascript:void(0)' data-url='".  site_url('payments/printIt/' . $payment->loan_payment_id) ."' class='btn-print-receipt btn btn-default'>Print</a>";
+            $actions .= "<a href='javascript:void(0)' data-url='".  site_url('payments/printIt/' . $payment->loan_payment_id) ."' class='btn-print-receipt btn btn-default'>Imprimir</a>";
 
             $data_row = [];
             $data_row["DT_RowId"] = $payment->loan_payment_id;
@@ -137,10 +139,16 @@ class Payments extends Secure_area implements iData_controller {
             
             $data_row["trans_id"] = $payment->loan_payment_id;
             $data_row["customer"] = ucwords($payment->customer_name);
-            $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Flexible") . " (" . to_currency($payment->loan_amount) . ")";
+            $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Individual") . " (" . to_currency($payment->loan_amount) . ")";
             $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
             $data_row["payable_amount"] = to_currency($payment->paid_amount);
             $data_row["trans_date"] = date($this->config->item('date_format'), $payment->date_paid);
+            $data_row["payment_due"] = date($this->config->item('date_format'), $payment->payment_due);
+            // Calcula la diferencia
+            //$diferencia = $payment->payment_due->diff($payment->date_paid);
+            // Obtiene el número de días de diferencia
+            //$overdue_days = $diferencia->days;
+            //$data_row["overdue_days"] = $payment->payment_due->diff($payment->date_paid);
             $data_row["teller"] = ucwords($payment->teller_name);
             
             $tbl_balance += $payment->paid_amount;
@@ -209,12 +217,20 @@ class Payments extends Secure_area implements iData_controller {
         $loan_agent = $this->Person->get_info($loan->loan_agent_id);
         $customer = $this->Person->get_info($payment->customer_id);
         $collateral = $this->Guarantee->get_info($payment->loan_id);
+        $branch = $this->Payment->getBranch($payment->branch_id);
+
+        //para debugear
+        // $myfile = fopen("payment.txt", "w") or die("Unable to open file!");
+        // $txt = "".json_encode($branch);
+        // fwrite($myfile, $txt);
+        // fclose($myfile);
 
         // pdf viewer 
         $data['collateral'] = $collateral;
         $data['count'] = $payment->loan_payment_id;
         $data['client'] = ucwords($customer->first_name." ".$customer->last_name);
         $data['account'] = $loan->account;
+        $data['branch_name'] = $branch->branch_name;
         //$data['loan'] = to_currency($loan->loan_amount);
         $data['loan'] = to_currency($loan->apply_amount);
         $data['loan_id'] = $payment->loan_id;
@@ -301,6 +317,9 @@ class Payments extends Secure_area implements iData_controller {
 
     function save($payment_id = -1)
     {
+        $branch_name = $this->input->post('branch_name');
+        $branch = $this->Payment->getBranchByName($branch_name);
+
         $payment_data = array(
             'account' => $this->input->post('account'),
             'loan_id' => $this->input->post('loan_id'),
@@ -312,7 +331,8 @@ class Payments extends Secure_area implements iData_controller {
             'teller_id' => $this->input->post('teller'),
             'modified_by' => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
             'payment_due' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('payment_due'))) : strtotime($this->input->post('payment_due')),
-            'lpp_amount' => $this->input->post('lpp_amount')
+            'lpp_amount' => $this->input->post('lpp_amount'),
+            'branch_id' => $branch?$branch->id:null
         );
 
         if ($this->input->post("loan_payment_id") > 0)
@@ -427,6 +447,7 @@ class Payments extends Secure_area implements iData_controller {
                 to_currency($payment->balance_amount),
                 to_currency($payment->paid_amount),
                 date($this->config->item('date_format'), $payment->date_paid),
+                date($this->config->item('date_format'), $payment->payment_due),
                 ucwords($payment->teller_name),
                 $actions
             );

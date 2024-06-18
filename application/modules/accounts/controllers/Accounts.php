@@ -694,6 +694,7 @@ class Accounts extends Secure_area implements iData_controller
         $data["account_id"] = $this->input->post("account_id");
         $data["branch_name"] = $this->input->post("branch_name");
         $data["person_name"] = $this->input->post("person_name");
+        $data["trans_date"] = $this->input->post("trans_date");
         
         $html = $this->load->view('accounts/pdf_receipt', $data, true);
         

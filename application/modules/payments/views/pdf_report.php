@@ -42,7 +42,7 @@
     <body>
         <table width="73%">
             <tr>
-                <td width="75%" rowspan="4"></td>
+                <td width="75%" rowspan="5"></td>
                 <!--<td width="75%" rowspan="4"><img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px"/></td>-->
                 <!--<td align="right">Transacción No. <?= $count; ?> </td>-->
                 <td></td>
@@ -57,6 +57,9 @@
             </tr>
             <tr>
                 <td><small>Usuario: <?= $teller; ?></small></td>
+            </tr>
+            <tr>
+                <td><small>Sucursal: <?= $branch_name; ?></small></td>
             </tr>
             <tr>
                 <td colspan="2"><br></td>
@@ -168,6 +171,7 @@
 	
                     //Declaramos la ruta y nombre del archivo a generar
 	                $filename = $dir.'test.png';
+                    
 
                     //Parámetros de Configuración
 	
@@ -177,11 +181,11 @@
 	                $contenido = " ID Tran: " . $count . "\n Cliente: " . $account . "\n Cuota: " . $number . " de " . $size . "\n Total: " . $total; //Texto
 	
                     //Enviamos los parámetros a la Función para generar código QR 
-	                // QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
+	                QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
 	
                     //Mostramos la imagen generada
-                    echo '<img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=http%3A%2F%2Fwww.google.com%2F&choe=UTF-8" title="'.$contenido.'" />';
-	                // echo '<img src="'.$dir.basename($filename).'" />';  
+                    // echo '<img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=http%3A%2F%2Fwww.google.com%2F&choe=UTF-8" title="'.$contenido.'" />';
+	                echo '<img src="'.$dir.basename($filename).'" />';  
                 ?>
                 </td>
             </tr>

@@ -43,7 +43,7 @@
 
         $(".btn-delete-proof-file").click(function () {
             var $this = $(this);
-            alertify.confirm("Are you sure you wish to delete this file?", function () {
+            alertify.confirm("¿Está seguro de querer eliminar este archivo?", function () {
                 var url = '<?= site_url('loans/ajax') ?>';
                 var params = {
                     ajax_type: 9,

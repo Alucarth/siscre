@@ -7,7 +7,7 @@ $(document).ready(function(){
     
     $(document).on("click", ".btn-delete", function(){
         var $this = $(this);
-        alertify.confirm("Are you sure you wish to delete this document?", function(){
+        alertify.confirm("¿Está seguro de que desea eliminar este documento?", function(){
             var url = SITE_URL + 'documents/ajax';
             var params = {
                 softtoken: $("input[name='softtoken']").val(),

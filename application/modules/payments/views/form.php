@@ -15,8 +15,9 @@
 
     </h3>
     <p class="title-description">
-        Información básica de pago
+        Información básica de pago 
     </p>
+    <input id="branch_name" name="branch_name"  type="hidden" value="<?php echo get_branch_name() ?>">
 </div>
 
 <div class="section">

@@ -1,0 +1,11 @@
+{
+    "plugin": {	
+        "name":"home",
+		"description":"Advance dashboard plugin for K-Loans",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : false
+		}  
+    }
+}
