@@ -292,6 +292,7 @@
         });
 
         $('.input-group.date').datepicker({
+            language: 'es',
             format: '<?= calendar_date_format(); ?>',
             todayBtn: "linked",
             keyboardNavigation: false,

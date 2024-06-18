@@ -919,6 +919,7 @@
     //validation and submit handling
     $(document).ready(function () {        
         $('.input-group.date').datepicker({
+            language: 'es',
             format: '<?= calendar_date_format(); ?>',
             todayBtn: "linked",
             keyboardNavigation: false,
@@ -1216,6 +1217,7 @@
             }
 
             $('.input-group.date').datepicker({
+                language: 'es',
                 format: '<?= calendar_date_format(); ?>',
                 todayBtn: "linked",
                 keyboardNavigation: false,
