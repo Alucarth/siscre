@@ -42,42 +42,63 @@
                         <?php endif; ?>
                         <p><?=ktranslate2("Loan Management System")?></p>
                     </header>
-                    <div class="auth-content">
-                        <p class="text-center"><?=ktranslate2("ADMIN LOGIN")?></p>
-                        <?php echo form_open('login', array('class' => 'form-signin')) ?>
-                            <span class="text-center" style="color:red"><?php echo validation_errors(); ?></span>
-                            <div class="form-group">
-                                <label for="username"><?=ktranslate2("Username")?></label>
-                                <input type="text" class="form-control underlined" name="username" id="username" placeholder="Your username" required value="">
-                            </div>
-                            <div class="form-group">
-                                <label for="password"><?=ktranslate2("Password")?></label>
-                                <input type="password" class="form-control underlined" name="password" id="password" placeholder="Your password" required value="">
-                            </div>
+                    <?php  if(date("h:i:sa") > '')
+                            // $current_time = "6:59 pm";
                             
-                            <?php if ( is_plugin_active("branches") ): ?>
-                                <div class="form-group">
-                                    <label for="branch">Branch</label>
-                                    <select class="form-control" name="branch_id">
-                                        <option value="-1">Please select</option>
-                                        <?php foreach ($branches as $branch): ?>
-                                            <option value="<?=$branch->id;?>"><?=$branch->branch_name;?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                            $current_time = date("h:i a");
+                            // echo 'tiemp o'. $current_time;
+                            $sunrise = "7:00 am";
+                            $sunset = "7:00 pm";
+                            $date1 = DateTime::createFromFormat('h:i a', $current_time);
+                            $date2 = DateTime::createFromFormat('h:i a', $sunrise);
+                            $date3 = DateTime::createFromFormat('h:i a', $sunset);
+                            if ($date1 > $date2 && $date1 < $date3)
+                            {
+                               ?>
+                                <div class="auth-content">
+                                    <p class="text-center"><?=ktranslate2("ADMIN LOGIN")?></p>
+                                    <?php echo form_open('login', array('class' => 'form-signin')) ?>
+                                        <span class="text-center" style="color:red"><?php echo validation_errors(); ?></span>
+                                        <div class="form-group">
+                                            <label for="username"><?=ktranslate2("Username")?></label>
+                                            <input type="text" class="form-control underlined" name="username" id="username" placeholder="Your username" required value="">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="password"><?=ktranslate2("Password")?></label>
+                                            <input type="password" class="form-control underlined" name="password" id="password" placeholder="Your password" required value="">
+                                        </div>
+                                        
+                                        <?php if ( is_plugin_active("branches") ): ?>
+                                            <div class="form-group">
+                                                <label for="branch">Branch</label>
+                                                <select class="form-control" name="branch_id">
+                                                    <option value="-1">Please select</option>
+                                                    <?php foreach ($branches as $branch): ?>
+                                                        <option value="<?=$branch->id;?>"><?=$branch->branch_name;?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                        <?php endif; ?>
+                                        
+                                        <div class="form-group">
+                                            <label for="remember">
+                                                &nbsp;
+                                            </label>
+                                            <a href="javascript:void(0)" class="btn-forgot-password forgot-btn pull-right"><?=ktranslate2("Forgot password")?>?</a>
+                                        </div>
+                                        <div class="form-group">
+                                            <button type="submit" class="btn btn-block btn-primary"><?=ktranslate2("Login")?></button>
+                                        </div>                            
+                                    <?php echo form_close(); ?>
                                 </div>
-                            <?php endif; ?>
-                            
-                            <div class="form-group">
-                                <label for="remember">
-                                    &nbsp;
-                                </label>
-                                <a href="javascript:void(0)" class="btn-forgot-password forgot-btn pull-right"><?=ktranslate2("Forgot password")?>?</a>
-                            </div>
-                            <div class="form-group">
-                                <button type="submit" class="btn btn-block btn-primary"><?=ktranslate2("Login")?></button>
-                            </div>                            
-                        <?php echo form_close(); ?>
-                    </div>
+                               <?php
+                            }
+                            else{
+                                echo '     El sistema se encuentra disponible de 7:00 AM. a 7:00 PM.';
+
+                            }
+                     ?>
+                    
                 </div>
                 <div class="text-center">
 
