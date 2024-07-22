@@ -163,14 +163,15 @@
                 <td align="right" width="65%" rowspan="5">
                 <?php
             	    //Declaramos una carpeta temporal para guardar la imágenes generadas
-	                $dir = 'temp/';
+	               $dir = 'temp/';
 	
 	                //Si no existe la carpeta la creamos
-	          
+			if (!file_exists($dir))
+                        mkdir($dir);
 	
                     //Declaramos la ruta y nombre del archivo a generar
 	                $filename = $dir.'test.png';
-			echo  $filename; 
+//			echo  $filename; 
 
                     //Parámetros de Configuración
 	
@@ -180,12 +181,12 @@
 	                $contenido = " ID Tran: " . $count . "\n Cliente: " . $account . "\n Cuota: " . $number . " de " . $size . "\n Total: " . $total; //Texto
 	
                     //Enviamos los parámetros a la Función para generar código QR 
-          		// QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
-			echo '<img src= "'QRcode::png('test asd ')'">';
+          		QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
+			//echo '<img src= "'QRcode::png('test asd ')'">';
 	
                     //Mostramos la imagen generada
                     // echo '<img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=http%3A%2F%2Fwww.google.com%2F&choe=UTF-8" title="'.$contenido.'" />';
-	            //    echo '<img src="'.$dir.basename($filename).'" />';  
+	               echo '<img src="'.$dir.basename($filename).'" />';
                 ?>
                 </td>
             </tr>
