@@ -75,11 +75,12 @@ $query_builder = TRUE;
 
 $db['default'] = array(
 	'dsn'	=> '',
-	'hostname' => "127.0.0.1",
-	'username' => "keyrus",
-	'password' => "123456",
-	//'password' => "123456",
-	'database' => "credisurgir_db",
+	'hostname' => 'database',
+	'username' => 'root',
+	'password' => 'tiger',
+	'database' => 'credisurgir_db',
+	// 'username' => "keyrus",
+	// 'password' => "tommyt9949018",
 	'dbdriver' => 'mysqli',
 	'dbprefix' => 'c19_',
 	'pconnect' => FALSE,

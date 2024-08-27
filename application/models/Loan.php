@@ -1118,17 +1118,17 @@ class Loan extends CI_Model {
     function get_loan_interest_types()
     {
         $interest_types = [];
-        //$interest_types["flat"] = "Tarifa plana";
-        //$interest_types["fixed"] = "Interés fijo";
-        //$interest_types["interest_only"] = "Solo interés";
-        //$interest_types["outstanding_interest"] = "Interés pendiente";
-        //$interest_types["one_time"] = "Pago único";
-        //$interest_types["mortgage"] = "Amortización de hipoteca";
+        $interest_types["flat"] = "Tarifa plana";
+        $interest_types["fixed"] = "Interés fijo";
+        $interest_types["interest_only"] = "Solo interés";
+        $interest_types["outstanding_interest"] = "Interés pendiente";
+        $interest_types["one_time"] = "Pago único";
+        $interest_types["mortgage"] = "Amortización de hipoteca";
         $interest_types["mortgage2"] = "Amortización de hipoteca 2";
-        //$interest_types["loan_deduction"] = "Deducción de préstamo";
-        //$interest_types["loan_interest_reduction"] = "Reducción de interés";
-        //$interest_types["annual_rate"] = "Tarifa anual";
-        //$interest_types["pago_excel"] = "Pago excel";
+        $interest_types["loan_deduction"] = "Deducción de préstamo";
+        $interest_types["loan_interest_reduction"] = "Reducción de interés";
+        $interest_types["annual_rate"] = "Tarifa anual";
+        $interest_types["pago_excel"] = "Pago excel";
         $interest_types["fixed_fee"] = "Cuota fija";
 
         return $interest_types;
@@ -1236,7 +1236,8 @@ class Loan extends CI_Model {
         $penalty_amount = $post_var["penalty_amount"];
 
         $exclude_sundays = $post_var["exclude_sundays"];
-        $exclude_schedules = $post_var["exclude_schedules"];
+        if(isset($post_var["exclude_schedules"])){
+        $exclude_schedules = $post_var["exclude_schedules"];}
 
         if ($this->config->item('date_format') == 'd/m/Y')
         {
@@ -2966,7 +2967,8 @@ class Loan extends CI_Model {
 
         $penalty_amount = $post_var["penalty_amount"];
 
-        $exclude_schedules = $post_var["exclude_schedules"];
+        if(isset($post_var["exclude_schedules"])){
+        $exclude_schedules = $post_var["exclude_schedules"];}
 
 
 
@@ -3346,7 +3348,8 @@ class Loan extends CI_Model {
 		$operating_expenses = $post_var["operating_expenses"];
         $penalty_amount = $post_var["penalty_amount"];
         $exclude_sundays = $post_var["exclude_sundays"];
-        $exclude_schedules = $post_var["exclude_schedules"];
+        if(isset($post_var["exclude_schedules"])){
+        $exclude_schedules = $post_var["exclude_schedules"];}
 		$adicional_fees = $post_var["additional_fees"];
 
         if ($this->config->item('date_format') == 'd/m/Y')
@@ -3427,8 +3430,9 @@ class Loan extends CI_Model {
             $tmp["payment_amount"] = $payment_amount;
             $tmp["payment_amount_capital"] = $principal_amount;
 			$tmp["operating_expenses_amount"] = $operating_expenses_amount;
+            if(isset($datos)){
             $tmp["valores_calculados"] = $datos;
-
+}
             if ( $pay_term_name == 'biweekly' )
             {
                 $payment_date = strtotime(date('Y-m-d', $payment_date) . '+2 week');
@@ -3484,7 +3488,8 @@ class Loan extends CI_Model {
         $operating_expenses = $post_var["operating_expenses"];
         $penalty_amount = $post_var["penalty_amount"];
         $exclude_sundays = $post_var["exclude_sundays"];
-        $exclude_schedules = $post_var["exclude_schedules"];
+        if(isset($post_var["exclude_schedules"])){
+        $exclude_schedules = $post_var["exclude_schedules"];}
         $adicional_fees = $post_var["additional_fees"];
 
         if ($this->config->item('date_format') == 'd/m/Y')
