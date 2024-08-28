@@ -36,8 +36,3 @@ $lang["module_messages"] = "Mensajes";
 $lang["module_messages_desc"] = "Agregar, actualizar, eliminar y buscar mensajes";
 $lang["module_emails"] = "Plantillas de correo electrónico";
 $lang["module_emails_desc"] = "Listar y buscar plantillas de correo electrónico";
-
-$lang["module_accounting"] = "Contabilidad";
-$lang["module_accounting_desc"] = "Modulo contable";
-$lang["module_general_ledger"] = "Libro Mayor";
-$lang["module_general_ledger_desc"] = "Reporte de Libro Mayor contable";
