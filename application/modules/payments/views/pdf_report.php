@@ -193,7 +193,7 @@
                 <td align="left">Firma cliente: ....................&nbsp;</td>
             </tr>
             <tr>
-                <td align="left">CI: <?= $document_number; ?>&nbsp;</td>
+                <td align="left">CI: <?= $ci; ?>&nbsp;</td>
             </tr>
             <tr>
                 <td align="left">Nombre: <?= $client; ?></td>

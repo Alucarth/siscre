@@ -76,7 +76,7 @@ INSERT INTO `c19_app_config` (`key`, `value`) VALUES
 ('sales_invoice_format', '0'),
 ('tax_included', '0'),
 ('timezone', 'America/La_Paz'),
-('website', 'https://solcreditobo.com');
+('website', 'https://credisurgir.com');
 
 -- --------------------------------------------------------
 

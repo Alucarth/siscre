@@ -218,6 +218,7 @@ class Payments extends Secure_area implements iData_controller {
         $customer = $this->Person->get_info($payment->customer_id);
         $collateral = $this->Guarantee->get_info($payment->loan_id);
         $branch = $this->Payment->getBranch($payment->branch_id);
+        $ci = $this->Payment->get_info($payment->ci);
 
         //para debugear
         // $myfile = fopen("payment.txt", "w") or die("Unable to open file!");
@@ -229,6 +230,8 @@ class Payments extends Secure_area implements iData_controller {
         $data['collateral'] = $collateral;
         $data['count'] = $payment->loan_payment_id;
         $data['client'] = ucwords($customer->first_name." ".$customer->last_name);
+        //ci
+        $data['ci'] = $payment->ci;
         $data['account'] = $loan->account;
         $data['branch_name'] = $branch->branch_name;
         //$data['loan'] = to_currency($loan->loan_amount);
