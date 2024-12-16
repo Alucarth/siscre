@@ -1212,7 +1212,7 @@ class Loan extends CI_Model {
 
             default:
 
-                $data_scheds = $this->calculate_percentage($post_var);
+                $data_scheds = $this->calculate_fixed_fee($post_var);
 
                 break;
 
@@ -3346,7 +3346,7 @@ class Loan extends CI_Model {
 		$operating_expenses = $post_var["operating_expenses"];
         $penalty_amount = $post_var["penalty_amount"];
         $exclude_sundays = $post_var["exclude_sundays"];
-        $exclude_schedules = isset($post_var["exclude_schedules"]) ? $post_var["exclude_schedules"] : '';
+        $exclude_schedules = $post_var["exclude_schedules"];
 		$adicional_fees = $post_var["additional_fees"];
 
         if ($this->config->item('date_format') == 'd/m/Y')
@@ -3427,7 +3427,7 @@ class Loan extends CI_Model {
             $tmp["payment_amount"] = $payment_amount;
             $tmp["payment_amount_capital"] = $principal_amount;
 			$tmp["operating_expenses_amount"] = $operating_expenses_amount;
-            // $tmp["valores_calculados"] = $datos;
+            $tmp["valores_calculados"] = $datos;
 
             if ( $pay_term_name == 'biweekly' )
             {
@@ -3600,16 +3600,13 @@ class Loan extends CI_Model {
     }
 
 
-    // Se cambia la logica con el ejemplo excel
     function calculate_fixed_fee($post_var)
     {
-        $grace_period = $post_var["grace_period_days"];
         $apply_amount = $post_var["ApplyAmt"];
         $interest_rate = $post_var["TotIntRate"];
         $pay_term = (int) $post_var["NoOfPayments"];
         $pay_term_name = $post_var["PayTerm"];
 		$operating_expenses = $post_var["operating_expenses"];
-        $penalty_amount = $post_var["penalty_amount"];
         $exclude_sundays = $post_var["exclude_sundays"];
         $exclude_schedules = isset($post_var["exclude_schedules"]) ?: '';
 		$adicional_fees = $post_var["additional_fees"];
@@ -3625,96 +3622,61 @@ class Loan extends CI_Model {
 
         $term = (int) $post_var["NoOfPayments"];
 
-        if ( $pay_term_name == 'biweekly' )
-        {
-            $term *= 2;
-            $pay_term *= 2;
-			$interest_rate /= 2;
-            $operating_expenses /= 2;
-        }
-        
-        if ( $pay_term_name == 'month_weekly' )
-        {
-            $term *= 4;
-            $pay_term *= 4;
-			$interest_rate /= 4;
-            $operating_expenses /= 4;
-        }
-
         $data_scheds = [];
         $interest_rate = ($interest_rate / 100);
-		//$operating_expenses = ($operating_expenses / 100);
         $balance_owed = $apply_amount;
-        //$operating_expenses_amount = $apply_amount * $operating_expenses;        
         $operating_expenses_amount = $operating_expenses;
-        
-        $tea = $interest_rate * 12; // Tasa Efectiva Anual
-        // La usamos para calcular el "valor indice" en el TEAM
-        $team = ( pow((1 + $tea / 12), 12) ) - 1; // TEA Maximizada
-        $team = number_format((float) $team, 5, '.', ''); // Formateo a 5 decimales como el ejemplo excel
 
-        $payment_date_current = ""; // fecha actual
-        $payment_date_next = ""; // fecha siguiente
-        $payment_date_acum = ""; // dias acumulados
-        $delta_index_value = 0; // calculo intermedio
-        $index_value = 0; // "valor indice" excel
-
-        // recorremos las fechas para obtener el "valor indice"
-        for ($i = 1; $i <= $term; $i++){
-            $days_diff = 0; // var diferencia de dias
-            $payment_date_current = (!$payment_date_next) ? $payment_date : $payment_date_next; // obtengo la fecha de desembolso o la siguiente
-            $payment_date_current  = strtotime(date('Y-m-d', $payment_date_current)); // convierto para operar fechas
-            $payment_date_next  = strtotime(date('Y-m-d', $payment_date_current) . '+1 ' . $pay_term_name);
-            $days_diff = $payment_date_next - $payment_date_current;
-            $days_diff = date('t', $days_diff) ?: 0; // obtengo la cantidad de dias
-            $payment_date_acum += $days_diff;
-            $delta_index_value = 1 / pow(( 1 + $team ), ( $payment_date_acum / 360 )); // calculo el "valor indice" por fecha
-            $index_value += $delta_index_value;
-            $index_value = number_format((float) $index_value, 5, '.', '');
+        $periodicity = 0;
+        $factor = 0;
+  
+        switch ($pay_term_name) {
+            case 'day':
+                $periodicity = 360;
+                break;
+            case 'week':
+                $periodicity = 52;
+                break;
+            case 'biweekly':
+                $periodicity = 24;
+                break;
+            case 'month':
+                $periodicity = 12;
+                break;
+            default:
+                throw new Exception("Invalid frecuency!");
+                break;
         }
-
-        $deno = ( $index_value > 0) ? $index_value : 1;
-        $fixed_fee = $balance_owed / $deno; // valor de cuota fija
-        $fixed_fee = number_format((float) $fixed_fee, 2, '.', '');
 
         $i = 0;
         $y = 1;
+        $factor = $interest_rate / $periodicity;
+        $deno = 1 - pow( 1 + ( $factor ), -$term);
+        $num = $apply_amount * ( $factor );
+        $payment_amount = $num / $deno; // valor de cuota
+        $payment_amount = number_format($payment_amount, 4, '.', '');
+        
         while ($balance_owed > 0 && $i < $term)
         {
             $pay_term = $pay_term > 0 ? $pay_term : 1;
-            $term_pay = $fixed_fee; // asigno la cuota fija calculada
-			$payment_amount = $term_pay;
-			// $payment_amount = $term_pay + $operating_expenses_amount;
-            $interest = $apply_amount * $interest_rate;
-            $principal_amount = $term_pay - $interest;
+            $interest = $apply_amount * $factor;
+            $principal_amount = $payment_amount - $interest;
             $balance_owed = $apply_amount - $principal_amount;
 
-            if($y == $term){ // ajuste para la ultima cuota
+            if($y == $term){
                 if( $balance_owed != 0 ){
-                    $apply_amount += $balance_owed; // Ajusta el pago total
+                    $payment_amount += $balance_owed; // Ajusta el pago total
                     $balance_owed = 0; // Establece el balance a cero
                 }
-            }
-
-            $color = $title = $grace_period_days = '';
-            if (isset($grace_period[$y]))
-            {
-                $payment_date = strtotime(date("Y-m-d", $payment_date) . ' +' . $grace_period[$y] . ' day');
-                $color = 'red';
-                $title = 'In grace period';
-                $grace_period_days = $grace_period[$y] . ' days';
             }
 
             $tmp = [];
             $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
             $tmp["payment_balance"] = $balance_owed;
-            $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
-            $tmp["penalty_amount"] = $penalty_amount;
             $tmp["interest"] = $interest;
             $tmp["payment_amount"] = $payment_amount;
             $tmp["payment_amount_capital"] = $principal_amount;
 			$tmp["operating_expenses_amount"] = $operating_expenses_amount;
-            $tmp["valores_calculados"] = $datos;
 
             if ( $pay_term_name == 'biweekly' )
             {
@@ -3766,7 +3728,7 @@ class Loan extends CI_Model {
     //     $loan_amount = $post_var["ApplyAmt"];
     //     $interest_rate = $post_var["TotIntRate"];
     //     $exclude_sundays = $post_var["exclude_sundays"];
-    //     $exclude_schedules = isset($post_var["exclude_schedules"]) ?: '';
+    //     $exclude_schedules = $post_var["exclude_schedules"];
     //     $penalty_amount = $post_var["penalty_amount"];
     //     $pay_term = $post_var["PayTerm"];
     //     $operating_expenses = $post_var["operating_expenses"];
