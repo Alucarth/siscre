@@ -8,7 +8,7 @@
 
 <div class="form-group row">
     <label class="col-sm-2 control-label text-xs-right">
-    Aplicar cantidad:
+    Monto de préstamo:
     </label>
     <div class="col-sm-2">
         <input type="hidden" id="amount" name="amount" value="<?=$loan_info->loan_amount;?>" />
@@ -30,7 +30,7 @@
 <div class="hr-line-dashed"></div>
 <div class="form-group row">
     <label class="col-sm-2 control-label text-xs-right">
-        Tasa de interés:
+        Tasa de interés anual:
     </label>
     <div class='col-sm-2'>
         <div class="input-group">
@@ -42,9 +42,9 @@
         
         <div id="div_ineterest_type_label">
             <span id="sp-interest-type-label">
-            <?php echo isset($interest_types[$loan_info->interest_type]) ? $interest_types[$loan_info->interest_type] : 'Elija una opción'; ?>
+            <?php echo isset($interest_types[$loan_info->interest_type]) ?: ''; ?>
+            <!-- <?php echo isset($interest_types[$loan_info->interest_type]) ? $interest_types[$loan_info->interest_type] : 'Elija una opción'; ?> -->
             </span>
-            (<a href="javascript:void(0)" id="btn-change-interest-type">Cambiar</a>)
         </div>
         <div style="display:none;" id="div_interest_type">
             <select name="interest_type" id="DTE_Field_interest_type" class="form-control">
@@ -77,53 +77,16 @@
         </div>
         <div class="col-sm-2">
             <select class="form-control" name="term_period" id="term_period">
-                <option value="day" <?= $loan_info->term_period === "day" ? 'selected="selected"' : ''; ?>>Día</option>
-                <option value="week" <?= $loan_info->term_period === "week" ? 'selected="selected"' : ''; ?>>Semana</option>
-                <option value="month" <?= $loan_info->term_period === "month" ? 'selected="selected"' : ''; ?>>Mes</option>
-                <option value="biweekly" <?= $loan_info->term_period === "biweekly" ? 'selected="selected"' : ''; ?>>Mes (Quincenal)</option>
-                <option value="month_weekly" <?= $loan_info->term_period === "month_weekly" ? 'selected="selected"' : ''; ?>>Mes (Semanal)</option>
-                <option value="year" <?= $loan_info->term_period === "year" ? 'selected="selected"' : ''; ?>>Año</option>
+                <option value="day" <?= $loan_info->term_period === "day" ? 'selected="selected"' : ''; ?>>Días</option>
+                <option value="week" <?= $loan_info->term_period === "week" ? 'selected="selected"' : ''; ?>>Semanas</option>
+                <option value="month" <?= $loan_info->term_period === "month" ? 'selected="selected"' : ''; ?>>Meses</option>
+                <option value="biweekly" <?= $loan_info->term_period === "biweekly" ? 'selected="selected"' : ''; ?>>Quincenas</option>
+                <!-- <option value="month_weekly" <?= $loan_info->term_period === "month_weekly" ? 'selected="selected"' : ''; ?>>Mes (Semanal)</option> -->
+                <option value="year" <?= $loan_info->term_period === "year" ? 'selected="selected"' : ''; ?>>Años</option>
             </select>
         </div>          
     </div>
     
-    <script>
-        $(document).ready(function(){
-            $("#term_period").change(function(){
-                if ( $(this).val() == 'biweekly' )
-                {
-                    $("#sp-term-description").html("La tasa de interés se aplica todos los meses, pero el cliente debe pagar dos veces en un mes");
-                    $("#div_explain").slideDown();
-                }
-                else if ( $(this).val() == 'month_weekly' )
-                {
-                    $("#sp-term-description").html("La tasa de interés se aplica todos los meses, pero el cliente debe pagar todas las semanas.");
-                    $("#div_explain").slideDown();
-                }
-                else
-                {
-                    $("#div_explain").slideUp();                    
-                }
-                    
-            });
-        });
-    </script>
-    
-</div>
-
-<div id="div_explain" style="display:none;">
-    <div class="hr-line-dashed"></div>
-    <div class="form-group row">
-        <label class="col-lg-2 control-label text-xs-right">
-            Descripción del término:
-        </label>
-        <div class="col-lg-10">
-            <div class="alert alert-info">
-                <i class="fa fa-info-circle"></i>
-                <span id="sp-term-description"></span>
-            </div>
-        </div>
-    </div>
 </div>
 
 <div class="hr-line-dashed"></div>
@@ -185,50 +148,6 @@
 <!--<//?php endif; ?>-->
 
 <div class="hr-line-dashed"></div>
-<div class="form-group row">
-    <label class="col-lg-2 control-label text-xs-right">
-        Sanciones por pago atrasado:
-    </label>
-    <div class="col-lg-2">
-        <div class="input-group">
-            <input type="text" name="penalty_value" id="penalty_value" class="form-control" value="<?= $loan_info->penalty_value > 0 ? $loan_info->penalty_value : 0?>" />
-            <?php if ( $loan_info->penalty_type == 'amount' ): ?>
-            <span class="input-group-addon input-group-append" title="Click to toggle type"><span class="input-group-text" id="btn-toggle-penalty-type">Amt</span></span>
-            <?php else: ?>
-            <span class="input-group-addon input-group-append" title="Click to toggle type"><span class="input-group-text" id="btn-toggle-penalty-type">%</span></span>
-            <?php endif; ?>
-            <input type="hidden" id="hid-penalty-type" name="penalty_type" value="<?=$loan_info->penalty_type != '' ? $loan_info->penalty_type : 'percentage';?>" />
-        </div>
-    </div>
-    
-    <div class="col-lg-2">
-        <label>
-            <a href="javascript:void(0)" id="btn-add-grace-period">Agregar período de gracia</a>
-        </label>
-    </div>
-    
-</div>
-
-<script>
-    $(document).ready(function(){
-        $("#btn-add-grace-period").click(function(){
-            $("#md-grace-periods").modal("show");
-        });
-        
-        $("#btn-toggle-penalty-type").click(function(){
-            if ( $(this).html() == '%' )
-            {
-                $(this).html("Amt");
-                $("#hid-penalty-type").val("amount");
-            }
-            else
-            {
-                $(this).html("%");
-                $("#hid-penalty-type").val("percentage");
-            }
-        });
-    });
-</script>
 
 <div class="form-group row">
     <label class="col-sm-2 control-label text-xs-right">
