@@ -89,6 +89,7 @@ class My_wallets extends Secure_area implements iData_controller {
         $wallets = $this->My_wallet->get_all($limit, $offset, $keywords, $order, 0, $selected_user, $filters);
         $count_all = $this->My_wallet->get_all($limit, $offset, $keywords, $order, 1, $selected_user, $filters);
         $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
+        $user_info = $this->Employee->get_info($user_id); // Info del user para roles
 
         $tmp = array();
 
@@ -104,11 +105,15 @@ class My_wallets extends Secure_area implements iData_controller {
                 $wallet_type = $wallet->wallet_type;
             }
             
-            $actions = "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-wallet-id='" . $wallet->wallet_id . "' title='Delete'><span class='fa fa-trash'></span></a>";
+            if ( check_access($user_info->role_id, "my_wallets", "delete") ){
+                $actions =  "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn' data-wallet-id='" . $wallet->wallet_id . "' title='Delete'><span class='fa fa-trash'></span></a>";
+            } else {
+                $actions =  "<a href='javascript:void(0)' class='btn-xs btn-danger btn-delete btn disabled' data-wallet-id='" . $wallet->wallet_id . "' title='Delete'><span class='fa fa-trash'></span></a>";
+            }
 
             $data_row = [];
             $data_row["DT_RowId"] = $wallet->wallet_id;
-            $data_row["actions"] = $actions;
+            $data_row["actions"] = isset($actions) ? $actions : "";
             
             $data_row["amount"] = to_currency($wallet->amount, 1);
             $data_row["description"] = $wallet->descriptions;
