@@ -900,6 +900,29 @@
             processData: false
         });
     });
+
+    $(document).on("blur", "input[name='ci']", function() {
+        let ci = $(this).val().trim();
+    
+        if (!ci) return; // Si está vacío
+    
+        $.ajax({
+            url: '<?=site_url("loans/check_garante")?>',
+            type: 'POST',
+            dataType: 'json',
+            data: { ci: ci },
+            success: function(response) {
+                console.log("Respuesta:", response); // Ver en consola
+                if (response.exists) {
+                    alertify.warning("Este CI ya es garante en un crédito activo");
+                }
+            },
+            error: function(xhr) {
+                console.error("Error en AJAX:", xhr.responseText);
+                alertify.error("Error técnico al validar. Intente nuevamente.");
+            }
+        });
+    });
 </script>
 
 <script type='text/javascript'>

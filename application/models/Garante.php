@@ -155,6 +155,21 @@ class Garante extends CI_Model {
         
         return $id;
     }
+
+    public function es_garante_en_credito_activo($ci, $excluir_garante_id = null) {
+        $this->db->select('COUNT(*) as total');
+        $this->db->from('c19_garantes g');
+        $this->db->join('c19_loans l', 'l.loan_id = g.loan_id');
+        $this->db->where('g.ci', $ci);
+        $this->db->where('l.loan_status', 'approved'); 
+        
+        if ($excluir_garante_id) {
+            $this->db->where('g.garante_id !=', $excluir_garante_id);
+        }
+        
+        $query = $this->db->get();
+        return ($query->row()->total > 0);
+    }
 }
 
 ?>

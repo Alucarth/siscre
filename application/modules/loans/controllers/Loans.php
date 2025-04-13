@@ -2426,6 +2426,23 @@ class Loans extends Secure_area implements iData_controller
         
         send($return);
     }
+
+    public function check_garante() {
+        header('Content-Type: application/json');
+        error_log("Datos recibidos: " . print_r($_POST, true)); // Verifica en logs
+        $ci = $this->input->post('ci');
+        $garante_id = $this->input->post('garante_id') ?: null;
+        
+        if (empty($ci)) {
+            echo json_encode(['exists' => false]);
+            return;
+        }
+    
+        $this->load->model('Garante');
+        $exists = $this->Garante->es_garante_en_credito_activo($ci, $garante_id);
+        
+        echo json_encode(['exists' => $exists]);
+    }
 }
 
 ?>
