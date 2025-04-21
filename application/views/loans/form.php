@@ -682,9 +682,115 @@
                Garante
             </div>
             <div class="modal-body">
+                <!-- Contenedor para errores generales -->
+                <div id="g-errors" class="alert alert-danger d-none"></div>
                 <?php echo form_open_multipart(site_url('loans/save_garante'), ["id"=>"frmGarante"]); ?>
                     <input type="text" name="loan_id" value="<?=$loan_info->loan_id;?>" />
                     <input type="text" name="garante_id" value="" />
+                    <!-- Nombre -->
+                    <div class="form-group">
+                        <label for="nombre">Nombre</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="nombre"
+                            name="nombre"
+                            required pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ ]{3,250}"
+                            title="Sólo letras y espacios (3–250 caracteres)"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!-- Cédula de Identidad -->
+                    <div class="form-group">
+                        <label for="ci">CI</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="ci"
+                            name="ci"
+                            required pattern="\d{6,8}"
+                            maxlength="8"
+                            title="6 a 8 dígitos numéricos"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!-- Teléfono fijo -->
+                    <div class="form-group">
+                        <label for="phone">Teléfono</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="phone"
+                            name="phone"
+                            required pattern="\d{7,8}"
+                            maxlength="8"
+                            title="7 u 8 dígitos numéricos"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!-- Teléfono celular -->
+                    <div class="form-group">
+                        <label for="cellphone">Celular</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="cellphone"
+                            name="cellphone"
+                            required pattern="\d{8}"
+                            maxlength="8"
+                            title="8 dígitos numéricos"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input
+                            type="email"
+                            class="form-control"
+                            id="email"
+                            name="email"
+                            required
+                            title="Debe ser un correo válido"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!-- Dirección de hogar -->
+                    <div class="form-group">
+                        <label for="direccion_hogar">Dir. Hogar</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="direccion_hogar"
+                            name="direccion_hogar"
+                            required
+                            pattern="[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ.,# ]{3,250}"
+                            title="Sólo letras, números y espacios (3–250 caracteres)"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!-- Dirección de trabajo -->
+                    <div class="form-group">
+                        <label for="direccion_trabajo">Dir. Trabajo</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="direccion_trabajo"
+                            name="direccion_trabajo"
+                            required
+                            pattern="[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ.,# ]{3,250}"
+                            title="Sólo letras, números y espacios (3–250 caracteres)"
+                        />
+                        <div class="invalid-feedback"></div>
+                    </div>
+
+                    <!--
                     <div class="form-group">
                         <label>Nombre</label>
                         <input type="text" class="form-control" id="nombre" name="nombre" />
@@ -713,14 +819,13 @@
                         <label>Email</label>
                         <input type="text" class="form-control" id="email" name="email" />
                     </div>
-
-                    <?php echo form_close();?>
-                
+                    -->
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal"><?=ktranslate2("Close")?></button>
                 <button type="button" class="btn btn-primary" id="btn-submit-garante">Guardar</button>
             </div>
+            <?php echo form_close(); ?>
         </div>
         <!-- /.modal-content -->
     </div>
@@ -868,38 +973,73 @@
             processData: false
         });
     });
-    $("#frmGarante").on("submit", function(e){
-        e.preventDefault();
-        var $this = $(this);
-        var formData = new FormData( this );
-        
-        $("#btn-submit-garante").prop("disabled", true);
-        $.ajax({
-            url: $this.attr("action"),
-            type: 'POST',
-            data: formData,
-            success: function (data) {
-                var data = $.parseJSON(data);
-                if ( data.status == "OK" )
-                {
-                    $("#md-garante").modal("hide");
-                    $("#tbl_garante").DataTable().ajax.reload();
-                }
-                else
-                {
-                    alertify.alert("<?= ktranslate2("i cant save data")?>!");
-                }
-                
-                $("#btn-submit-garante").prop("disabled", false);
-            },
-            error: function(xhr, status, error){
-                alert("Error!" + xhr.status);
-            },
-            cache: false,
-            contentType: false,
-            processData: false
-        });
-    });
+   
+</script>
+
+<script>
+$(function(){
+  // Genera la URL usando PHP
+  var saveUrl = '<?= site_url("loans/save_garante") ?>';
+
+  $("#frmGarante")
+    // quita cualquier event handler previo
+    .off("submit")
+    .on("submit", function(e){
+      e.preventDefault();
+      var $form = $(this);
+
+      // 1) Limpio errores previos
+      $("#g-errors").addClass("d-none").text("");
+      $form.find(".is-invalid").removeClass("is-invalid");
+      $form.find(".invalid-feedback").text("");
+
+      $("#btn-submit-garante").prop("disabled", true);
+
+      var fd = new FormData(this);
+      $.ajax({
+        url: saveUrl,
+        method: "POST",
+        data: fd,
+        dataType: "json",
+        contentType: false,
+        processData: false,
+
+        success: function(res) {
+          if (res.status === "OK") {
+            $("#md-garante").modal("hide");
+            $("#tbl_garante").DataTable().ajax.reload();
+            return;
+          }
+
+          // 2) Errores generales
+          if (res.errors.general) {
+            $("#g-errors")
+              .removeClass("d-none")
+              .text(res.errors.general);
+          }
+
+          // 3) Errores por campo
+          $.each(res.errors, function(field, msg){
+            if (field === "general") return;
+            var $inp = $form.find("[name='"+field+"']");
+            $inp.addClass("is-invalid");
+            $inp.next(".invalid-feedback").text(msg);
+          });
+        },
+
+        error: function(jqXHR, status, err) {
+          console.error("AJAX Error:", status, err);
+          $("#g-errors")
+            .removeClass("d-none")
+            .text("Error de conexión. Intenta de nuevo.");
+        },
+
+        complete: function(){
+          $("#btn-submit-garante").prop("disabled", false);
+        }
+      });
+  });
+});
 </script>
 
 <script type='text/javascript'>

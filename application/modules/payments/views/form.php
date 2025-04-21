@@ -165,6 +165,25 @@
                                     </div>
                                     <div class="hr-line-dashed"></div>
 
+                                    <div class="form-group row">
+                                        <label class="col-sm-2 control-label">Gastos de operación:</label>
+                                        <div class="col-sm-10">
+                                            <?php
+                                            echo form_input([
+                                                'name'     => 'operating_expenses_amount',
+                                                'id'       => 'operating_expenses_amount',
+                                                'value'    => isset($payment_info->operating_expenses_amount)
+                                                                ? $payment_info->operating_expenses_amount
+                                                                : '',
+                                                'class'    => 'form-control',
+                                                'type'     => 'number',
+                                                'step'     => 'any',
+                                                'readonly' => true
+                                            ]);
+                                            ?>
+                                        </div>
+                                    </div>
+
                                     <script>
                                         $(document).ready(function () {
                                             $("#loan_id").change(function () {
@@ -189,6 +208,7 @@
                                                 var url = '<?= site_url('payments/ajax') ?>';
                                                 var params = {
                                                     softtoken: $("input[name='softtoken']").val(),
+                                                    loan_id: $("#loan_id").val(),   
                                                     due_date: $("#sel_payment_due").val(),
                                                     amount_to_pay: $("#sel_payment_due option:selected").attr('data-amount-to-pay'),
                                                     penalty_value: $("#sel_payment_due option:selected").attr('data-penalty-value'),
@@ -200,6 +220,7 @@
                                                     {
                                                         $("#hid-penalty-amount-total").val(data.penalty_amount);
                                                         $("#paid_amount").val(data.amount_to_pay);
+                                                        $("#operating_expenses_amount").val(data.operating_expenses_amount);
                                                     }
                                                 }, 'json');
                                             });

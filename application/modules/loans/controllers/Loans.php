@@ -2401,6 +2401,95 @@ class Loans extends Secure_area implements iData_controller
 
     public function save_garante()
     {
+        $this->load->model('Garante');
+        $this->load->library('form_validation');
+
+        // 1) Recogemos loan_id y los datos del formulario
+        $loan_id    = $this->input->post('loan_id');
+        $garante_id = $this->input->post('garante_id');
+
+        // 2) Reglas de validación
+        $this->form_validation->set_data($this->input->post());
+        $this->form_validation->set_rules('nombre',    'Nombre',               'required|regex_match[/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{3,250}$/]');
+        $this->form_validation->set_rules('ci',        'Cédula de Identidad',  'required|regex_match[/^[0-9]{6,8}$/]|callback_ci_not_registered');
+        $this->form_validation->set_rules('phone',     'Teléfono fijo',        'required|regex_match[/^[0-9]{7,8}$/]');
+        $this->form_validation->set_rules('cellphone', 'Teléfono celular',     'required|regex_match[/^[0-9]{8}$/]');
+        $this->form_validation->set_rules('email',     'Correo electrónico',   'required|valid_email');
+
+        // 3) Ejecutamos validación
+        if ($this->form_validation->run() === FALSE)
+        {
+            // Devolvemos errores en JSON para procesar en la vista
+            /*
+            $return = [
+                'status' => 'ERROR',
+                'errors' => $this->form_validation->error_array()
+            ];
+            echo json_encode($return);
+            */
+            // Si la validación falla, envío los mensajes de cada campo
+            echo json_encode([
+                'status' => 'ERROR',
+                'errors' => $this->form_validation->error_array()  // ej. ['ci' => 'El CI ya existe', ...]
+            ]);
+            return;
+        }
+
+        // 4) Preparamos array para guardar
+        $garante_data = [
+            'loan_id'   => $loan_id,                         // ¡Importante!
+            'nombre'    => $this->input->post('nombre'),
+            'ci'        => $this->input->post('ci'),
+            'phone'     => $this->input->post('phone'),
+            'cellphone' => $this->input->post('cellphone'),
+            'email'     => $this->input->post('email'),
+            'direccion_hogar' => $this->input->post('direccion_hogar'),
+            'direccion_trabajo' => $this->input->post('direccion_trabajo'),
+        ];
+
+        // 5) Guardado
+        /*$new_id = $this->Garante->save($garante_data, $garante_id);
+
+        echo json_encode([
+            'status'     => 'OK',
+            'garante_id' => $new_id
+        ]);
+        */
+        
+        if (!$this->Garante->save($garante_data, $this->input->post('garante_id')))
+        {
+            // Si falla el INSERT/UPDATE por cualquier razón…
+            echo json_encode([
+                'status' => 'ERROR',
+                'errors' => ['general' => 'No se pudo guardar el garante. Intenta de nuevo.']
+            ]);
+            return;
+        }
+
+        // Si todo OK:
+        echo json_encode([
+            'status'     => 'OK',
+            'garante_id' => $garante_data['garante_id']
+        ]);
+    }
+
+    /**
+    * Callback para chequear CI no repetido en crédito activo
+    */
+    public function ci_not_registered($ci)
+    {
+        if ($this->Garante->is_active_guarantee($ci))
+        {
+            $this->form_validation->set_message('ci_not_registered',
+                "El CI {$ci} ya está asignado como garante de un crédito activo."
+            );
+            return FALSE;
+        }
+        return TRUE;
+    }
+/*
+    public function save_garante()
+    {
         $this->load->model("Garante");
         $loan_id = $this->input->post("loan_id");
         $garante_id = $this->input->post("garante_id");
@@ -2426,6 +2515,7 @@ class Loans extends Secure_area implements iData_controller
         
         send($return);
     }
+        */
 }
 
 ?>

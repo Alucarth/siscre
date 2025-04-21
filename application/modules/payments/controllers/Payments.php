@@ -76,7 +76,7 @@ class Payments extends Secure_area implements iData_controller {
         $datatable->add_column('loan_balance', false);
         $datatable->add_column('trans_date', false);
         $datatable->add_column('payment_due', false);
-        //$datatable->add_column('overdue_days', false);
+        $datatable->add_column('overdue_days', false);
         $datatable->add_column('teller', false);
         
 
@@ -136,19 +136,14 @@ class Payments extends Secure_area implements iData_controller {
             $data_row = [];
             $data_row["DT_RowId"] = $payment->loan_payment_id;
             $data_row["actions"] = $actions;
-            
             $data_row["trans_id"] = $payment->loan_payment_id;
             $data_row["customer"] = ucwords($payment->customer_name);
             $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Individual") . " (" . to_currency($payment->loan_amount) . ")";
-            $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
             $data_row["payable_amount"] = to_currency($payment->paid_amount);
+            $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
             $data_row["trans_date"] = date($this->config->item('date_format'), $payment->date_paid);
             $data_row["payment_due"] = date($this->config->item('date_format'), $payment->payment_due);
-            // Calcula la diferencia
-            //$diferencia = $payment->payment_due->diff($payment->date_paid);
-            // Obtiene el número de días de diferencia
-            //$overdue_days = $diferencia->days;
-            //$data_row["overdue_days"] = $payment->payment_due->diff($payment->date_paid);
+            $data_row["overdue_days"] = $payment->date_paid - $payment->payment_due > 0 ? ($payment->date_paid - $payment->payment_due) / (60 * 60 * 24) : 0;
             $data_row["teller"] = ucwords($payment->teller_name);
             
             $tbl_balance += $payment->paid_amount;
@@ -446,6 +441,7 @@ class Payments extends Secure_area implements iData_controller {
                 (trim($payment->loan_type) !== "" ? $payment->loan_type : "Flexible") . " (" . to_currency($payment->loan_amount) . ")",
                 to_currency($payment->balance_amount),
                 to_currency($payment->paid_amount),
+                to_currency($payment->operating_expenses_amount),
                 date($this->config->item('date_format'), $payment->date_paid),
                 date($this->config->item('date_format'), $payment->payment_due),
                 ucwords($payment->teller_name),
@@ -487,13 +483,14 @@ class Payments extends Secure_area implements iData_controller {
         echo json_encode($suggestion);
         exit;
     }
-    
+    /*old
     private function _check_loan_penalties()
     {
         $due_date = $this->input->post("due_date");
         $amount_to_pay = $this->input->post("amount_to_pay");
         $penalty_value = $this->input->post("penalty_value");
         $penalty_type = $this->input->post("penalty_type");
+        $loan_id = $this->input->post("loan_id");
         
         if ($this->config->item('date_format') == 'd/m/Y')
         {
@@ -501,6 +498,7 @@ class Payments extends Secure_area implements iData_controller {
         }
         
         $penalty_amount = 0;
+        $operating_expenses_amount = $this->input->post("operating_expenses_amount") ?: 0;//monto de ahorro
         if ( time() > strtotime($due_date) )
         {
             // penalize
@@ -516,13 +514,103 @@ class Payments extends Secure_area implements iData_controller {
             }
         }
         
+        // ——— Aquí extraemos los gastos operativos del JSON ———
+        $operating_expenses_amount = 0;
+        $loan_row = $this->db
+                        ->select('periodic_loan_table')
+                        ->from('loans')
+                        ->where('loan_id', $loan_id)
+                        ->get()
+                        ->row();
+
+        if ($loan_row && ! empty($loan_row->periodic_loan_table)) {
+            $scheds = json_decode($loan_row->periodic_loan_table);
+            foreach ($scheds as $sched) {
+                // Las fechas usan el mismo formato que en el <option>
+                if (trim($sched->payment_date) === trim($due_date)) {
+                    $operating_expenses_amount = (float)$sched->operating_expenses_amount;
+                    break;
+                }
+            }
+        }
+
         $return['status'] = "OK";
         $return['penalty_amount'] = $penalty_amount;
         $return['amount_to_pay'] = number_format($amount_to_pay, 2, '.', '');
+        $return['operating_expenses_amount'] = $operating_expenses_amount;
         
+        $return['__debug_scheds_json'] = $loan_row->periodic_loan_table;//prueba debug
+        log_message('debug', 'Comparando fechas: due_date='.$due_date);
+
         send($return);
     }
-    
+    */
+
+    private function _check_loan_penalties()
+    {
+        // 1) Recoge los parámetros
+        $raw_due_date      = $this->input->post("due_date");
+        $amount_to_pay     = (float)$this->input->post("amount_to_pay");
+        $penalty_value     = (float)$this->input->post("penalty_value");
+        $penalty_type      = $this->input->post("penalty_type");
+        $loan_id           = $this->input->post("loan_id");
+
+        // 2) Calcula el timestamp de due_date (independientemente del formato)
+        if ($this->config->item('date_format') == 'd/m/Y') {
+            $due_ts = strtotime( uk_to_isodate($raw_due_date) );
+        } else {
+            $due_ts = strtotime( $raw_due_date );
+        }
+
+        // 3) Penalización como antes, usando due_ts
+        $penalty_amount = 0;
+        if ( time() > $due_ts ) {
+            $pen = $penalty_type === 'percentage'
+                ? $amount_to_pay * ($penalty_value / 100)
+                : $penalty_value;
+            if ($pen > 0) {
+                $penalty_amount = $amount_to_pay + $pen;
+            }
+        }
+
+        // 4) Recupera el JSON de amortización
+        $loan_row = $this->db
+                        ->select('periodic_loan_table')
+                        ->from('loans')
+                        ->where('loan_id', $loan_id)
+                        ->get()
+                        ->row();
+
+        $operating_expenses_amount = 0;
+        if ($loan_row && $loan_row->periodic_loan_table) {
+            $scheds = json_decode($loan_row->periodic_loan_table);
+            foreach ($scheds as $sched) {
+                // 5) Para cada schedule, calcula también su timestamp
+                if ($this->config->item('date_format') == 'd/m/Y') {
+                    $sched_ts = strtotime( uk_to_isodate($sched->payment_date) );
+                } else {
+                    $sched_ts = strtotime( $sched->payment_date );
+                }
+
+                // 6) ¡La comparación ahora sí encaja!
+                if ($sched_ts === $due_ts) {
+                    $operating_expenses_amount = (float)$sched->operating_expenses_amount;
+                    break;
+                }
+            }
+        }
+
+        // 7) Devuelve todo en el JSON
+        $return = [
+            'status'                    => 'OK',
+            'penalty_amount'            => number_format($penalty_amount, 2, '.', ''),
+            'amount_to_pay'             => number_format($amount_to_pay,   2, '.', ''),
+            'operating_expenses_amount' => number_format($operating_expenses_amount, 2, '.', ''),
+        ];
+
+        send($return);
+    }
+
     private function _get_loan_schedules()
     {
         $loan_id = $this->input->post("loan_id");

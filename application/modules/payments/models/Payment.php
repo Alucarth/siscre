@@ -415,7 +415,8 @@ class Payment extends CI_Model {
         $this->db->where("customer_id", $customer_id);
         $this->db->where("customer_id >", 0);
         $this->db->where("delete_flag", 0);
-        $this->db->where("loan_balance > ", 0);
+        $this->db->where("loan_balance > ", 1);
+        $this->db->where("loan_status", 'approved');
         return $this->db->get()->result();
     }
 
