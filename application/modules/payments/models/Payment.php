@@ -201,7 +201,7 @@ class Payment extends CI_Model {
         $select = "loan_payments.*, CONCAT(customer.first_name, ' ', customer.last_name) as customer_name, 
                    CONCAT(teller.first_name, ' ',teller.last_name) as teller_name, 
                    user.username as user_name,
-                   loan_types.name as loan_type";
+                   loan_types.name as loan_type, leads.id_no as ci";
 
         $this->db->select($select, FALSE);
         $this->db->from('loan_payments');
@@ -210,6 +210,7 @@ class Payment extends CI_Model {
         $this->db->join('employees as user', 'user.person_id = loan_payments.teller_id', 'LEFT');
         $this->db->join('loans', 'loans.loan_id = loan_payments.loan_id', 'LEFT');
         $this->db->join('loan_types', 'loan_types.loan_type_id = loans.loan_type_id', 'LEFT');
+        $this->db->join('leads', 'leads.customer_id = loans.customer_id', 'LEFT');
         $this->db->where('loan_payment_id', $payment_id);
 
         $query = $this->db->get();

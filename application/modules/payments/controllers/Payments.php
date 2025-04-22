@@ -224,6 +224,7 @@ class Payments extends Secure_area implements iData_controller {
         $data['collateral'] = $collateral;
         $data['count'] = $payment->loan_payment_id;
         $data['client'] = ucwords($customer->first_name." ".$customer->last_name);
+        $data['document_number'] = $payment->ci;
         $data['account'] = $loan->account;
         $data['branch_name'] = $branch->branch_name;
         //$data['loan'] = to_currency($loan->loan_amount);
