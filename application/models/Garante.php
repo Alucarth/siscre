@@ -156,20 +156,24 @@ class Garante extends CI_Model {
         return $id;
     }
 
-    public function es_garante_en_credito_activo($ci, $excluir_garante_id = null) {
-        $this->db->select('COUNT(*) as total');
+    /**
+    * Verifica si un CI ya figura como garante de un crédito con estado “active”
+    *
+    * @param string $ci
+    * @return bool  true si ya existe un garante activo con ese CI
+    */
+    public function is_active_guarantee($ci)
+    {
+        $this->db->select('g.garante_id');
         $this->db->from('c19_garantes g');
-        $this->db->join('c19_loans l', 'l.loan_id = g.loan_id');
+        $this->db->join('c19_loans l', 'g.loan_id = l.loan_id');
         $this->db->where('g.ci', $ci);
-        $this->db->where('l.loan_status', 'approved'); 
-        
-        if ($excluir_garante_id) {
-            $this->db->where('g.garante_id !=', $excluir_garante_id);
-        }
-        
+        $this->db->where('l.loan_status', 'approved');  
         $query = $this->db->get();
-        return ($query->row()->total > 0);
+
+        return ($query->num_rows() > 0);
     }
+
 }
 
 ?>

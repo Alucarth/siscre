@@ -564,163 +564,152 @@ class Customers extends Person_controller {
       Inserts/updates a customer
      */
 
-    function save($customer_id = -1)
-    {
-        $employer_id = $this->input->post("employer");
-        
-        $person_data = array(
-            'first_name' => $this->input->post('first_name'),
-            'last_name' => $this->input->post('last_name'),
-            'email' => $this->input->post('email'),
-            'phone_number' => $this->input->post('phone_number'),
-            'address_1' => $this->input->post('address_1'),
-            'address_2' => $this->input->post('address_2'),
-            'city' => $this->input->post('city'),
-            'state' => $this->input->post('state'),
-            'zip' => $this->input->post('zip'),
-            'country' => $this->input->post('country'),
-            'comments' => $this->input->post('comments'),
-            'role_id' => CUSTOMER_ROLE_ID
-        );
-        
-        if ( trim($this->input->post("password")) != trim($this->input->post("repassword")))
-        {
-            echo json_encode(array('success' => false, 'message' => ' Password don\'t match!' .
-                $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => -1));
-            exit;
-        }
+     public function save($customer_id = -1)
+{
+    $employer_id = $this->input->post("employer");
 
-        $int_date_of_birth = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_of_birth'))) : strtotime($this->input->post('date_of_birth'));
-        
-        $customer_data = array(
-            'account_number' => $this->input->post('account_number') == '' ? null : $this->input->post('account_number'),
-            'taxable' => $this->input->post('taxable') == '' ? 0 : 1,
-            'bank_name' => $this->input->post('bank_name'),
-            'bank_account_num' => $this->input->post('bank_account_num'),
-            'date_of_birth' => $int_date_of_birth,
-            'parent_id' => $employer_id
-        );
-        
-        if ( is_plugin_active('branches') )
-        {
-            $customer_data["branch_id"] = $this->input->post("branch_id");
-        }
-        
-        $extra_fields = $this->Customer->get_extra_fields();
-        foreach ( $extra_fields as $field )
-        {
-            $customer_data[$field->name] = $this->input->post($field->name);
-        }
+    $person_data = array(
+        'first_name' => $this->input->post('first_name'),
+        'last_name' => $this->input->post('last_name'),
+        'email' => $this->input->post('email'),
+        'phone_number' => $this->input->post('phone_number'),
+        'address_1' => $this->input->post('address_1'),
+        'address_2' => $this->input->post('address_2'),
+        'city' => $this->input->post('city'),
+        'state' => $this->input->post('state'),
+        'zip' => $this->input->post('zip'),
+        'country' => $this->input->post('country'),
+        'comments' => $this->input->post('comments'),
+        'role_id' => CUSTOMER_ROLE_ID
+    );
 
-        if (is_array($this->input->post("sources")))
-        {
-            $income_sources = array();
-            $i = 0;
-            foreach ($this->input->post("sources") as $sources)
-            {
-                $tmp = $this->input->post("values");
-                $income_sources[] = $sources . "=" . $tmp[$i];
-                $i++;
-            }
-        }
+    // Validar si el domicilio ya está registrado con otro usuario
+    $existing_data = $this->Customer->get_customer_by_address($person_data['address_1'], $person_data['address_2']);
 
-        $financial_data = array(
-            "financial_status_id" => $this->input->post("financial_status_id") > 0 ? $this->input->post("financial_status_id") : 0,
-            "income_sources" => json_encode($income_sources)
-        );
+    if (!empty($existing_data) && isset($existing_data->person_id) && $existing_data->person_id != $customer_id) {
+    $this->output->set_content_type('application/json')->set_output(json_encode([
+        "success" => false,
+        "message" => "El domicilio ya está registrado con otro usuario. ¿Desea continuar de todas formas?"
+    ]));
+    return;
+    }
 
-        if ($this->Customer->save($person_data, $customer_data, $customer_id, $financial_data))
-        {
-            // Save/Update photo URL
-            $this->_update_photo_url($customer_data['person_id']);
-            
-            // $myfile = fopen("php_error_logs.txt", "w") or die("Unable to open file!");
-            // $txt = $customer_data['person_id']."\n";
-          
+    
+    // Validar si las contraseñas coinciden
+    if (trim($this->input->post("password")) != trim($this->input->post("repassword"))) {
+        echo json_encode(array('success' => false, 'message' => "Password don't match!", 'person_id' => -1));
+        exit;
+    }
 
-            // $middle_name = $this->input->post("middle_name"); //este campo no esta en el formulario y estaba generando error
-            $middle_name = ' ';
-            
-            $lead_data = [];
-            $lead_data["full_name"] = $person_data["first_name"] . " " . $middle_name . " " . $person_data["last_name"];
-            $lead_data["first_name"] = $person_data["first_name"];
-            $lead_data["middle_name"] = $middle_name;
-            $lead_data["last_name"] = $person_data["last_name"];
-            $lead_data["email"] = $person_data["email"];
-            $lead_data["city"] = $person_data["city"];
-            $lead_data["address1"] = $person_data["address_1"];
-            $lead_data["signup_complete"] = 1;
-            $lead_data["customer_id"] = $customer_data['person_id'];
-            $lead_data["id_type"] = $this->input->post("id_type");
-            $lead_data["id_no"] = $this->input->post("id_no");
-            $lead_data["gender"] = $this->input->post("gender");
-            $lead_data["marital_status"] = $this->input->post("marital_status");
-            $lead_data["birth_date"] = $this->input->post("date_of_birth");
-            $lead_data["street_no"] = $this->input->post("street_no");
-            $lead_data["occupation"] = $this->input->post("occupation");
-            $lead_data["company_name"] = $this->input->post("company_name");
-            $lead_data["work_term"] = $this->input->post("work_term");
-            $lead_data["net_monthly_income"] = $this->input->post("net_monthly_income");
-            $lead_data["company_phone"] = $this->input->post("company_phone");
-            $lead_data["guarantor_phone"] = $this->input->post("guarantor_phone");
-            
-            $lead_data["bank_name"] = $this->input->post("bank_name");
-            $lead_data["account_holder_name"] = $this->input->post("account_holder_name");
-            $lead_data["account_number"] = $this->input->post("account_number");
-            $lead_data["gcash_num"] = $this->input->post("gcash_num");
-            
-            $lead_data["ubo"] = $this->input->post("ubo");
-            $lead_data["cc_number"] = $this->input->post("cc_number");
-            $lead_data["vat_number"] = $this->input->post("vat_number");
-            $lead_data["employer_id"] = $employer_id;
-            
-            $lead_data["business_name"] = $this->input->post("business_name");
-            $lead_data["company_name"] = trim($lead_data["business_name"]) != '' ? $lead_data["business_name"] : $lead_data["company_name"];
-            $lead_data["business_address"] = $this->input->post("business_address");
-            $lead_data["business_type"] = $this->input->post("business_type");
-            $lead_data["business_nif"] = $this->input->post("business_nif");
-            $lead_data["business_legal_structure"] = $this->input->post("business_legal_structure");
-            $lead_data["business_financial_institution"] = $this->input->post("business_financial_institution");
-            $lead_data["business_account_name"] = $this->input->post("business_account_name");
-            $lead_data["business_phone"] = $this->input->post("business_phone");
-            $lead_data["business_payroll_date"] = $this->input->post("business_payroll_date");
-            $lead_data["business_total_employees"] = $this->input->post("business_total_employees");
-            $lead_data["business_agent_record"] = $this->input->post("business_agent_record");            
+    // Convertir la fecha de nacimiento a timestamp
+    $int_date_of_birth = $this->config->item('date_format') == 'd/m/Y' 
+        ? strtotime(uk_to_isodate($this->input->post('date_of_birth'))) 
+        : strtotime($this->input->post('date_of_birth'));
 
-            // fwrite($myfile, $txt);
-            // $txt = json_encode($lead_data)."\n";
-            // fwrite($myfile, $txt);
-            // fclose($myfile);
+    $customer_data = array(
+        'account_number' => $this->input->post('account_number') == '' ? null : $this->input->post('account_number'),
+        'taxable' => $this->input->post('taxable') == '' ? 0 : 1,
+        'bank_name' => $this->input->post('bank_name'),
+        'bank_account_num' => $this->input->post('bank_account_num'),
+        'date_of_birth' => $int_date_of_birth,
+        'parent_id' => $employer_id
+    );
 
-            $this->leads_model->save_customer($lead_data);
-            
-            $this->update_user_loggedin($customer_data['person_id'], $lead_data);
-            
-            if ( $this->input->post("notify_customer") == '1' && trim($password) != '' )
-            {
-                $id = $customer_id == -1 ? $lead_data["customer_id"] : $customer_id;
-                $customer = $this->Person->get_info($id);
-                //$this->password_reset_notify($customer, $password);
-            }
-            
-            //New customer
-            if ($customer_id == -1)
-            {
-                echo json_encode(array('success' => true, 'message' => $this->lang->line('customers_successful_adding') . ' ' .
-                    $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => $customer_data['person_id']));
-            }
-            else //previous customer
-            {
-                echo json_encode(array('success' => true, 'message' => $this->lang->line('customers_successful_updating') . ' ' .
-                    $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => $customer_id));
-            }
-        }
-        else//failure
-        {
-            echo json_encode(array('success' => false, 'message' => $this->lang->line('customers_error_adding_updating') . ' ' .
-                $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => -1));
+    if (is_plugin_active('branches')) {
+        $customer_data["branch_id"] = $this->input->post("branch_id");
+    }
+
+    // Agregar campos extra de la tabla customers
+    $extra_fields = $this->Customer->get_extra_fields();
+    foreach ($extra_fields as $field) {
+        $customer_data[$field->name] = $this->input->post($field->name);
+    }
+
+    // Manejar fuentes de ingreso
+    $income_sources = [];
+    if (is_array($this->input->post("sources"))) {
+        $i = 0;
+        foreach ($this->input->post("sources") as $sources) {
+            $tmp = $this->input->post("values");
+            $income_sources[] = $sources . "=" . $tmp[$i];
+            $i++;
         }
     }
+
+    $financial_data = array(
+        "financial_status_id" => $this->input->post("financial_status_id") > 0 ? $this->input->post("financial_status_id") : 0,
+        "income_sources" => json_encode($income_sources)
+    );
+
+    if ($this->Customer->save($person_data, $customer_data, $customer_id, $financial_data)) {
+        // Guardar o actualizar la foto del usuario
+        $this->_update_photo_url($customer_data['person_id']);
+
+        // Datos del lead
+        $middle_name = ' ';
+        $lead_data = [
+            "full_name" => $person_data["first_name"] . " " . $middle_name . " " . $person_data["last_name"],
+            "first_name" => $person_data["first_name"],
+            "middle_name" => $middle_name,
+            "last_name" => $person_data["last_name"],
+            "email" => $person_data["email"],
+            "city" => $person_data["city"],
+            "address1" => $person_data["address_1"],
+            "signup_complete" => 1,
+            "customer_id" => $customer_data['person_id'],
+            "id_type" => $this->input->post("id_type"),
+            "id_no" => $this->input->post("id_no"),
+            "gender" => $this->input->post("gender"),
+            "marital_status" => $this->input->post("marital_status"),
+            "birth_date" => $this->input->post("date_of_birth"),
+            "street_no" => $this->input->post("street_no"),
+            "occupation" => $this->input->post("occupation"),
+            "company_name" => $this->input->post("company_name"),
+            "work_term" => $this->input->post("work_term"),
+            "net_monthly_income" => $this->input->post("net_monthly_income"),
+            "company_phone" => $this->input->post("company_phone"),
+            "guarantor_phone" => $this->input->post("guarantor_phone"),
+            "bank_name" => $this->input->post("bank_name"),
+            "account_holder_name" => $this->input->post("account_holder_name"),
+            "account_number" => $this->input->post("account_number"),
+            "gcash_num" => $this->input->post("gcash_num"),
+            "ubo" => $this->input->post("ubo"),
+            "cc_number" => $this->input->post("cc_number"),
+            "vat_number" => $this->input->post("vat_number"),
+            "employer_id" => $employer_id,
+            "business_name" => $this->input->post("business_name"),
+            "business_address" => $this->input->post("business_address"),
+            "business_type" => $this->input->post("business_type"),
+            "business_nif" => $this->input->post("business_nif"),
+            "business_legal_structure" => $this->input->post("business_legal_structure"),
+            "business_financial_institution" => $this->input->post("business_financial_institution"),
+            "business_account_name" => $this->input->post("business_account_name"),
+            "business_phone" => $this->input->post("business_phone"),
+            "business_payroll_date" => $this->input->post("business_payroll_date"),
+            "business_total_employees" => $this->input->post("business_total_employees"),
+            "business_agent_record" => $this->input->post("business_agent_record"),
+        ];
+        $lead_data["company_name"] = trim($lead_data["business_name"]) != '' ? $lead_data["business_name"] : $lead_data["company_name"];
+
+        $this->leads_model->save_customer($lead_data);
+        $this->update_user_loggedin($customer_data['person_id'], $lead_data);
+
+        if ($this->input->post("notify_customer") == '1' && trim($password) != '') {
+            $id = $customer_id == -1 ? $lead_data["customer_id"] : $customer_id;
+            $customer = $this->Person->get_info($id);
+            //$this->password_reset_notify($customer, $password);
+        }
+
+        $message_key = $customer_id == -1 ? 'customers_successful_adding' : 'customers_successful_updating';
+        echo json_encode(array('success' => true, 'message' => $this->lang->line($message_key) . ' ' .
+            $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => $customer_data['person_id']));
+    } else {
+        echo json_encode(array('success' => false, 'message' => $this->lang->line('customers_error_adding_updating') . ' ' .
+            $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => -1));
+    }
+}
+
+     
     
     private function update_user_loggedin($customer_id, $lead_data)
     {

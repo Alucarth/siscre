@@ -2114,6 +2114,50 @@ class Loans extends Secure_area implements iData_controller
         send($return);
     }
     
+    //tarea 2
+    public function export_full_report() {
+        try {
+            $this->load->library('DataTableLib'); // Ajusta a tu librería
+            
+            $html = $this->input->post('html');
+            $title = $this->input->post('title');
+            $totals = $this->input->post('totals');
+            
+            // Validación básica
+            if (empty($html)) {
+                throw new Exception("No se recibió contenido para exportar");
+            }
+            
+            // Configurar PDF
+            $pdf = new Pdf_lib();
+            $pdf->setTitle($title);
+            $pdf->AddPage();
+            $pdf->writeHTML($html, true);
+            
+            // Guardar archivo
+            $filename = 'prestamos_completos_'.date('Ymd_His').'.pdf';
+            $filepath = FCPATH.'uploads/temp/'.$filename;
+            $pdf->Output($filepath, 'F');
+            
+            // Registrar en logs (opcional)
+            log_message('info', "PDF generado: {$filename}");
+            
+            echo json_encode([
+                'status' => 'OK',
+                'download_url' => base_url('uploads/temp/'.$filename),
+                'file_name' => $filename
+            ]);
+            
+        } catch (Exception $e) {
+            log_message('error', 'Error al generar PDF: '.$e->getMessage());
+            echo json_encode([
+                'status' => 'ERROR',
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+//
+
     public function upload()
     {
         $this->load->model("Document_model");

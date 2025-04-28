@@ -47,7 +47,7 @@
                             
                             $current_time = date("h:i a");
                             // echo 'tiemp o'. $current_time;
-                            $sunrise = "0:00 am";
+                            $sunrise = "0:01 am";
                             $sunset = "11:59 pm";
                             $date1 = DateTime::createFromFormat('h:i a', $current_time);
                             $date2 = DateTime::createFromFormat('h:i a', $sunrise);
@@ -173,6 +173,8 @@
 
         <script src="<?php echo base_url('modular-admin/js/vendor.js?v=' . APP_VERSION) ?>"></script>
         <script src="<?php echo base_url('modular-admin/js/app.js') ?>"></script>
+
+        
     </body>
 
 </html>

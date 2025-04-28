@@ -15,7 +15,23 @@ class Printing extends CI_Controller {
     {
         parent::__construct('overdues');
     }
+    
+        public function get_last_accounts() {
+            $this->load->model('Loans_model');
 
+            $data = $this->Loans_model->get_last_50_accounts();
+
+            if ($data) {
+                echo json_encode([
+                    "status" => "OK",
+                    "data" => $data,
+                    "total_proceeds" => array_sum(array_column($data, 'amount')),
+                    "total_balance" => array_sum(array_column($data, 'balance'))
+                ]);
+            } else {
+                echo json_encode(["status" => "ERROR"]);
+            }
+        }
     public function print_list($filename = '')
     {
         ini_set('memory_limit', '-1');
@@ -90,7 +106,39 @@ class Printing extends CI_Controller {
 
         send($return);
     }
+
+    //tarea 3
+    public function export_all_receivables_pdf()
+{
+    // 1. Consulta SQL simple para prueba
+    $query = $this->db->query("SELECT * FROM c19_branches");
+    $result = $query->result_array();
+
+    // 2. Preparar datos para la vista
+    $data = [
+        'titulo' => 'Reporte de Sucursales (Prueba)',
+        'fecha' => date('d/m/Y H:i:s'),
+        'registros' => $result
+    ];
+
+    // 3. Cargar vista como HTML
+    $html = $this->load->view('pdf/reporte_cuentas_pdf', $data, TRUE);
+
+    // 4. Generar PDF con tu librería actual
+    $this->load->library('pdf');
+    $mpdf = $this->pdf->load('"en-GB-x","A4","","",10,10,10,10,6,3,"L"');
     
+    // Configuración adicional
+    $mpdf->SetDisplayMode('fullpage');
+    $mpdf->WriteHTML($html);
+    
+    // Salida del PDF
+    $filename = 'reporte_sucursales_'.date('Ymd_His').'.pdf';
+    $mpdf->Output($filename, 'D'); // 'D' para descarga forzada
+    exit;
+}
+    //
+
     public function payment_list($filename = '')
     {
         ini_set('memory_limit', '-1');

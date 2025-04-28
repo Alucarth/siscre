@@ -135,3 +135,5 @@ $lang["_config"] = "Config";
 $lang["_accounts"] = "Accounts";
 $lang["_branches"] = "Branches";
 $lang["_ahorro"] = "Ahorro";
+$lang["_imprimir_todo"] = "Imprimir Todo";
+$lang["_print_all"] = "Print All";

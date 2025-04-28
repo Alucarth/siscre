@@ -365,7 +365,60 @@ class Loan extends CI_Model {
      */
 
 
+     function save(&$loan_data, $loan_id = false, $has_payment = false)
+     {
+         // Validación para préstamos existentes
+         if ($loan_id && $this->exists($loan_id)) {
+             $current_loan = $this->get_info($loan_id);
+             
+             // Bloquear cambio de rechazado a aprobado
+             if ($current_loan->loan_status == 'rejected' && isset($loan_data['loan_status']) && $loan_data['loan_status'] == 'approved') {
+                 log_message('error', 'Intento ilegal de cambiar préstamo rechazado (ID: '.$loan_id.') a aprobado');
+                 return false;
+             }
+         }
+     
+         // Lógica existente para tipo de préstamo
+         if ($loan_data["loan_type_id"] > 0) {
+             $loan_data['loan_payment_date'] = $this->_get_loan_payment_date($loan_data);
+         }
+     
+         // Lógica para nuevo préstamo
+         if (!$loan_id or !$this->exists($loan_id)) {
+             $loan_data['loan_balance'] = $loan_data["loan_amount"];
+             if ($this->db->insert('loans', $loan_data)) {
+                 $loan_data['loan_id'] = $this->db->insert_id();
+                 $this->move_attachments($loan_data);
+                 
+                 if (is_plugin_active('activity_log')) {
+                     $employee_id = $this->Employee->get_logged_in_employee_info()->person_id;
+                     track_action($employee_id, "loans", "Added new loan #" . $loan_data['loan_id']);
+                 }
+                 return true;
+             }
+             return false;
+         }
+     
+         // Lógica para préstamo existente
+         $loan_info = $this->get_info($loan_id);
+         
+         // Validar cambio de monto del préstamo
+         if ($loan_info->loan_amount != $loan_data["loan_amount"]) {
+             $loan_data["loan_balance"] = $loan_data["loan_amount"];
+         }
+         
+         $this->db->where('loan_id', $loan_id);
+         $ret = $this->db->update('loans', $loan_data);
+         
+         if (is_plugin_active('activity_log')) {
+             $employee_id = $this->Employee->get_logged_in_employee_info()->person_id;
+             track_action($employee_id, "loans", "Updated loan #" . $loan_id);
+         }
+         
+         return $ret;
+     }
 
+    /*
     function save(&$loan_data, $loan_id = false, $has_payment = false)
     {
         if ($loan_data["loan_type_id"] > 0)
@@ -406,6 +459,7 @@ class Loan extends CI_Model {
         return $ret;
 
     }
+    */
 
 
 

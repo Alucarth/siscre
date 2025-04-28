@@ -443,9 +443,21 @@ class Customers extends Person_controller {
     /*
       Inserts/updates a customer
      */
+    
+     //Funcion tarea 1
+     public function address_exists($address_1, $address_2)
+     {
+         $this->db->where('address_1', $address_1);
+         $this->db->where('address_2', $address_2);
+         $query = $this->db->get('c19_customers');
+     
+         return $query->num_rows() > 0; // Retorna verdadero si ya existe
+     }
+    //Funcion tarea 1     
 
     function save($customer_id = -1)
     {
+        
         $person_data = array(
             'first_name' => $this->input->post('first_name'),
             'last_name' => $this->input->post('last_name'),
@@ -459,6 +471,15 @@ class Customers extends Person_controller {
             'country' => $this->input->post('country'),
             'comments' => $this->input->post('comments')
         );
+        //tarea1 
+        $existing_customer = $this->Customer->get_customer_by_address($person_data['address_1'], $person_data['city'], $person_data['state'], $person_data['zip']);
+    
+        if ($existing_customer && $existing_customer->customer_id != $customer_id) {
+        $return["success"] = false;
+        $return["message"] = "El domicilio ya está registrado con otro usuario. ¿Desea continuar de todas formas?";
+        send($return);
+        return;
+        } //
 
         $int_date_of_birth = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_of_birth'))) : strtotime($this->input->post('date_of_birth'));
         
@@ -515,6 +536,18 @@ class Customers extends Person_controller {
             "financial_status_id" => $this->input->post("financial_status_id") > 0 ? $this->input->post("financial_status_id") : 0,
             "income_sources" => json_encode($income_sources)
         );
+
+        // Verificar si ya existe un cliente con la misma dirección antes de registrar
+        $direccion_1 = trim(strtolower($this->input->post('address_1')));
+        $direccion_2 = trim(strtolower($this->input->post('address_2')));
+        
+        $existe = $this->Customer->address_exists($direccion_1, $direccion_2);
+        
+        if ($existe) {
+            echo json_encode(array('success' => false, 'message' => 'El domicilio ya está registrado por otro cliente.'));
+            return;
+        }
+        //tarea 1
 
         if ($this->Customer->save($person_data, $customer_data, $customer_id, $financial_data))
         {

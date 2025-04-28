@@ -147,6 +147,18 @@ class Customer extends Person {
     /*
       Gets information about a particular customer
      */
+    //Funcion tarea 1
+    public function address_exists($address_1, $address_2)
+    {
+    $this->db->from('customers');
+    $this->db->where('LOWER(TRIM(address_1))', strtolower(trim($address_1)));
+    $this->db->where('LOWER(TRIM(address_2))', strtolower(trim($address_2)));
+    
+    $query = $this->db->get();
+
+    return ($query->num_rows() > 0);
+    }
+    //Tarea 1
 
     function get_info($customer_id)
     {

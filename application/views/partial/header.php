@@ -584,7 +584,18 @@
 
                                     </script>
 
+                                    <!-- Tarea 5: Alerta de expiración de sesión -->
+                                    <script>
+                                        window.onload = function() {
+                                            const warningTime = 900 * 1000; // segundos * 1000  
 
+                                            setTimeout(() => {
+                                                alert("La sesión está a punto de expirar.");
+                                                location.reload();
+                                            }, warningTime);
+                                        };
+                                    </script>
+                                    <!-- Fin-->
 
                                     <?php else: ?>
 

@@ -25,7 +25,7 @@ class Customer extends Person {
 
     function get_all($limit = 10000, $offset = 0, $search = "", $order = array(), $sel_user = false, $count_only = false, $filters = [])
     {
-        $sorter = array("", "p.last_name", "p.first_name", "c.bank_name", "c.bank_account_num", "p.email", "p.phone_number");
+        $sorter = array("", "p.last_name", "p.first_name", "c.bank_name", "c.bank_account_num", "p.email", "p.phone_number", "p.address_1", "p.address_2");
         
         $extra_fields = $this->Customer->get_extra_fields();
         foreach ( $extra_fields as $field )
