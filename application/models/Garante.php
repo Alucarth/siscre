@@ -164,6 +164,7 @@ class Garante extends CI_Model {
     */
     public function is_active_guarantee($ci)
     {
+        /*
         $this->db->select('g.garante_id');
         $this->db->from('c19_garantes g');
         $this->db->join('c19_loans l', 'g.loan_id = l.loan_id');
@@ -172,6 +173,27 @@ class Garante extends CI_Model {
         $query = $this->db->get();
 
         return ($query->num_rows() > 0);
+        */
+        /**
+         * Si ya hay al menos 1 (antes) o ahora 2 (ajustado) garantías activas.
+         */
+        return $this->count_active_guarantees($ci) > 0;
+    }
+
+    /**
+     * Cuenta cuántos créditos activos tiene un CI como garante.
+     *
+     * @param string $ci
+     * @return int
+     */
+    public function count_active_guarantees($ci)
+    {
+        $this->db
+        ->from('c19_garantes g')
+        ->join('c19_loans l', 'g.loan_id = l.loan_id')
+        ->where('g.ci', $ci)
+        ->where('l.loan_status', 'active'); // ajusta al valor real
+        return $this->db->count_all_results();
     }
 
 }

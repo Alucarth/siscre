@@ -2399,6 +2399,25 @@ class Loans extends Secure_area implements iData_controller
         send($return);
     }
 
+    /**
+     * Callback de form_validation:
+     * Falla si count_active_guarantees($ci) >= 2
+     */
+    public function ci_limit_two($ci)
+    {
+        $count = $this->Garante->count_active_guarantees($ci);
+
+        if ($count >= 2)
+        {
+            $this->form_validation->set_message(
+                'ci_limit_two',
+                "El CI {$ci} ya garantiza {$count} créditos activos (límite 2)."
+            );
+            return FALSE;
+        }
+        return TRUE;
+    }
+    
     public function save_garante()
     {
         $this->load->model('Garante');
@@ -2411,7 +2430,8 @@ class Loans extends Secure_area implements iData_controller
         // 2) Reglas de validación
         $this->form_validation->set_data($this->input->post());
         $this->form_validation->set_rules('nombre',    'Nombre',               'required|regex_match[/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{3,250}$/]');
-        $this->form_validation->set_rules('ci',        'Cédula de Identidad',  'required|regex_match[/^[0-9]{6,8}$/]|callback_ci_not_registered');
+        //$this->form_validation->set_rules('ci',        'Cédula de Identidad',  'required|regex_match[/^[0-9]{6,8}$/]|callback_ci_not_registered'); //cambio de regla
+        $this->form_validation->set_rules('ci',        'Cédula de Identidad',  'required|regex_match[/^[0-9]{6,8}$/]|callback_ci_limit_two');
         $this->form_validation->set_rules('phone',     'Teléfono fijo',        'required|regex_match[/^[0-9]{7,8}$/]');
         $this->form_validation->set_rules('cellphone', 'Teléfono celular',     'required|regex_match[/^[0-9]{8}$/]');
         $this->form_validation->set_rules('email',     'Correo electrónico',   'required|valid_email');
@@ -2487,35 +2507,7 @@ class Loans extends Secure_area implements iData_controller
         }
         return TRUE;
     }
-/*
-    public function save_garante()
-    {
-        $this->load->model("Garante");
-        $loan_id = $this->input->post("loan_id");
-        $garante_id = $this->input->post("garante_id");
-               
-        $garante_data = [];
-        $garante_data["nombre"] = $this->input->post('nombre');
-        $garante_data["ci"] = $this->input->post('ci');
-        $garante_data["phone"] = $this->input->post('phone');
-        $garante_data["cellphone"] = $this->input->post('cellphone');
-        $garante_data["loan_id"] = $loan_id;
-        $garante_data["direccion_hogar"] = $this->input->post('direccion_hogar');
-        $garante_data["direccion_trabajo"] = $this->input->post('direccion_trabajo');
-        $garante_data["email"] = $this->input->post('email');
-        
-        // $this->db->insert('guarantee', $data);
-        $garante_id = $this->Garante->save( $garante_data ,$garante_id);
-        // $garante_id = $this->Garante->save( $garante_data);
 
-        $return["status"] = "OK";
-        $return["garante_id"] = $garante_id;
-        
-        
-        
-        send($return);
-    }
-        */
 }
 
 ?>
