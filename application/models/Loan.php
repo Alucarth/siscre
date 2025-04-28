@@ -422,7 +422,6 @@ class Loan extends CI_Model {
         $num_months = ($loan_type->term_period_type === "year") ? 12 : 1;
 
 
-
         if ($loan_type->term_period_type === "year")
 
         {
