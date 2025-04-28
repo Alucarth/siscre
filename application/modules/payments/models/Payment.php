@@ -201,8 +201,7 @@ class Payment extends CI_Model {
         $select = "loan_payments.*, CONCAT(customer.first_name, ' ', customer.last_name) as customer_name, 
                    CONCAT(teller.first_name, ' ',teller.last_name) as teller_name, 
                    user.username as user_name,
-                   ci.id_no as ci,
-                   loan_types.name as loan_type";
+                   loan_types.name as loan_type, leads.id_no as ci";
 
         $this->db->select($select, FALSE);
         $this->db->from('loan_payments');
@@ -211,8 +210,7 @@ class Payment extends CI_Model {
         $this->db->join('employees as user', 'user.person_id = loan_payments.teller_id', 'LEFT');
         $this->db->join('loans', 'loans.loan_id = loan_payments.loan_id', 'LEFT');
         $this->db->join('loan_types', 'loan_types.loan_type_id = loans.loan_type_id', 'LEFT');
-        //campo CI
-        $this->db->join('leads as ci', 'ci.customer_id = loan_payments.customer_id', 'LEFT');
+        $this->db->join('leads', 'leads.customer_id = loans.customer_id', 'LEFT');
         $this->db->where('loan_payment_id', $payment_id);
 
         $query = $this->db->get();
@@ -418,7 +416,8 @@ class Payment extends CI_Model {
         $this->db->where("customer_id", $customer_id);
         $this->db->where("customer_id >", 0);
         $this->db->where("delete_flag", 0);
-        $this->db->where("loan_balance > ", 0);
+        $this->db->where("loan_balance > ", 1);
+        $this->db->where("loan_status", 'approved');
         return $this->db->get()->result();
     }
 

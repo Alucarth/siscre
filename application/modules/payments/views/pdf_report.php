@@ -40,9 +40,9 @@
         </style>
     </head>
     <body>
-        <table width="73%">
+        <table width="100%">
             <tr>
-                <td width="75%" rowspan="5"></td>
+                <td width="65%" rowspan="5"></td>
                 <!--<td width="75%" rowspan="4"><img id="img-pic" src="<?= (trim($this->config->item("logo")) !== "") ? base_url("uploads/logo/" . $this->config->item('logo')) : base_url("uploads/common/no_img.png"); ?>" style="height:50px"/></td>-->
                 <!--<td align="right">Transacción No. <?= $count; ?> </td>-->
                 <td></td>
@@ -50,7 +50,7 @@
             </tr>
             <tr>
                 <!--<td>Nro. Cuota <?= $number; ?> de <?= $size; ?></td>-->
-                <td width="25%"><small>Fecha: <?= $trans_date; ?></small></td>    
+                <td width="35%"><small>Fecha: <?= $trans_date; ?></small></td>    
             </tr>
             <tr>
                 <td><small>Hora: <?= $time_date; ?></small></td>    
@@ -65,7 +65,7 @@
                 <td colspan="2"><br></td>
             </tr>
         </table>
-        <table width="73%">
+        <table width="100%">
             <tr>
                 <td align="center" style="line-height: 0.5">
                     <H6><b>LIQUIDACIÓN DE AMORTIZACIÓN DE CREDITO</b></H6>  
@@ -73,7 +73,7 @@
             </tr>
         </table>
         <br>
-        <table width="73%" style="font-size: 12px;">
+        <table width="100%" style="font-size: 14px;">
             <tbody>
                 <tr>
                     <td width="35%" align="left"><strong>Transacción No.:</strong></td>
@@ -126,12 +126,15 @@
                     <td align="left">&nbsp;<?= $lpp; ?></td>
                     <td align="left"></td>
                 </tr>
+                <!-- Se comenta la sección de gastos operativos a solicitud del cliente -->
+                <!--
                 <tr>
                     <td align="left">Ahorro:</td>
                     <td align="left"></td>
                     <td align="left">&nbsp;<?= $operating_expenses_amount; ?></td>
                     <td align="left"></td>
                 </tr>
+                -->
                 <tr>
                     <td align="left"><b>Total </b></td>
                     <td align="left"></td>
@@ -157,7 +160,7 @@
                 </tr>
             </tbody>
         </table>
-        <table width="73%" style="font-size: 12px;">
+        <table width="100%" style="font-size: 12px;">
             <tr>
                 <td>&nbsp;</td>
                 <td align="right" width="65%" rowspan="5">
@@ -193,7 +196,7 @@
                 <td align="left">Firma cliente: ....................&nbsp;</td>
             </tr>
             <tr>
-                <td align="left">CI: <?= $ci; ?>&nbsp;</td>
+                <td align="left">CI: <?= $document_number; ?>&nbsp;</td>
             </tr>
             <tr>
                 <td align="left">Nombre: <?= $client; ?></td>

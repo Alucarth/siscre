@@ -165,6 +165,48 @@
                                     </div>
                                     <div class="hr-line-dashed"></div>
 
+                                    <div class="form-group row">
+                                        <label class="col-sm-2 control-label">Ahorro:</label>
+                                        <div class="col-sm-10">
+                                            <?php
+                                            echo form_input([
+                                                'name'     => 'operating_expenses_amount',
+                                                'id'       => 'operating_expenses_amount',
+                                                'value'    => isset($payment_info->operating_expenses_amount)
+                                                                ? $payment_info->operating_expenses_amount
+                                                                : '',
+                                                'class'    => 'form-control',
+                                                'type'     => 'number',
+                                                'step'     => 'any',
+                                                'readonly' => true
+                                            ]);
+                                            ?>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group row">
+                                        <label class="col-sm-2 control-label">Monto total:</label>
+                                        <div class="col-sm-10">
+                                            <?php
+                                            // forzamos a float para evitar notices y asegurar que no sea null
+                                            $initial_total = (float)$payment_info->paid_amount
+                                                        + (float)$payment_info->operating_expenses_amount;
+                                            echo form_input([
+                                                'name'     => 'total_amount',
+                                                'id'       => 'total_amount',
+                                                'value'    => number_format($initial_total, 2, '.', ''),
+                                                'class'    => 'form-control',
+                                                'type'     => 'number',
+                                                'step'     => 'any',
+                                                'readonly' => true
+                                            ]);
+                                            ?>
+                                        </div>
+                                    </div>
+                                    <div class="hr-line-dashed"></div>
+
+                                    <!-- old -->
+                                     <!--
                                     <script>
                                         $(document).ready(function () {
                                             $("#loan_id").change(function () {
@@ -189,6 +231,7 @@
                                                 var url = '<?= site_url('payments/ajax') ?>';
                                                 var params = {
                                                     softtoken: $("input[name='softtoken']").val(),
+                                                    loan_id: $("#loan_id").val(),   
                                                     due_date: $("#sel_payment_due").val(),
                                                     amount_to_pay: $("#sel_payment_due option:selected").attr('data-amount-to-pay'),
                                                     penalty_value: $("#sel_payment_due option:selected").attr('data-penalty-value'),
@@ -200,10 +243,72 @@
                                                     {
                                                         $("#hid-penalty-amount-total").val(data.penalty_amount);
                                                         $("#paid_amount").val(data.amount_to_pay);
+                                                        $("#operating_expenses_amount").val(data.operating_expenses_amount);
                                                     }
                                                 }, 'json');
                                             });
                                         });
+                                    </script>
+                                    -->
+                                    <!-- old -->
+
+                                    <script>
+                                    $(document).ready(function () {
+
+                                    // 1) Cuando cambia el préstamo, recargo los vencimientos
+                                    $("#loan_id").on("change", function () {
+                                        var url = '<?= site_url('payments/ajax') ?>';
+                                        var params = {
+                                        softtoken: $("input[name='softtoken']").val(),
+                                        loan_id:   $("#loan_id").val(),
+                                        type:      1
+                                        };
+                                        $("#sel_payment_due").prop('disabled', true);
+                                        $.post(url, params, function (data) {
+                                        if (data.status === "OK") {
+                                            $("#sel_payment_due").html(data.options).prop('disabled', false);
+                                            $("#balance_amount").val(data.balance);
+                                        }
+                                        }, 'json');
+                                    });
+
+                                    // Función para recalcular el Total (cuota + ahorro)
+                                    function recalcTotal() {
+                                        var cuota  = parseFloat($("#paid_amount").val())               || 0;
+                                        var ahorro = parseFloat($("#operating_expenses_amount").val()) || 0;
+                                        $("#total_amount").val((cuota + ahorro).toFixed(2));
+                                    }
+
+                                    // 2) Cuando cambia la fecha de vencimiento, AJAX tipo 2 + recalcTotal()
+                                    $("#sel_payment_due").on("change", function () {
+                                        var url = '<?= site_url('payments/ajax') ?>';
+                                        var params = {
+                                        softtoken: $("input[name='softtoken']").val(),
+                                        loan_id:   $("#loan_id").val(),
+                                        due_date:  $("#sel_payment_due").val(),
+                                        amount_to_pay:    $("#sel_payment_due option:selected").attr('data-amount-to-pay'),
+                                        penalty_value:    $("#sel_payment_due option:selected").attr('data-penalty-value'),
+                                        penalty_type:     $("#sel_payment_due option:selected").attr('data-penalty-type'),
+                                        type: 2
+                                        };
+
+                                        $.post(url, params, function (data) {
+                                        if (data.status === "OK") {
+                                            $("#hid-penalty-amount-total").val(data.penalty_amount);
+                                            $("#paid_amount").val(data.amount_to_pay);
+                                            $("#operating_expenses_amount").val(data.operating_expenses_amount);
+                                            recalcTotal();
+                                        }
+                                        }, 'json');
+                                    });
+
+                                    // 3) Si el usuario edita manualmente cualquiera de los dos inputs, vuelvo a calcular
+                                    $("#paid_amount, #operating_expenses_amount").on("input", recalcTotal);
+
+                                    // 4) Al cargar la página, un primer recálculo (por si ya vienen valores precargados)
+                                    recalcTotal();
+
+                                    });
                                     </script>
 
                                     <div class="form-group row"><label class="col-sm-2 control-label"><?php echo form_label($this->lang->line('payments_teller') . ':', 'teller', array('class' => 'wide')); ?></label>
