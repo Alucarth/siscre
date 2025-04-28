@@ -192,7 +192,7 @@ class Garante extends CI_Model {
         ->from('c19_garantes g')
         ->join('c19_loans l', 'g.loan_id = l.loan_id')
         ->where('g.ci', $ci)
-        ->where('l.loan_status', 'active'); // ajusta al valor real
+        ->where('l.loan_status', 'approved'); 
         return $this->db->count_all_results();
     }
 
