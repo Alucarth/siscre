@@ -564,6 +564,13 @@ class Loans extends Secure_area implements iData_controller
         $add_fee_amounts = $this->input->post("add_fee_amounts");
         
         $current_user_id = $this->Employee->get_logged_in_employee_info()->person_id;
+        //Tarea 7
+        $loan_info = $this->Loan->get_info($loan_id);
+        if ($loan_id > 0 && strtolower($loan_info->loan_status) === 'reject') {
+        echo json_encode(array('success' => false, 'message' => 'No se puede modificar un préstamo rechazado. Cree un nuevo préstamo.'));
+        return;
+        }
+
         
         if (is_plugin_active("holidays"))
         {
@@ -675,12 +682,17 @@ class Loans extends Secure_area implements iData_controller
         {
             if ( $loan_info->loan_status != $loan_status )
             {
+                /*if ($loan_info->loan_status == 'rejected') {
+                    // Bloquear cambios en el préstamo rechazado
+                    return redirect()->back()->with('error', 'No se puede modificar un préstamo rechazado.');
+                }*/
                 $loan_data['loan_approved_by_id'] = $current_user_id;
                 $loan_data['loan_approved_date'] = time();
             }
-        }
+        }       
         else
         {
+             
             if ( $loan_status == 'paid' )
             {
                 
@@ -778,25 +790,6 @@ class Loans extends Secure_area implements iData_controller
             echo json_encode(array('success' => false, 'message' => $this->lang->line('loans_error_adding_updating') . ' ' .
                 $loan_data['account'], 'loan_id' => -1));
         }
-    //Tarea 7
-    $loan_status = $this->input->post("status");
-    $exclude_additional_fees = $this->input->post("exclude_additional_fees") != '' ? 1 : 0;
-    
-    // Obtener información actual del préstamo (si es edición)
-    if ($loan_id != -1) {
-        $current_loan = $this->Loan->get_info($loan_id);
-        
-        // Validación para préstamos rechazados
-        if ($current_loan->loan_status == 'rejected' && $loan_status == 'approved') {
-            $response = [
-                'success' => false,
-                'message' => $this->lang->line('loans_cannot_approve_rejected')
-            ];
-            echo json_encode($response);
-            return;
-        }
-    }
-    //
     }
 
     function delete()

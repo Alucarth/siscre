@@ -221,6 +221,9 @@
                                             <label class="control-label col-sm-2 text-xs-right"><?php echo form_label($this->lang->line('loans_status') . ':', 'status', array('class' => 'wide')); ?></label>
                                             <div class="col-sm-10">
                                                 <select class="form-control" id="status" name="status">
+                                                    // Disable the status selection if the loan is rejected
+                                                    <?= strtolower($loan_info->loan_status) == 'reject' ? 'disabled' : '' ?>>
+                                                    //
                                                     <option value="pending" <?=strtolower($loan_info->loan_status) == 'pending'?'selected="selected"':'';?>><?=ktranslate2("Pending")?></option>
                                                     <option value="paid" <?=strtolower($loan_info->loan_status) == 'paid'?'selected="selected"':'';?>><?=ktranslate2("Paid")?></option>
                                                     <option value="reject" <?=strtolower($loan_info->loan_status) == 'reject'?'selected="selected"':'';?>><?=ktranslate2("Reject")?></option>
@@ -833,7 +836,7 @@
 </div>
 <!-- /.modal -->
 
-<!--Tarea7-->
+<!--
 <script>
 $(document).ready(function() {
     // Obtener estado actual del préstamo
@@ -863,7 +866,7 @@ $(document).ready(function() {
     });
 });
 </script>
-
+                        -->
 
 <!-- Modal -->
 <div class="modal fade" id="md-upload-document" role="dialog">
