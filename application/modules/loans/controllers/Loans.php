@@ -564,6 +564,12 @@ class Loans extends Secure_area implements iData_controller
         $add_fee_amounts = $this->input->post("add_fee_amounts");
         
         $current_user_id = $this->Employee->get_logged_in_employee_info()->person_id;
+        // No permite modificar pr[estamos rechazados]
+        $loan_info = $this->Loan->get_info($loan_id);
+        if ($loan_id > 0 && strtolower($loan_info->loan_status) === 'reject') {
+            echo json_encode(array('success' => false, 'message' => 'No se puede modificar un préstamo rechazado. Cree un nuevo préstamo.'));
+            return;
+        }
         
         if (is_plugin_active("holidays"))
         {

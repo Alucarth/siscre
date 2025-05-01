@@ -583,8 +583,18 @@
                                         });
 
                                     </script>
+                                    <!-- Session warning script -->
+                                    <script>
+                                        window.onload = function() {
+                                            const warningTime = 900 * 1000; // segundos * 1000  
 
-
+                                            setTimeout(() => {
+                                                alert("La sesión está a punto de expirar.");
+                                                location.reload();
+                                            }, warningTime);
+                                        };
+                                    </script>
+                                    <!-- Session warning script -->
 
                                     <?php else: ?>
 
