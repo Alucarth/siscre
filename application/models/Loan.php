@@ -3705,6 +3705,7 @@ class Loan extends CI_Model {
             $interest = $apply_amount * $interest_rate;
             $principal_amount = $term_pay - $interest;
             $balance_owed = $apply_amount - $principal_amount;
+            
             /*
             $datos = array();
             array_push($datos,$deno);
