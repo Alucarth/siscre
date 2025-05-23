@@ -288,6 +288,20 @@
 
     <body>
 
+        <!-- Alertas de CI set_alert -->
+        <?php if ($msg = $this->session->flashdata('success')): ?>
+        <div class="alert alert-success alert-dismissible" role="alert">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <?= $msg ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($msg = $this->session->flashdata('error')): ?>
+        <div class="alert alert-danger alert-dismissible" role="alert">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            <?= $msg ?>
+        </div>
+        <?php endif; ?>
 
 
         <input type="hidden" id="site_url" name="site_url" value="<?= site_url() ?>" />

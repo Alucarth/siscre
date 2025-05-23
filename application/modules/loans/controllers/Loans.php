@@ -671,13 +671,23 @@ class Loans extends Secure_area implements iData_controller
         $loan_info = $this->Loan->get_info($loan_id);
         
         $is_reverted = false;
-        if ( $loan_status == 'approved' )
+        if ( $loan_status == 'approved' ) //cambiar estado a aprobado?
         {
-            if ( $loan_info->loan_status != $loan_status )
+            if ( $loan_info->loan_status != $loan_status ) //estados: pending, approved, paid, reject
             {
                 $loan_data['loan_approved_by_id'] = $current_user_id;
                 $loan_data['loan_approved_date'] = time();
             }
+            else
+            {
+                $is_reverted = true;
+            }
+            /*
+            {
+                $loan_data['loan_approved_by_id'] = $current_user_id;
+                $loan_data['loan_approved_date'] = time();
+            }
+                */
         }
         else
         {

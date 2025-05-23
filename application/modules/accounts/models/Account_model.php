@@ -632,4 +632,19 @@ class Account_model extends CI_Model
         
         return $total_deposits;
     }
+
+    /**
+     * Cuenta cuántas transacciones existen con este tipo de cuenta.
+     *
+     * Si en tu base tienes una tabla de 'accounts' con account_type_id,
+     * cámbia el nombre del método count_all_results() a esa tabla.
+     */
+    public function count_by_type($type_id)
+    {
+        return $this->db
+            ->where('account_type_id', $type_id)
+            ->count_all_results('c19_account_transactions'); 
+            // ← aquí pon el nombre real de la tabla de cuentas si difiere
+    }
+
 }

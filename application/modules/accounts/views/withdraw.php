@@ -170,7 +170,20 @@
                                         <div id="div-account-balance"><?=to_currency("0");?></div>
                                     </div>
                                 </div>
-                                
+<!--
+                                <div class="form-group">
+                                    <label for="account_type_id">Tipo de Cuenta</label>
+                                    <select name="account_type_id" id="account_type_id" class="form-control" required>
+                                        <option value="">-- Seleccione --</option>
+                                        <?php foreach($account_types as $type): ?>
+                                        <option value="<?= $type->account_type_id ?>"
+                                        <?= isset($withdraw_info->account_type_id) && $withdraw_info->account_type_id == $type->account_type_id ? 'selected' : '' ?>>
+                                        <?= "{$type->code} - {$type->name}" ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                        -->
                                 <div class="form-group row">
                                     <label class="col-lg-2 text-xs-right control-label">
                                         Monto:

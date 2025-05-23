@@ -64,7 +64,7 @@
                 
                     <?php $sub_menus = json_decode($module->sub_menus, true); ?>
 
-                    <?php if (count($sub_menus) > 0): ?>
+                    <?php if (is_array($sub_menus) && count($sub_menus) > 0): ?>
                         <?php $parent_active = ( stristr($module->module_id, $this->router->fetch_class()) ? 'active open' : '' ); ?>
                         <li class="nav-parent <?= $parent_active ?>">       
 
@@ -83,6 +83,18 @@
                                         </a>
                                     </li>
                                 <?php endforeach; ?> 
+
+                                <?php if ($module->module_id === 'accounts'): ?>
+                                    <?php // Enlace fijo a Tipos de Cuentas ?>
+                                    <?php $child_active = ($this->router->fetch_class()==='account_types') ? 'active' : ''; ?>
+                                    <li class="<?= $child_active ?>">
+                                        <a href="<?= site_url('accounts/account_types') ?>">
+                                            <span class="fa fa-list"></span>
+                                            <span class="nav-label">Tipos de Cuentas</span>
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
+
                             </ul>
                         </li>
 

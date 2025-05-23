@@ -517,6 +517,10 @@ class Accounts extends Secure_area implements iData_controller
         $data["trans_id"] = $trans_id;
         $data["account_id"] = $account_id;
         //$data["clients"] = $clients;
+
+         // Cargar tipos de cuenta
+        //$this->load->model('account_types_model');
+        //$data['account_types'] = $this->Account_types_model->get_all();
         
         $this->load->view("accounts/deposit", $data);
     }
@@ -538,6 +542,10 @@ class Accounts extends Secure_area implements iData_controller
         $data["accounts"] = $accounts;
         $data["trans_id"] = $trans_id;
         $data["account_id"] = $account_id;
+
+          // Cargar tipos de cuenta
+        //$this->load->model('account_types_model');
+        //$data['account_types'] = $this->Account_types_model->get_all();
         
         $this->load->view("accounts/withdraw", $data);
     }
@@ -545,6 +553,7 @@ class Accounts extends Secure_area implements iData_controller
     function save_transaction($id = -1)
     {
         $account_id = $this->input->post("account_id");
+        $account_type_id = $this->input->post("account_type_id");
         $description = $this->input->post("description");
         $trans_type = $this->input->post("trans_type");
         $client_id = $this->input->post("client_id");
@@ -569,6 +578,7 @@ class Accounts extends Secure_area implements iData_controller
         //}
         
         $data["account_id"] = $account_id;
+        $data["account_type_id"] = $account_type_id;
         $data["amount"] = $amount;
         $data["description"] = $description;
         $data["trans_type"] = $trans_type;

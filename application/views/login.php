@@ -47,8 +47,8 @@
                             
                             $current_time = date("h:i a");
                             // echo 'tiemp o'. $current_time;
-                            $sunrise = "7:00 am";
-                            $sunset = "7:00 pm";
+                            $sunrise = "00:00 am";
+                            $sunset = "11:59 pm";
                             $date1 = DateTime::createFromFormat('h:i a', $current_time);
                             $date2 = DateTime::createFromFormat('h:i a', $sunrise);
                             $date3 = DateTime::createFromFormat('h:i a', $sunset);
