@@ -166,7 +166,7 @@ class Home_model extends CI_Model {
                 $tmp = json_decode($row->add_fees, true);
                 foreach ( $tmp as $fee )
                 {
-                    $total_fees += $fee;
+                    $total_fees += (float) $fee;
                 }
             }
         }
