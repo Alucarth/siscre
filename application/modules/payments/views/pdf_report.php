@@ -170,18 +170,33 @@
                         mkdir($dir);
 	
                     //Declaramos la ruta y nombre del archivo a generar
-	                $filename = $dir.'test.png';
+	                $filename = $dir . 'voucher_' . $count . '.png';
                     
 
                     //Parámetros de Configuración
 	
-	                $tamaño = 2; //Tamaño de Pixel
-	                $level = 'M'; //Precisión L = Baja, M = Mediana, Q = Alta, H= Máxima
-	                $framSize = 1; //Tamaño en blanco
-	                $contenido = " ID Tran: " . $count . "\n Cliente: " . $account . "\n Cuota: " . $number . " de " . $size . "\n Total: " . $total; //Texto
-	
-                    //Enviamos los parámetros a la Función para generar código QR 
-	                QRcode::png($contenido, $filename, $level, $tamaño, $framSize); 
+	                // En la sección donde se genera el QR, reemplaza el contenido con esto:
+                    $contenido = "
+                    COMPROBANTE DE PAGO
+                    ID Transacción: {$count}
+                    Cliente: {$client}
+                    Crédito: {$loan_id}
+                    Cuota: {$number} de {$size}
+                    -----------------------------
+                    • Capital: {$capital}
+                    • Interés: {$interest}
+                    • Penalidad: {$lpp}
+                    • Ahorro: {$operating_expenses_amount}
+                    -----------------------------
+                    TOTAL: {$total}
+                    (Literal: {$literal})
+                    -----------------------------
+                    Fecha: {$trans_date}
+                    Sucursal: {$branch_name}
+                    Usuario: {$teller}
+                    ";
+
+                    QRcode::png($contenido, $filename, 'M', 1, 2); // Ajusta tamaño (4) y margen (2)
 	
                     //Mostramos la imagen generada
                     // echo '<img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=http%3A%2F%2Fwww.google.com%2F&choe=UTF-8" title="'.$contenido.'" />';
