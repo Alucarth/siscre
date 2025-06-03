@@ -180,7 +180,7 @@
             </div>
         </div>
         <div class="hr-line-dashed"></div>
-    
+        
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
                 Zona:
@@ -193,7 +193,7 @@
                             'id' => 'address_1',
                             'value' => $person_info->address_1,
                             'class' => 'form-control',
-                            'placeholder' => 'Villa Ingenio, El Kenko, San Martín'
+                            'placeholder' => 'Villa Ingenio, El Kenko, San Martín, etc.'
                         )
                 );
                 ?>
