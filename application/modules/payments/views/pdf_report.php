@@ -185,7 +185,6 @@
                     -----------------------------
                     • Capital: {$capital}
                     • Interés: {$interest}
-                    • Penalidad: {$lpp}
                     • Ahorro: {$operating_expenses_amount}
                     -----------------------------
                     TOTAL: {$total}
@@ -193,7 +192,7 @@
                     -----------------------------
                     Fecha: {$trans_date}
                     Sucursal: {$branch_name}
-                    Usuario: {$teller}
+                    Cajero: {$teller}
                     ";
 
                     QRcode::png($contenido, $filename, 'M', 1, 2); // Ajusta tamaño (4) y margen (2)
