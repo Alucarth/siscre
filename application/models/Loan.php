@@ -3566,7 +3566,7 @@ class Loan extends CI_Model {
         }
 
         $loan_amount = $apply_amount;
-        $interest_amount = ($loan_amount * ($interest_rate/100));
+        $interest_amount = round($loan_amount * ($interest_rate/100), 2);
         //$operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
         $operating_expenses_amount = $operating_expenses;
         $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
@@ -3656,7 +3656,7 @@ class Loan extends CI_Model {
         $penalty_amount = $post_var["penalty_amount"];
         $exclude_sundays = $post_var["exclude_sundays"];
         $exclude_schedules = $post_var["exclude_schedules"];
-		$adicional_fees = $post_var["additional_fees"];
+		$adicional_fees = $post_var["additional_fees"]; 
 
         if ($this->config->item('date_format') == 'd/m/Y')
         {
@@ -3686,7 +3686,7 @@ class Loan extends CI_Model {
         }
 
         $data_scheds = [];
-        $interest_rate = ($interest_rate / 100);
+        $interest_rate = round(($interest_rate / 100), 10)  ;
 		//$operating_expenses = ($operating_expenses / 100);
         $balance_owed = $apply_amount;
         //$operating_expenses_amount = $apply_amount * $operating_expenses;        
@@ -3694,6 +3694,11 @@ class Loan extends CI_Model {
 
         $i = 0;
         $y = 1;
+        
+        $total_capital_pagado = 0;
+        $total_interest_pagado = 0;
+        $apply_amount_original = $apply_amount;
+
         while ($balance_owed > 0 && $i < $term)
         {
             $pay_term = $pay_term > 0 ? $pay_term : 1;
@@ -3701,10 +3706,21 @@ class Loan extends CI_Model {
             $deno = $deno > 0 ? $deno : 1;
             
             $term_pay = ($apply_amount * $interest_rate) / $deno;
-			$payment_amount = $term_pay + $operating_expenses_amount;
-            $interest = $apply_amount * $interest_rate;
-            $principal_amount = $term_pay - $interest;
+			//Tarea 8
+            if ($i == $term - 1) {
+                $principal_amount = round($apply_amount_original - $total_capital_pagado, 2); // capital restante exacto
+                $interest = round($principal_amount * $interest_rate, 2); // interés final real
+                $payment_amount = round($principal_amount + $interest + $operating_expenses_amount, 2);
+            } else {
+                $interest = round($apply_amount * $interest_rate, 2); // Redondeo aplicado
+                $principal_amount = round($term_pay - $interest, 2); // Redondeo aplicado
+                $payment_amount = round($term_pay + $operating_expenses_amount, 2);
+                $total_capital_pagado += $principal_amount;
+                $total_interest_pagado += $interest;
+            }
+
             $balance_owed = $apply_amount - $principal_amount;
+            //Fin Tarea 8
             
             /*
             $datos = array();
