@@ -53,25 +53,25 @@
               <div>
                 <?php
                   $action = isset($type)
-                  ? 'accounts/account_types/form/'.$type->account_type_id
-                  : 'accounts/account_types/form';
+                  ? 'savings_accounts/savings_account_types/form/'.$type->savings_account_type_id
+                  : 'savings_accounts/savings_account_types/form';
                   echo form_open($action, ['class'=>'form-horizontal']);
                 ?>
 
-                <?php if (isset($type)): ?>
+                <?php if (isset($type)): // solo en edición mostramos el código ?>
                 <div class="form-group">
-                  <?= form_label('Código único', 'code', ['class'=>'col-sm-2 control-label']) ?>
-                  <div class="col-sm-6">
-                    <?= form_input([
-                      'name'=>'code',
-                      'id'=>'code',
-                      'value'=>set_value('code', $type->code ?? ''),
-                      'class'=>'form-control',
-                      'required'=>'required'
-                    ]) ?>
-                  </div>
+                    <?= form_label('Código único', 'code', ['class'=>'col-sm-2 control-label']) ?>
+                    <div class="col-sm-6">
+                        <?= form_input([
+                        'name'=>'code',
+                        'value'=>set_value('code', $type->code),
+                        'class'=>'form-control',
+                        'readonly'=>'readonly'
+                        ]) ?>
+                    </div>
                 </div>
                 <?php endif; ?>
+
 
                 <div class="form-group">
                   <?= form_label('Nombre', 'name', ['class'=>'col-sm-2 control-label']) ?>
@@ -102,6 +102,31 @@
                 </div>
 
                 <div class="form-group">
+                    <?= form_label('¿Plazo Fijo?', 'is_fixed_term', ['class'=>'col-sm-2 control-label']) ?>
+                    <div class="col-sm-2">
+                        <?= form_dropdown(
+                            'is_fixed_term',
+                            [0 => 'No', 1 => 'Sí'],
+                            set_value('is_fixed_term', $type->is_fixed_term ?? 0),
+                            'class="form-control" id="is_fixed_term"'
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="form-group" id="term-days-group" style="<?= isset($type) && $type->is_fixed_term ? '' : 'display:none' ?>">
+                    <?= form_label('Plazo (días)', 'term_days', ['class'=>'col-sm-2 control-label']) ?>
+                    <div class="col-sm-2">
+                        <?= form_input([
+                            'type'=>'number',
+                            'name'=>'term_days',
+                            'value'=>set_value('term_days', $type->term_days ?? 0),
+                            'class'=>'form-control',
+                            'min'=>1
+                            ]) ?>
+                    </div>
+                </div>
+
+                <div class="form-group">
                   <?= form_label('Descripción', 'description', ['class'=>'col-sm-2 control-label']) ?>
                   <div class="col-sm-6">
                     <?= form_textarea([
@@ -128,7 +153,7 @@
 
                 <div class="col-lg-12">
                   <div class="form-group">
-                    <a class="btn btn-default btn-secondary" href="<?= site_url('accounts/account_types') ?>"
+                    <a class="btn btn-default btn-secondary" href="<?= site_url('savings_accounts/savings_account_types') ?>"
                       id="btn-close">
                       Cancelar
                     </a>
@@ -144,6 +169,20 @@
     </div>
   </div>    
 </div>
+<script>
+  $(function() {
+    var $sel = $('#is_fixed_term'),
+        $grp = $('#term-days-group');
+    if (!$sel.length || !$grp.length) return;
+
+    // inicial: muestra u oculta según el valor actual
+    $grp.toggle($sel.val() === '1');
+
+    // al cambiar (Select2 dispara change en el <select>)
+    $sel.on('change', function() {
+      $grp.toggle($(this).val() === '1');
+    });
+  });
+</script>
 
 <?php $this->load->view('partial/footer'); ?>
-

@@ -135,3 +135,4 @@ $lang["_config"] = "Config";
 $lang["_accounts"] = "Accounts";
 $lang["_branches"] = "Branches";
 $lang["_ahorro"] = "Ahorro";
+$lang["_savings_accounts"] = "Savings Accounts";

@@ -67,12 +67,6 @@ $route['reports/(specific_:any)/(:any)/(:any)/(:any)'] = "reports/$1/$2/$3/$4";
 $route['reports/specific_customer'] = "reports/specific_customer_input";
 $route['reports/specific_employee'] = "reports/specific_employee_input";
 $route['reports/specific_discount'] = "reports/specific_discount_input";
-// Rutas para el sub-módulo “Tipos de Cuentas” dentro de accounts
-$route['accounts/account_types']               = 'accounts/account_types/index';
-$route['accounts/account_types/form']          = 'accounts/account_types/form';
-$route['accounts/account_types/form/(:num)']   = 'accounts/account_types/form/$1';
-$route['accounts/account_types/delete/(:num)'] = 'accounts/account_types/delete/$1';
-
 
 $route['scaffolding_trigger'] = "";
 

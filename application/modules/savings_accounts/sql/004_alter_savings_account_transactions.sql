@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `c19_savings_account_transactions` (
+  `transaction_id`      INT(11)       NOT NULL AUTO_INCREMENT COMMENT 'PK: ID de transacción',
+  `savings_account_id`  INT(11)       NOT NULL                COMMENT 'FK → c19_savings_accounts.savings_account_id',
+  `trans_type`          ENUM('deposit','withdraw','transfer') NOT NULL COMMENT 'Tipo: depósito/retirada/transferencia',
+  `amount`              DECIMAL(12,2) NOT NULL                COMMENT 'Monto de la operación',
+  `trans_date`          DATETIME      NOT NULL                COMMENT 'Fecha y hora de la transacción',
+  `description`         VARCHAR(255)  DEFAULT NULL            COMMENT 'Notas opcionales',
+  `depositor_name`      VARCHAR(150)  NOT NULL                COMMENT 'Nombre completo de quien realiza el depósito',
+  `depositor_document`  VARCHAR(50)   NOT NULL                COMMENT 'Documento de ID del depositante',
+  `branch_id`           INT(11)       NOT NULL                COMMENT 'FK → c19_branches.branch_id (sucursal)',
+  `person_id`           INT(11)       NOT NULL                COMMENT 'FK → c19_people.person_id (titular de la cuenta)',
+  `registered_by`       INT(11)       NOT NULL                COMMENT 'FK → c19_people.person_id quien registra',
+  `ip_address`          VARCHAR(45)   NOT NULL                COMMENT 'IP o terminal de registro',
+  `status`              TINYINT(1)    NOT NULL DEFAULT 1     COMMENT '1=Activo, 0=Inactivo (soft-delete)',
+  `date_added`          INT(11)       NOT NULL                COMMENT 'Timestamp de creación',
+  `date_modified`       INT(11)       NOT NULL                COMMENT 'Timestamp de última modificación',
+  `modified_by`         INT(11)       NOT NULL                COMMENT 'FK → quien modificó/revirtió',
+  PRIMARY KEY (`transaction_id`),
+  KEY `idx_sav_trans_account` (`savings_account_id`),
+  KEY `idx_sav_trans_branch`  (`branch_id`),
+  KEY `idx_sav_trans_person`  (`person_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
