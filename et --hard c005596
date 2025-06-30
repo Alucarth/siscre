@@ -1,0 +1,98 @@
+[33m4f3bc95[m[33m ([m[1;36mHEAD -> [m[1;32mpasantia[m[33m, [m[1;31morigin/pasantia[m[33m)[m Correción formulario de usuarios en la dirección
+[33mc1d5cdf[m Correción formulario de usuarios en la dirección
+[33mc005596[m Final centavos
+[33m1fb59e8[m Cambios en el QR para el voucher de pago
+[33m3dc1757[m Cambios en el QR para el voucher de pago
+[33meea8863[m Redondeo de centavos
+[33m299cba3[m Restriccion de prestamos rechazados
+[33m17b8d83[m Mantenimiento
+[33mff5c1eb[m WIP: cambios locales en Loan.php antes de aplicar stash
+[33m2ac2dfe[m ajustes del garante
+[33mf74e741[m primer commit
+[33me9a5ad1[m Ajuste para que obtenga la info de usuario y deshabilite el boton al verificar permisos de borrado
+[33me4087e1[m don eddy requirements
+[33mb1db01e[m Merge pull request #1 from rhb0js/main
+[33m8959073[m Merge branch 'main' of https://github.com/Alucarth/siscre Merge
+[33m103ee6e[m Se suma un array con la traduccion en el archivo "bootstrap-datepicker" y su llamado para los views correspondientes
+[33mc237d3f[m Módulo Dashboard
+[33mf3105b7[m Añadido fecha de pago programado en pagos
+[33mf405dd9[m Añadida la hora en el voucher de depósito y retiro de ahorro
+[33mf10737b[m Corrección fecha reportes de depósito y retiro
+[33m3f2bc7e[m Traducción Listado de documentos préstamos
+[33m080523a[m imagen
+[33m33d4899[m habilitando libreria qr
+[33m4ca3feb[m add branch id hidden
+[33m2e67c5e[m add branch id
+[33mb66a630[m report fixes
+[33me2b17f7[m report fixes
+[33m77b7589[m corrección total ahorro
+[33m72e28d5[m Se añadió telefono en cuentas por cobrar
+[33ma54821f[m Eliminación, restriccion para el teriro de ahorros
+[33m3b22a85[m Ajuste Cuentas por Cobrar y reportes en PDF
+[33m7479470[m Ajustes en formulario y voucher de ahorro
+[33m4af4d3f[m Ajustes en el Voucher y formulario de ahorro
+[33m6fb8fa8[m Ajustes en vouchers de pago y cuentas
+[33m270982f[m Número de prestamo en voucher de pago de cuota
+[33mab9fc2d[m Modificación de Gastos Operativos por Ahorro
+[33ma496863[m Cambio de Gastos operativos por Ahorro
+[33m55a9a13[m add banch and person in voucher transaction
+[33m5724296[m Ajuste en voucher de deposito y retiro
+[33ma86b1bb[m modificacion del voucher de deposito y retiro
+[33m8a89cf1[m se levanto la restriccion de pago por agencia
+[33m8b04978[m Merge branch 'main' of github.com:Alucarth/siscre
+[33mea2a8eb[m visualizar all customers
+[33mc411358[m Merge branch 'main' of https://github.com/Alucarth/siscre
+[33md3d5c08[m Ajustes y traducciones varias
+[33meade456[m adicion de boton de detale
+[33m617987a[m Traducción del módulo de ahorros
+[33m1a72c40[m Merge branch 'main' of github.com:Alucarth/siscre
+[33me0fe0e9[m eliminar garante funcionando
+[33m8047bfb[m actualizado creación de la tabla branches
+[33ma8fd11e[m Añadido módulo sucursales
+[33me287803[m Corregido CI de garantes en desembolso
+[33m2d5fe35[m Corregido lista de prestatario y traducciones
+[33mc6633b7[m Corregidos desembolso y cronograma de pago
+[33mecf12c2[m corregido formulario de informaci[on b[asica
+[33md777f7a[m Correccion de guardado de leads
+[33m129bfab[m Corregido notificaciones de pendientes
+[33mf574065[m Corregido cronograma de pago Gastos operativos
+[33mf1782e9[m Corregido código de cliente en el cronograma de pago
+[33m69d81c0[m Actualización diseño dubulgación de impresion
+[33m2d8ff0f[m Diseño dibulgación de impresión
+[33m0553acb[m Corregido el monto de sansiones para el voucher de pago de cuota
+[33ma6c2d3b[m Añadido sanción por pago tardío al voucher de pago de cuota
+[33m75f4936[m Añadido "BOLIVIANOS" en el monto literar del voucher de pago de cuota
+[33m2b02386[m añadida función de generador de QR, modificado voucher de pago de cuotas con QR
+[33m96c06f0[m Corregido monto literal en mayúsculas
+[33m7254675[m Ajuste en el formato de moneda
+[33m1d9b0e9[m Actualización de hora en pago de cuotas
+[33m41027c0[m Añadido hora en voucher de pago de cuota
+[33m25a7f83[m agregando hora al reporte de pagos
+[33m6984508[m añadida opción de fecha con hora
+[33m2fdd91e[m Ajustes al reporte de pago de cuota
+[33m881919b[m ajuste pago de cuota
+[33mf23b96f[m Corección registro prestatarios
+[33m84eff17[m ajuste de reportes
+[33m38e4256[m Ajustes a lista de prestatarios y traducciones adicionales
+[33mc4ebae4[m Traducciones menores
+[33ma9f3d5f[m Correción de idioma
+[33m31d2491[m corrigiendo la base de datos
+[33m72fb07a[m Merge branch 'main' of github.com:Alucarth/siscre
+[33m6c54c93[m garante primera version
+[33m08370fc[m logo
+[33m35bddb8[m Ajustes al módulo prestatarios
+[33mfcf8d7f[m Ajustes al módulo prestatarios
+[33mfb66fa8[m Ajustes en el reporte de pagos y prestamos
+[33m28b0701[m Ajuste de reporte pdf Comprobante de desembolso
+[33m297d277[m adicion de ci en reporte
+[33m30f9511[m Actualización comprobante de desembolso
+[33m4f5e31f[m Actualizacion
+[33m0c55e75[m ajuste en cronograma de pagos quincenal, semanal
+[33m8280cef[m problemas de credenciales
+[33m6e8074d[m restableciendo conexion a la base de datos
+[33m5561948[m credenciales db
+[33mf02e086[m modify path
+[33mf9d9438[m yml formato
+[33ma6c1631[m para subir a produccion
+[33m9983d6e[m subiendo cpanel
+[33m4b17f2b[m proyecto base

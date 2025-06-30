@@ -305,6 +305,19 @@ class Payment extends CI_Model {
             if ($this->db->insert('loan_payments', $payment_data))
             {
                 $payment_data['loan_payment_id'] = $this->db->insert_id();
+                // Actualizar el saldo del préstamo
+                $this->db->where('loan_id', $payment_data['loan_id']);
+                $this->db->set('loan_balance', 'loan_balance - ' . $payment_data['paid_amount'], false);
+                $this->db->update('loans');
+                
+                // Verificar si el saldo llegó a cero y actualizar el estado
+                $this->db->where('loan_id', $payment_data['loan_id']);
+                $loan = $this->db->get('loans')->row();
+                
+                if ($loan->loan_balance <= 0) {
+                    $this->db->where('loan_id', $payment_data['loan_id']);
+                    $this->db->update('loans', array('loan_status' => 'paid'));
+                }
                 return true;
             }
             return false;
@@ -314,7 +327,7 @@ class Payment extends CI_Model {
         $this->db->where('loan_payment_id', $payment_id);
         return $this->db->update('loan_payments', $payment_data);
     }
-
+    
     /*
       Deletes one payment
      */
