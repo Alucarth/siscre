@@ -156,6 +156,7 @@
 
 <div class="extra-filters" style="display: none;">
     <button class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print");?></button>
+    <button class="btn btn-primary" id="btn-export-all-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print All");?></button>
 </div>
 
 <div id="dt-extra-params">
@@ -250,6 +251,19 @@
                 unblockElement("#btn-export-pdf");
             }, "json");
         });
+
+        //Tarea 3
+        $(document).on("click", "#btn-export-all-pdf", function() {
+            var $btn = $(this);
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Generando...');
+
+            window.open('<?= site_url('printing/export_all_receivables_pdf') ?>', '_blank');
+
+            setTimeout(function() {
+                $btn.prop('disabled', false).html('<span class="fa fa-print"></span> <?= ktranslate2("Print All"); ?>');
+            }, 3000);
+        });
+        //
 
         $(document).on("click", ".btn-delete", function () {
             var $this = $(this);
