@@ -1212,7 +1212,7 @@ class Loan extends CI_Model {
 
             default:
 
-                $data_scheds = $this->calculate_fixed_fee($post_var);
+                $data_scheds = $this->calculate_percentage($post_var);
 
                 break;
 
@@ -3465,14 +3465,6 @@ class Loan extends CI_Model {
 
             $pay_term = $pay_term - 1;
             $i++;
-
-            if($i == $term){
-                if( $balance_owed != 0 ){
-                    $apply_amount += $balance_owed; // Ajusta el pago total
-                    $balance_owed = 0; // Establece el balance a cero
-                }
-            }
-
             $y++;
         }
 
@@ -3481,6 +3473,7 @@ class Loan extends CI_Model {
 
 
     function calculate_loan_pago_excel($post_var)
+
     {
 
         $grace_period = $post_var["grace_period_days"];
@@ -3521,10 +3514,9 @@ class Loan extends CI_Model {
 
         $loan_amount = $apply_amount;
         $interest_amount = ($loan_amount * ($interest_rate/100));
-        $interest_amount = round($interest_calc, 2);
         //$operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
         $operating_expenses_amount = $operating_expenses;
-        $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)), $pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
+        $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
         $payment_amount_fees = $payment_amount + $operating_expenses_amount;
         $data_scheds = [];
         $no_of_days = 0;
@@ -3562,11 +3554,10 @@ class Loan extends CI_Model {
             $tmp["payment_balance"] = $balance_owed; 
             $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
             $tmp["penalty_amount"] = $penalty_amount / $pay_term;
-            $capital = $payment_amount - $interest_amount - $operating_expenses_amount;
-            $tmp["interest"] = round($interest_amount, 2);
-            $tmp["payment_amount"] = round($payment_amount_fees, 2);
-            $tmp["payment_amount_capital"] = round($capital, 2);
-            $tmp["operating_expenses_amount"] = round($operating_expenses_amount, 2);
+            $tmp["interest"] = $interest_amount;
+            $tmp["payment_amount"] = $payment_amount_fees;
+            $tmp["payment_amount_capital"] = $payment_amount;
+            $tmp["operating_expenses_amount"] = $operating_expenses_amount;
 
             if ( $pay_term_name == 'biweekly' )
             {
@@ -3603,86 +3594,123 @@ class Loan extends CI_Model {
 
     function calculate_fixed_fee($post_var)
     {
+        $grace_period = $post_var["grace_period_days"];
         $apply_amount = $post_var["ApplyAmt"];
         $interest_rate = $post_var["TotIntRate"];
         $pay_term = (int) $post_var["NoOfPayments"];
         $pay_term_name = $post_var["PayTerm"];
-        $operating_expenses = $post_var["operating_expenses"];
+		$operating_expenses = $post_var["operating_expenses"];
+        $penalty_amount = $post_var["penalty_amount"];
         $exclude_sundays = $post_var["exclude_sundays"];
-        $exclude_schedules = isset($post_var["exclude_schedules"]) ?: '';
-        $adicional_fees = $post_var["additional_fees"];
+        $exclude_schedules = $post_var["exclude_schedules"];
+		$adicional_fees = $post_var["additional_fees"];
 
-        if ($this->config->item('date_format') == 'd/m/Y') {
+        if ($this->config->item('date_format') == 'd/m/Y')
+        {
             $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
-        } else {
+        }
+        else
+        {
             $payment_date = strtotime($post_var["InstallmentStarted"]);
         }
 
         $term = (int) $post_var["NoOfPayments"];
 
-        $data_scheds = [];
-        $interest_rate = ($interest_rate / 100);
-        $interest_rate = round($interest_rate, 10);
-        $balance_owed = $apply_amount;
-        $operating_expenses_amount = $operating_expenses;
-
-        switch ($pay_term_name) {
-            case 'day':
-                $periodicity = 360;
-                break;
-            case 'week':
-                $periodicity = 52;
-                break;
-            case 'biweekly':
-                $periodicity = 24;
-                break;
-            case 'month':
-                $periodicity = 12;
-                break;
-            default:
-                throw new Exception("Invalid frequency!");
+        if ( $pay_term_name == 'biweekly' )
+        {
+            $term *= 2;
+            $pay_term *= 2;
+			$interest_rate /= 2;
+            $operating_expenses /= 2;
+        }
+        
+        if ( $pay_term_name == 'month_weekly' )
+        {
+            $term *= 4;
+            $pay_term *= 4;
+			$interest_rate /= 4;
+            $operating_expenses /= 4;
         }
 
+        $data_scheds = [];
+        $interest_rate = ($interest_rate / 100);
+		//$operating_expenses = ($operating_expenses / 100);
+        $balance_owed = $apply_amount;
+        //$operating_expenses_amount = $apply_amount * $operating_expenses;        
+        $operating_expenses_amount = $operating_expenses;
+
         $i = 0;
-        $factor = $interest_rate / $periodicity;
-        $deno = 1 - pow(1 + $factor, -$term);
-        $num = $apply_amount * $factor;
-        $payment_amount_unrounded = $num / $deno;
-        $payment_amount = number_format($payment_amount_unrounded, 2, '.', '');
-
-        $total_payment_rounded = 0;
-
-        while ($balance_owed > 0 && $i < $term) {
-            $interest = $apply_amount * $factor;
-            $principal_amount = $payment_amount - $interest;
+        $y = 1;
+        while ($balance_owed > 0 && $i < $term)
+        {
+            $pay_term = $pay_term > 0 ? $pay_term : 1;
+            $deno = 1 - 1 / pow((1 + $interest_rate), $pay_term);
+            $deno = $deno > 0 ? $deno : 1;
+            
+            $term_pay = ($apply_amount * $interest_rate) / $deno;
+			$payment_amount = $term_pay + $operating_expenses_amount;
+            $interest = $apply_amount * $interest_rate;
+            $principal_amount = $term_pay - $interest;
             $balance_owed = $apply_amount - $principal_amount;
+            /*
+            $datos = array();
+            array_push($datos,$deno);
+            array_push($datos,$operating_expenses_amount);
+            array_push($datos,$term_pay);
+            array_push($datos,$payment_amount);
+            array_push($datos,$interest);
+            array_push($datos,$principal_amount);
+            array_push($datos,$balance_owed);
+            array_push($datos,$interest_rate);
+            array_push($datos,$operating_expenses);
+            */
+
+            $color = $title = $grace_period_days = '';
+            if (isset($grace_period[$y]))
+            {
+                $payment_date = strtotime(date("Y-m-d", $payment_date) . ' +' . $grace_period[$y] . ' day');
+                $color = 'red';
+                $title = 'In grace period';
+                $grace_period_days = $grace_period[$y] . ' days';
+            }
 
             $tmp = [];
             $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
-            $tmp["payment_balance"] = round($balance_owed, 2);
-            $tmp["interest"] = round($interest, 2);
-            $tmp["payment_amount"] = round($payment_amount, 2);
-            $tmp["payment_amount_capital"] = round($principal_amount, 2);
-            $tmp["operating_expenses_amount"] = round($operating_expenses_amount, 2);
+            $tmp["payment_balance"] = $balance_owed;
+            $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
+            $tmp["penalty_amount"] = $penalty_amount;
+            $tmp["interest"] = $interest;
+            $tmp["payment_amount"] = $payment_amount;
+            $tmp["payment_amount_capital"] = $principal_amount;
+			$tmp["operating_expenses_amount"] = $operating_expenses_amount;
+            $tmp["valores_calculados"] = $datos;
 
-            $total_payment_rounded += $tmp["payment_amount"];
-
-            // Avanzar fecha
-            if ($pay_term_name == 'biweekly') {
+            if ( $pay_term_name == 'biweekly' )
+            {
                 $payment_date = strtotime(date('Y-m-d', $payment_date) . '+2 week');
-            } elseif ($pay_term_name == 'month_weekly') {
+            }
+            else if ( $pay_term_name == 'month_weekly' )
+            {
                 $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 week');
-            } else {
+            }
+            else
+            {
                 $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 ' . $pay_term_name);
             }
 
-            // Excluir domingos o feriados
-            if (is_plugin_active("holidays")) {
+            if (is_plugin_active("holidays"))
+            {
                 $payment_date = get_excluded_days($payment_date, $exclude_schedules);
-            } else {
-                if ($exclude_sundays) {
-                    $in_day = strtolower(date("l", $payment_date));
-                    if ($in_day == "sunday") {
+            }
+            else
+            {
+                if ($exclude_sundays)
+                {
+                    $in_day = date("l", $payment_date);
+                    $in_day = strtolower($in_day);
+
+                    if ($in_day == "sunday")
+                    {
                         $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
                     }
                 }
@@ -3691,255 +3719,237 @@ class Loan extends CI_Model {
             $apply_amount = $balance_owed;
             $data_scheds[] = $tmp;
 
+            $pay_term = $pay_term - 1;
             $i++;
-        }
-
-        // Ajuste final por redondeo
-        $total_real_payment = round($payment_amount_unrounded * $term, 2);
-        $difference = round($total_real_payment - $total_payment_rounded, 2);
-
-        if (abs($difference) > 0 && count($data_scheds) > 0) {
-            $last_index = count($data_scheds) - 1;
-
-            // Ajustar cuota final
-            $data_scheds[$last_index]["payment_amount"] = round(
-                $data_scheds[$last_index]["payment_amount"] + $difference,
-                2
-            );
-
-            // Mantener el interés intacto, ajustar solo el capital
-            $data_scheds[$last_index]["payment_amount_capital"] = round(
-                $data_scheds[$last_index]["payment_amount"] - $data_scheds[$last_index]["interest"],
-                2
-            );
+            $y++;
         }
 
         return $data_scheds;
     }
 
-    // function calculate_fixed_fee_old($post_var)
+    function calculate_fixed_fee_old($post_var)
    
-    // {
-    //     $grace_period = $post_var["grace_period_days"];
-    //     $term = $post_var["NoOfPayments"];
-    //     $loan_amount = $post_var["ApplyAmt"];
-    //     $interest_rate = $post_var["TotIntRate"];
-    //     $exclude_sundays = $post_var["exclude_sundays"];
-    //     $exclude_schedules = $post_var["exclude_schedules"];
-    //     $penalty_amount = $post_var["penalty_amount"];
-    //     $pay_term = $post_var["PayTerm"];
-    //     $operating_expenses = $post_var["operating_expenses"];
+    {
+        $grace_period = $post_var["grace_period_days"];
+        $term = $post_var["NoOfPayments"];
+        $loan_amount = $post_var["ApplyAmt"];
+        $interest_rate = $post_var["TotIntRate"];
+        $exclude_sundays = $post_var["exclude_sundays"];
+        $exclude_schedules = $post_var["exclude_schedules"];
+        $penalty_amount = $post_var["penalty_amount"];
+        $pay_term = $post_var["PayTerm"];
+        $operating_expenses = $post_var["operating_expenses"];
 
 
-    //     if ($pay_term == 'biweekly')
-    //     {
-    //         $fixed_amount = ($loan_amount * ($interest_rate / 100)) * ($term);
-    //         $interest_amount = ($loan_amount * ($interest_rate/100));
-    //         $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
-    //         $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
-    //         $payment_amount_fees = $payment_amount + $operating_expenses_amount;
-    //         $total_amount = 0;
-    //         $no_of_days = 0;
-    //         $total_interest = 0;
-    //         $total_principal = 0;
+        if ($pay_term == 'biweekly')
+        {
+            $fixed_amount = ($loan_amount * ($interest_rate / 100)) * ($term);
+            $interest_amount = ($loan_amount * ($interest_rate/100));
+            $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
+            $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
+            $payment_amount_fees = $payment_amount + $operating_expenses_amount;
+            $total_amount = 0;
+            $no_of_days = 0;
+            $total_interest = 0;
+            $total_principal = 0;
 
-    //         if ($this->config->item('date_format') == 'd/m/Y')
-    //         {
-    //             $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
-    //         }
-    //         else
-    //         {
-    //             $payment_date = strtotime($post_var["InstallmentStarted"]);
-    //         }
-    //         $data_scheds = [];
-    //         for ($i = 1; $i <= ($term * 2); $i++)
-    //         {
-    //             $compound_interest = $interest_amount / 2;
-    //             $principal_amount = $payment_amount_fees - $operating_expenses_amount - $compound_interest;
-    //             $balance_owed = $loan_amount - $principal_amount;
-    //             $total_amount += $payment_amount_fees;
-    //             $color = $title = $grace_period_days = '';
+            if ($this->config->item('date_format') == 'd/m/Y')
+            {
+                $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
+            }
+            else
+            {
+                $payment_date = strtotime($post_var["InstallmentStarted"]);
+            }
+            $data_scheds = [];
+            for ($i = 1; $i <= ($term * 2); $i++)
+            {
+                $compound_interest = $interest_amount / 2;
+                $principal_amount = $payment_amount_fees - $operating_expenses_amount - $compound_interest;
+                $balance_owed = $loan_amount - $principal_amount;
+                $total_amount += $payment_amount_fees;
+                $color = $title = $grace_period_days = '';
 
-    //             if ( isset($grace_period[$i]) )
-    //             {
-    //                 $payment_date = strtotime(date("Y-m-d H:i:s",$payment_date) . ' +' . $grace_period[$i] . ' day');
-    //                 $color = 'red';
-    //                 $title = 'In grace period';
-    //                 $grace_period_days = $grace_period[$i] . ' days';
-    //             }
-    //             $tmp = [];
-    //             $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
-    //             $tmp["payment_balance"] = $balance_owed;
-    //             $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
-    //             $tmp["penalty_amount"] = $penalty_amount;
-    //             $tmp["interest"] = $compound_interest;
-    //             $tmp["payment_amount"] = $payment_amount_fees;
-    //             $tmp["payment_amount_capital"] = $principal_amount;
-    //             $tmp["operating_expenses_amount"] =  $operating_expenses_amount;
+                if ( isset($grace_period[$i]) )
+                {
+                    $payment_date = strtotime(date("Y-m-d H:i:s",$payment_date) . ' +' . $grace_period[$i] . ' day');
+                    $color = 'red';
+                    $title = 'In grace period';
+                    $grace_period_days = $grace_period[$i] . ' days';
+                }
+                $tmp = [];
+                $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
+                $tmp["payment_balance"] = $balance_owed;
+                $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
+                $tmp["penalty_amount"] = $penalty_amount;
+                $tmp["interest"] = $compound_interest;
+                $tmp["payment_amount"] = $payment_amount_fees;
+                $tmp["payment_amount_capital"] = $principal_amount;
+                $tmp["operating_expenses_amount"] =  $operating_expenses_amount;
 
-    //             $data_scheds[] = $tmp;
-    //             $payment_date = strtotime(date('Y-m-d', $payment_date) . '+15 days');
-    //             if (is_plugin_active("holidays") )
-    //             {
-    //                 $payment_date = get_excluded_days($payment_date, $exclude_schedules);
-    //             }
-    //             else
-    //             {
-    //                 if ($exclude_sundays)
-    //                 {
-    //                     $in_day = date("l", $payment_date);
-    //                     $in_day = strtolower($in_day);
-    //                     if ($in_day == "sunday")
-    //                     {
-    //                         $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
-    //                     }
-    //                 }
-    //             }
-    //             $loan_amount = $balance_owed;
-    //             $no_of_days++;
-    //             $total_interest += $compound_interest;
-    //             $total_principal += $principal_amount;
-    //         }
-    //     }
-    //     else if ( $pay_term == 'month_weekly' )
-    //     {
-    //         $fixed_amount = ($loan_amount * ($interest_rate / 100)) * ($term);
-    //         $fixed_operating_amount = ($loan_amount * ($operating_expenses/100)) * ($term);
-    //         $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
-    //         $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
-    //         $payment_amount_fees = $payment_amount + $operating_expenses_amount;
-    //         $payment_amount_adjust = ($payment_amount_fees * $term) / ($term * 4);
-    //         $interest_amount = ($loan_amount * ($interest_rate/100));
-    //         $total_amount = 0;
-    //         $no_of_days = 0;
-    //         $total_interest = 0;
-    //         $total_principal = 0;
-    //         if ($this->config->item('date_format') == 'd/m/Y')
-    //         {
-    //             $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
-    //         }
-    //         else
-    //         {
-    //             $payment_date = strtotime($post_var["InstallmentStarted"]);
-    //         }
-    //         $data_scheds = [];
-    //         for ($i = 1; $i <= ($term * 4); $i++)
-    //         {
-    //             $compound_interest = $interest_amount / 4;
-    //             $principal_amount = $payment_amount_adjust - $fixed_operating_amount - $compound_interest;
-    //             $balance_owed = $loan_amount - $principal_amount;
-    //             $total_amount += $payment_amount;
-    //             $color = $title = $grace_period_days = '';
-    //             if ( isset($grace_period[$i]) )
-    //             {
-    //                 $payment_date = strtotime(date("Y-m-d H:i:s",$payment_date) . ' +' . $grace_period[$i] . ' day');
-    //                 $color = 'red';
-    //                 $title = 'In grace period';
-    //                 $grace_period_days = $grace_period[$i] . ' days';
-    //             }
-    //             $tmp = [];
-    //             $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
-    //             $tmp["payment_balance"] = $balance_owed;
-    //             $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
-    //             $tmp["penalty_amount"] = $penalty_amount;
-    //             $tmp["interest"] = $compound_interest;
-    //             $tmp["payment_amount"] = $payment_amount;
-    //             $tmp["payment_amount_capital"] = $principal_amount;
-    //             $tmp["operating_expenses_amount"] =  $operating_expenses_amount;
+                $data_scheds[] = $tmp;
+                $payment_date = strtotime(date('Y-m-d', $payment_date) . '+15 days');
+                if (is_plugin_active("holidays") )
+                {
+                    $payment_date = get_excluded_days($payment_date, $exclude_schedules);
+                }
+                else
+                {
+                    if ($exclude_sundays)
+                    {
+                        $in_day = date("l", $payment_date);
+                        $in_day = strtolower($in_day);
+                        if ($in_day == "sunday")
+                        {
+                            $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
+                        }
+                    }
+                }
+                $loan_amount = $balance_owed;
+                $no_of_days++;
+                $total_interest += $compound_interest;
+                $total_principal += $principal_amount;
+            }
+        }
+        else if ( $pay_term == 'month_weekly' )
+        {
+            $fixed_amount = ($loan_amount * ($interest_rate / 100)) * ($term);
+            $fixed_operating_amount = ($loan_amount * ($operating_expenses/100)) * ($term);
+            $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
+            $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
+            $payment_amount_fees = $payment_amount + $operating_expenses_amount;
+            $payment_amount_adjust = ($payment_amount_fees * $term) / ($term * 4);
+            $interest_amount = ($loan_amount * ($interest_rate/100));
+            $total_amount = 0;
+            $no_of_days = 0;
+            $total_interest = 0;
+            $total_principal = 0;
+            if ($this->config->item('date_format') == 'd/m/Y')
+            {
+                $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
+            }
+            else
+            {
+                $payment_date = strtotime($post_var["InstallmentStarted"]);
+            }
+            $data_scheds = [];
+            for ($i = 1; $i <= ($term * 4); $i++)
+            {
+                $compound_interest = $interest_amount / 4;
+                $principal_amount = $payment_amount_adjust - $fixed_operating_amount - $compound_interest;
+                $balance_owed = $loan_amount - $principal_amount;
+                $total_amount += $payment_amount;
+                $color = $title = $grace_period_days = '';
+                if ( isset($grace_period[$i]) )
+                {
+                    $payment_date = strtotime(date("Y-m-d H:i:s",$payment_date) . ' +' . $grace_period[$i] . ' day');
+                    $color = 'red';
+                    $title = 'In grace period';
+                    $grace_period_days = $grace_period[$i] . ' days';
+                }
+                $tmp = [];
+                $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
+                $tmp["payment_balance"] = $balance_owed;
+                $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
+                $tmp["penalty_amount"] = $penalty_amount;
+                $tmp["interest"] = $compound_interest;
+                $tmp["payment_amount"] = $payment_amount;
+                $tmp["payment_amount_capital"] = $principal_amount;
+                $tmp["operating_expenses_amount"] =  $operating_expenses_amount;
 
-    //             $data_scheds[] = $tmp;
-    //             $payment_date = strtotime(date('Y-m-d', $payment_date) . '+7 days');
-    //             if (is_plugin_active("holidays") )
-    //             {
-    //                 $payment_date = get_excluded_days($payment_date, $exclude_schedules);
-    //             }
-    //             else
-    //             {
-    //                 if ($exclude_sundays)
-    //                 {
-    //                     $in_day = date("l", $payment_date);
-    //                     $in_day = strtolower($in_day);
-    //                     if ($in_day == "sunday")
-    //                     {
-    //                         $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
-    //                     }
-    //                 }
-    //             }
-    //             $loan_amount = $balance_owed;
-    //             $no_of_days++;
-    //             $total_interest += $compound_interest;
-    //             $total_principal += $principal_amount;
-    //         }
-    //     }
-    //     else
-    //     {
-    //         $data_scheds = [];
-    //         $fixed_amount = ($loan_amount * ($interest_rate / 100)) * $term;
-    //         $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
-    //         $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
-    //         $payment_amount_fees = $payment_amount + $operating_expenses_amount;
-    //         $interest_amount = ($loan_amount * ($interest_rate/100));
-    //         $total_amount = 0;
-    //         $no_of_days = 0;
-    //         $total_interest = 0;
-    //         $total_principal = 0;
-    //         if ($this->config->item('date_format') == 'd/m/Y')
-    //         {
-    //             $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
-    //         }
-    //         else
-    //         {
-    //             $payment_date = strtotime($post_var["InstallmentStarted"]);
-    //         }
-    //         for ($i = 1; $i <= $term; $i++)
-    //         {
-    //             $compound_interest = $interest_amount;
-    //             $principal_amount = $payment_amount_fees - $operating_expenses_amount - $compound_interest;
-    //             $balance_owed = $loan_amount - $principal_amount;
-    //             $total_amount += $payment_amount_fees;
-    //             $color = $title = $grace_period_days = '';
-    //             if ( isset($grace_period[$i]) )
-    //             {
-    //                 $payment_date = strtotime(date("Y-m-d H:i:s",$payment_date) . ' +' . $grace_period[$i] . ' day');
-    //                 $color = 'red';
-    //                 $title = 'In grace period';
-    //                 $grace_period_days = $grace_period[$i] . ' days';
-    //             }
-    //             $tmp = [];
-    //             $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
-    //             $tmp["payment_balance"] = $balance_owed;
-    //             $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
-    //             $tmp["penalty_amount"] = $penalty_amount;
-    //             $tmp["interest"] = $compound_interest;
-    //             $tmp["payment_amount"] = $payment_amount;
-    //             $tmp["payment_amount_capital"] = $principal_amount;
-    //             $tmp["operating_expenses_amount"] =  $operating_expenses_amount;
-    //             $data_scheds[] = $tmp;
-    //             $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 ' . $pay_term);
-    //             if (is_plugin_active("holidays") )
-    //             {
-    //                 $payment_date = get_excluded_days($payment_date, $exclude_schedules);
-    //             }
-    //             else
-    //             {
-    //                 if ($exclude_sundays)
-    //                 {
-    //                     $in_day = date("l", $payment_date);
-    //                     $in_day = strtolower($in_day);
-    //                     if ($in_day == "sunday")
-    //                     {
-    //                         $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
-    //                     }
-    //                 }
-    //             }
-    //             $loan_amount = $balance_owed;
-    //             $no_of_days++;
-    //             $total_interest += $compound_interest;
-    //             $total_principal += $principal_amount;
-    //         }
-    //     }
-    //     return $data_scheds;
-    // }
+                $data_scheds[] = $tmp;
+                $payment_date = strtotime(date('Y-m-d', $payment_date) . '+7 days');
+                if (is_plugin_active("holidays") )
+                {
+                    $payment_date = get_excluded_days($payment_date, $exclude_schedules);
+                }
+                else
+                {
+                    if ($exclude_sundays)
+                    {
+                        $in_day = date("l", $payment_date);
+                        $in_day = strtolower($in_day);
+                        if ($in_day == "sunday")
+                        {
+                            $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
+                        }
+                    }
+                }
+                $loan_amount = $balance_owed;
+                $no_of_days++;
+                $total_interest += $compound_interest;
+                $total_principal += $principal_amount;
+            }
+        }
+        else
+        {
+            $data_scheds = [];
+            $fixed_amount = ($loan_amount * ($interest_rate / 100)) * $term;
+            $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
+            $operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
+            $payment_amount_fees = $payment_amount + $operating_expenses_amount;
+            $interest_amount = ($loan_amount * ($interest_rate/100));
+            $total_amount = 0;
+            $no_of_days = 0;
+            $total_interest = 0;
+            $total_principal = 0;
+            if ($this->config->item('date_format') == 'd/m/Y')
+            {
+                $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
+            }
+            else
+            {
+                $payment_date = strtotime($post_var["InstallmentStarted"]);
+            }
+            for ($i = 1; $i <= $term; $i++)
+            {
+                $compound_interest = $interest_amount;
+                $principal_amount = $payment_amount_fees - $operating_expenses_amount - $compound_interest;
+                $balance_owed = $loan_amount - $principal_amount;
+                $total_amount += $payment_amount_fees;
+                $color = $title = $grace_period_days = '';
+                if ( isset($grace_period[$i]) )
+                {
+                    $payment_date = strtotime(date("Y-m-d H:i:s",$payment_date) . ' +' . $grace_period[$i] . ' day');
+                    $color = 'red';
+                    $title = 'In grace period';
+                    $grace_period_days = $grace_period[$i] . ' days';
+                }
+                $tmp = [];
+                $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);
+                $tmp["payment_balance"] = $balance_owed;
+                $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
+                $tmp["penalty_amount"] = $penalty_amount;
+                $tmp["interest"] = $compound_interest;
+                $tmp["payment_amount"] = $payment_amount;
+                $tmp["payment_amount_capital"] = $principal_amount;
+                $tmp["operating_expenses_amount"] =  $operating_expenses_amount;
+                $data_scheds[] = $tmp;
+                $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 ' . $pay_term);
+                if (is_plugin_active("holidays") )
+                {
+                    $payment_date = get_excluded_days($payment_date, $exclude_schedules);
+                }
+                else
+                {
+                    if ($exclude_sundays)
+                    {
+                        $in_day = date("l", $payment_date);
+                        $in_day = strtolower($in_day);
+                        if ($in_day == "sunday")
+                        {
+                            $payment_date = strtotime(date('Y-m-d', $payment_date) . '+1 day');
+                        }
+                    }
+                }
+                $loan_amount = $balance_owed;
+                $no_of_days++;
+                $total_interest += $compound_interest;
+                $total_principal += $principal_amount;
+            }
+        }
+        return $data_scheds;
+    }
 }
 
 

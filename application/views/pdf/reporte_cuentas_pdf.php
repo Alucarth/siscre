@@ -19,7 +19,7 @@
         <table width="100%" style="border: none; margin-bottom: 10px;">
             <tr>
                 <td align="left" width="30%" style="border: none;">
-                    <img src="<?= FCPATH ?>application/views/pdf/logo.png" alt="Logo" width="159" height="50">
+                    <img src="<?= FCPATH ?>uploads/app/logo.png" alt="Logo" width="159" height="50">
                 </td>
                 <td align="right" width="70%" style="border: none; font-size: 10pt;">
                     <strong><?= $this->config->item('company') ?></strong><br>
