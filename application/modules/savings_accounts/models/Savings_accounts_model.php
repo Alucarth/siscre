@@ -25,12 +25,44 @@ class Savings_accounts_model extends CI_Model
             ->result();
     }
 
+    public function get_all_with_person_active()
+    {
+        return $this->db
+            ->select("sa.*, sat.name AS type_name,
+                    CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,'')) AS person_name")
+            ->from('savings_accounts sa')
+            ->join('savings_account_types sat','sat.savings_account_type_id=sa.savings_account_type_id')
+            ->join('people p','p.person_id = sa.person_id','left')
+            ->where('sa.status', 1) // solo cuentas activas para operar
+            ->order_by('p.first_name','asc')
+            ->get()
+            ->result();
+    }
+
     public function get($id)
     {
         return $this->db
             ->where('savings_account_id',$id)
             ->get($this->table)
             ->row();
+    }
+
+    public function get_with_type($id)
+    {
+        return $this->db
+            ->select('sa.*, sat.name AS type_name, sat.is_fixed_term, sat.term_days')
+            ->from('savings_accounts sa')
+            ->join('savings_account_types sat','sat.savings_account_type_id = sa.savings_account_type_id','inner')
+            ->where('sa.savings_account_id', $id)
+            ->get()->row();
+    }
+
+    public function adjust_balance($id, $delta)
+    {
+        // Usa expresión para evitar race conditions simples
+        $this->db->set('current_balance', "current_balance + (". $this->db->escape($delta) .")", false)
+                ->where('savings_account_id', $id)
+                ->update('savings_accounts');
     }
 
     public function insert($data)

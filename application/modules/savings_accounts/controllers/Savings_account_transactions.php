@@ -3,20 +3,27 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Savings_account_transactions extends MX_Controller
 {
+    private $require_owner_auth = false;
     public function __construct()
     {
         parent::__construct();
 
-        // sidebar/header
+        $this->require_owner_auth = (bool)($this->config->item('savings_require_owner_auth') ?? false);
+        // si quieres forzar sin tocar config.php, descomenta la siguiente:
+        $this->require_owner_auth = false;
+
+        // Sidebar/header
         $this->load->model('Employee');
         $this->load->model('Module');
+
         $user_info = $this->Employee->get_logged_in_employee_info();
         if (!is_object($user_info)) redirect('login');
+
         $allowed_modules = $this->Module->get_allowed_modules($user_info->person_id);
         $messages = $alerts = [];
         $this->load->vars(compact('user_info','allowed_modules','messages','alerts'));
 
-        // modelos
+        // Modelos
         $this->load->model('savings_accounts/Savings_accounts_model');
         $this->load->model('savings_accounts/Savings_account_transactions_model');
         $this->load->model('savings_accounts/Savings_account_types_model');
@@ -24,85 +31,961 @@ class Savings_account_transactions extends MX_Controller
 
     public function index()
     {
-        // opcional: filtros GET ?account_id=&trans_type=&date_from=&date_to=
-        $filters = $this->input->get();
-        $data['transactions'] = $this->Savings_account_transactions_model->get_all($filters);
+        // --- Filtros desde GET ---
+        $filters = [
+            'account_id'    => $this->input->get('account_id', TRUE),
+            'trans_type'    => $this->input->get('trans_type', TRUE),
+            'date_from'     => $this->input->get('date_from', TRUE),
+            'date_to'       => $this->input->get('date_to', TRUE),
+            'branch_id'     => $this->input->get('branch_id', TRUE),
+            'registered_by' => $this->input->get('registered_by', TRUE),
+            'status'        => $this->input->get('status', TRUE),
+            'q'             => $this->input->get('q', TRUE),
+        ];
+
+        // --- Paginación (query string) ---
+        $this->load->library('pagination');
+
+        $limit = (int)($this->input->get('limit') ?: 25);
+        if (!in_array($limit, [25,50,100,200], true)) $limit = 25;
+
+        // página solicitada (puede venir inflada)
+        $req_page = max(1, (int)($this->input->get('page') ?: 1));
+
+        // contamos primero para poder **acotar** la página
+        $total = $this->Savings_account_transactions_model->count_all($filters);
+        $max_page = max(1, (int)ceil($total / $limit));
+        $page = min($req_page, $max_page);
+        $offset = ($page - 1) * $limit;
+
+        // ahora sí, traer filas de la página correcta
+        $rows = $this->Savings_account_transactions_model->get_all($filters, $limit, $offset);
+
+        // paginador
+        $config = [
+            'base_url'             => site_url('savings_accounts/savings_account_transactions'),
+            'total_rows'           => $total,
+            'per_page'             => $limit,
+            'page_query_string'    => TRUE,
+            'query_string_segment' => 'page',
+            'reuse_query_string'   => TRUE,
+        ];
+        $this->pagination->initialize($config);
+
+        // --- Catálogos ---
+        $accounts = $this->Savings_accounts_model->get_all_with_person_active();
+        $account_options = ['' => '— Todas —'];
+        foreach ($accounts as $a) {
+            $accno = $a->account_number ?: ('CA-' . str_pad($a->savings_account_id, 6, '0', STR_PAD_LEFT));
+            $owner = trim($a->person_name) !== '' ? trim($a->person_name) : ('ID ' . $a->person_id);
+            $label = '['.$accno.'] '.$owner.' — '.$a->type_name;
+            $account_options[$a->savings_account_id] = $label;
+        }
+
+        $type_options = ['' => '— Todos —','deposit'=>'Depósito','withdraw'=>'Retiro','transfer'=>'Transferencia'];
+
+        $branches = $this->db->select('id, branch_name')
+                            ->from($this->db->dbprefix('branches'))
+                            ->order_by('branch_name')->get()->result();
+        $branch_options = ['' => '— Todas —'];
+        foreach ($branches as $b) $branch_options[$b->id] = $b->branch_name;
+
+        $ops = $this->db->select('e.person_id, p.first_name, p.last_name')
+                        ->from($this->db->dbprefix('employees').' e')
+                        ->join($this->db->dbprefix('people').' p','p.person_id=e.person_id')
+                        ->where('e.deleted', 0)
+                        ->order_by('p.first_name, p.last_name')->get()->result();
+        $operator_options = ['' => '— Todos —'];
+        foreach ($ops as $o) $operator_options[$o->person_id] = trim($o->first_name.' '.$o->last_name);
+
+        $status_options = ['' => '— Todos —', '1'=>'Activos', '0'=>'Inactivos'];
+
+        // ================================
+        // Totales de la página (para la vista)
+        // ================================
+        $page_deposits  = 0.0;
+        $page_withdraws = 0.0;
+        foreach ($rows as $r) {
+            $amt = (float)$r->amount;
+            $tt  = strtolower((string)$r->trans_type);
+            if ($tt === 'deposit')  { $page_deposits  += $amt; }
+            if ($tt === 'withdraw') { $page_withdraws += $amt; }
+        }
+        $page_totals = [
+            'deposit'  => $page_deposits,
+            'withdraw' => $page_withdraws,
+            'net'      => $page_deposits - $page_withdraws,
+        ];
+
+        // ================================
+        // Saldos período + running balance
+        // ================================
+        $saldo_inicial_periodo = null;
+        $saldo_final_periodo   = null;
+
+        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
+        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+
+        // --- Caso A: UNA cuenta (como antes)
+        if (!empty($filters['account_id'])) {
+            $acc_id = (int)$filters['account_id'];
+            $acc    = $this->Savings_accounts_model->get($acc_id);
+            $now_balance = (float)($acc->current_balance ?? 0);
+
+            if ($end_dt) {
+                $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+                $saldo_final_periodo = $now_balance - $sum_newer_than_end;
+            } else {
+                $saldo_final_periodo = $now_balance;
+            }
+
+            if ($start_dt) {
+                $sum_newer_than_start = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($start_dt), $filters);
+                $saldo_inicial_periodo = $now_balance - $sum_newer_than_start;
+            }
+
+            if (!empty($rows)) {
+                $first = $rows[0];
+                $conds = [];
+                $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
+                if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
+                if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+
+                $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
+                $seed = $saldo_final_periodo - $sum_newer_in_period;
+
+                $running = $seed;
+                foreach ($rows as &$r) {
+                    $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                    $r->running_balance = $running;      // saldo después de ese movimiento
+                    $running -= ($sign * (float)$r->amount);
+                }
+                unset($r);
+            }
+        }
+        // --- Caso B: VARIAS cuentas (nuevo) -> running balance por cuenta
+        else if (!empty($rows)) {
+
+            // 1) Primer movimiento mostrado por cuenta (en esta página)
+            $first_by_acc = [];           // acc_id => primera fila (objeto)
+            $acc_ids = [];
+            foreach ($rows as $rr) {
+                $aid = (int)$rr->savings_account_id;
+                if (!isset($first_by_acc[$aid])) {
+                    $first_by_acc[$aid] = $rr;
+                    $acc_ids[] = $aid;
+                }
+            }
+
+            // 2) Saldo actual por cuenta (una consulta IN)
+            $acc_balances = []; // acc_id => current_balance
+            if (!empty($acc_ids)) {
+                $acc_rows = $this->db->select('savings_account_id, current_balance')
+                                    ->from($this->db->dbprefix('savings_accounts'))
+                                    ->where_in('savings_account_id', $acc_ids)
+                                    ->get()->result();
+                foreach ($acc_rows as $ar) {
+                    $acc_balances[(int)$ar->savings_account_id] = (float)$ar->current_balance;
+                }
+            }
+
+            // 3) Cálculo de seed y recorrido por cuenta
+            $closing_by_acc = [];  // acc_id => closing balance del período
+            $seed_by_acc    = [];  // acc_id => seed para la primera fila de esa cuenta en esta página
+
+            foreach ($first_by_acc as $aid => $first) {
+                $now_balance = (float)($acc_balances[$aid] ?? 0);
+
+                // closing (saldo al final del período para esa cuenta)
+                if ($end_dt) {
+                    $sum_newer_than_end = $this->_sum_signed($aid, "trans_date > ".$this->db->escape($end_dt), $filters);
+                    $closing_by_acc[$aid] = $now_balance - $sum_newer_than_end;
+                } else {
+                    $closing_by_acc[$aid] = $now_balance;
+                }
+
+                // sumas más nuevas que la PRIMERA fila de esa cuenta en esta página, dentro del período
+                $conds = [];
+                $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
+                if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
+                if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+
+                $sum_newer_in_period = $this->_sum_signed($aid, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
+
+                // seed por cuenta
+                $seed_by_acc[$aid] = $closing_by_acc[$aid] - $sum_newer_in_period;
+            }
+
+            // 4) Asignar running_balance por cuenta respetando el orden de la página
+            $running_by_acc = $seed_by_acc; // copia inicial
+            foreach ($rows as &$r) {
+                $aid  = (int)$r->savings_account_id;
+                $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                $r->running_balance = isset($running_by_acc[$aid]) ? $running_by_acc[$aid] : null;
+                $running_by_acc[$aid] = ($running_by_acc[$aid] ?? 0) - ($sign * (float)$r->amount);
+            }
+            unset($r);
+        }
+
+        // ================================
+        // Totales del PERÍODO (sin paginar)
+        // ================================
+        $pt_q = $this->db->select("
+                    SUM(CASE WHEN LOWER(trans_type)='deposit'  THEN amount ELSE 0 END) AS dep,
+                    SUM(CASE WHEN LOWER(trans_type)='withdraw' THEN amount ELSE 0 END) AS wit
+                ", FALSE)
+                ->from($this->db->dbprefix('savings_account_transactions') . ' tx');
+
+        if (!empty($filters['account_id']))    $pt_q->where('tx.savings_account_id', (int)$filters['account_id']);
+        if (!empty($filters['date_from']))     $pt_q->where('tx.trans_date >=', $filters['date_from'].' 00:00:00');
+        if (!empty($filters['date_to']))       $pt_q->where('tx.trans_date <=', $filters['date_to'].' 23:59:59');
+        if (!empty($filters['branch_id']))     $pt_q->where('tx.branch_id', (int)$filters['branch_id']);
+        if (!empty($filters['registered_by'])) $pt_q->where('tx.registered_by', (int)$filters['registered_by']);
+        if ($filters['status'] !== '' && $filters['status'] !== null) $pt_q->where('tx.status', (int)$filters['status']);
+        // Nota: no aplicamos 'q' ni 'trans_type' en los totales del PERÍODO.
+
+        $pt = $pt_q->get()->row();
+        $period_totals = [
+            'deposit'  => (float)($pt->dep ?? 0),
+            'withdraw' => (float)($pt->wit ?? 0),
+            'net'      => (float)($pt->dep ?? 0) - (float)($pt->wit ?? 0),
+        ];
+
+        // --- URLs de exportación conservando filtros (sin la paginación) ---
+        $qs = $this->input->get(NULL, TRUE);
+        unset($qs['page']);
+        $qs_str = http_build_query(array_filter($qs, fn($v) => $v !== '' && $v !== null));
+
+        // Aliases para compatibilidad con la vista (solo si es 1 cuenta tiene sentido mostrarlos)
+        $opening_balance = $saldo_inicial_periodo;
+        $closing_balance = $saldo_final_periodo;
+
+        $data = [
+            'filters'           => $filters,
+            'transactions'      => $rows,
+            'pagination_links'  => $this->pagination->create_links(),
+            'total_rows'        => $total,
+            'from_row' => $total ? ($offset + 1) : 0,
+            'to_row'   => $total ? min($offset + count($rows), $total) : 0,
+            'limit'             => $limit,
+
+            'account_options'   => $account_options,
+            'type_options'      => $type_options,
+            'branch_options'    => $branch_options,
+            'operator_options'  => $operator_options,
+            'status_options'    => $status_options,
+
+            'saldo_inicial_periodo' => $saldo_inicial_periodo,
+            'saldo_final_periodo'   => $saldo_final_periodo,
+            'opening_balance'       => $opening_balance,
+            'closing_balance'       => $closing_balance,
+
+            'page_totals'       => $page_totals,
+            'period_totals'     => $period_totals,
+
+            'export_csv_url'    => site_url('savings_accounts/savings_account_transactions/export_csv') . ($qs_str ? '?'.$qs_str : ''),
+            'export_pdf_url'    => site_url('savings_accounts/savings_account_transactions/export_pdf') . ($qs_str ? '?'.$qs_str : ''),
+        ];
+
         $this->load->view('savings_accounts/savings_account_transactions/index', $data);
+    }
+
+    /**
+     * Suma firmada (depósito=+, retiro=-) para una cuenta y una condición extra.
+     * Respeta filters: branch_id, registered_by, status, date_from/date_to (si le pasas en $filters).
+     */
+    private function _sum_signed(int $account_id, string $extra_where = '1=1', array $filters = [])
+    {
+        $tb = $this->db->dbprefix('savings_account_transactions');
+
+        $this->db->select("COALESCE(SUM(CASE WHEN trans_type='withdraw' THEN -amount ELSE amount END),0) AS s", false)
+                ->from($tb)
+                ->where('savings_account_id', $account_id);
+
+        // Estado si se pidió (1/0)
+        if (isset($filters['status']) && $filters['status'] !== '' && $filters['status'] !== null) {
+            $this->db->where('status', (int)$filters['status']);
+        }
+
+        // Filtros de sucursal / operador
+        if (!empty($filters['branch_id']))     $this->db->where('branch_id', (int)$filters['branch_id']);
+        if (!empty($filters['registered_by'])) $this->db->where('registered_by', (int)$filters['registered_by']);
+
+        // Si viene rango por filtros, aplícalo aquí también (pero cuidado: el seed ya arma su propio rango)
+        if (!empty($filters['date_from'])) $this->db->where('trans_date >=', $filters['date_from'].' 00:00:00');
+        if (!empty($filters['date_to']))   $this->db->where('trans_date <=', $filters['date_to'].' 23:59:59');
+
+        // Extra WHERE libre (para "newer than" etc.)
+        if ($extra_where && trim($extra_where) !== '1=1') {
+            $this->db->where($extra_where, null, false);
+        }
+
+        $row = $this->db->get()->row();
+        return (float)($row->s ?? 0);
+    }
+
+    public function owner_info($account_id)
+    {
+        $account_id = (int)$account_id;
+
+        $sql = "
+            SELECT 
+                sa.savings_account_id,
+                p.person_id,
+                CONCAT(p.first_name,' ',p.last_name) AS full_name,
+                p.photo_url,
+                l.id_no,
+                c.password AS customer_password
+            FROM {$this->db->dbprefix('savings_accounts')} sa
+            JOIN {$this->db->dbprefix('people')} p
+                ON p.person_id = sa.person_id
+            LEFT JOIN {$this->db->dbprefix('leads')} l
+                ON l.customer_id = sa.person_id
+            LEFT JOIN {$this->db->dbprefix('customers')} c
+                ON c.person_id = sa.person_id
+            WHERE sa.savings_account_id = ?
+            LIMIT 1
+        ";
+
+        // 👇 ESTA LÍNEA ES CLAVE
+        $row = $this->db->query($sql, [$account_id])->row();
+
+        if (!$row) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false]));
+        }
+
+        $photo_full = $this->_photo_url((int)$row->person_id, (string)($row->photo_url ?? ''));
+
+        $out = [
+            'ok'        => true,
+            'person_id' => (int)$row->person_id,
+            'full_name' => (string)$row->full_name,
+            'id_no'     => (string)($row->id_no ?? ''),
+            'photo_url' => $photo_full,
+        ];
+
+        return $this->output->set_content_type('application/json')
+            ->set_output(json_encode($out));
     }
 
     public function form($id = NULL)
     {
-        // dropdown de cuentas
-        $accounts = $this->Savings_accounts_model->get_all();
-        $opts = [];
-        foreach ($accounts as $a) {
-            $opts[$a->savings_account_id] = $a->account_number . ' – ' . $a->first_name . ' ' . $a->last_name;
-        }
-        $data['account_options'] = $opts;
+        // Catálogo de cuentas con nombre del cliente
+        $accounts = $this->Savings_accounts_model->get_all_with_person_active();
 
-        // tipos de operación
-        $data['type_options'] = [
+        $account_options = ['' => '-- Seleccione cuenta --'];
+        foreach ($accounts as $a) {
+            $accno  = $a->account_number ?: ('CA-' . str_pad($a->savings_account_id, 6, '0', STR_PAD_LEFT));
+            $owner  = trim($a->person_name) !== '' ? trim($a->person_name) : ('ID ' . $a->person_id);
+            $label  = '['.$accno.'] '.$owner.' — '.$a->type_name;
+            $account_options[$a->savings_account_id] = $label;
+        }
+
+        $type_options = [
             'deposit'  => 'Depósito',
             'withdraw' => 'Retiro',
-            'transfer' => 'Transferencia'
+            'transfer' => 'Transferencia',
         ];
 
+        // ------- POST: procesar guardado -------
         if ($this->input->post()) {
-            $post = $this->input->post();
-            if ($id) {
-                $this->Savings_account_transactions_model->update($id, $post);
-            } else {
-                $this->Savings_account_transactions_model->insert($post);
+            $trans_type = $this->input->post('trans_type');
+            $account_id = (int)$this->input->post('savings_account_id');
+            $amount     = (float)$this->input->post('amount');
+            $desc       = trim($this->input->post('description'));
+            $trans_dt   = $this->input->post('trans_date');
+            $trans_dt   = $trans_dt ? date('Y-m-d H:i:s', strtotime($trans_dt)) : date('Y-m-d H:i:s');
+
+            // branch_id desde login (sesión) o desde el empleado logueado como respaldo
+            $branch_id  = (int)($this->session->userdata('branch_id') ?: 0);
+            if ($branch_id === 0) {
+                $emp = $this->Employee->get_logged_in_employee_info();
+                if (is_object($emp) && isset($emp->branch_id)) {
+                    $branch_id = (int)$emp->branch_id;
+                }
             }
-            $this->session->set_flashdata('success','Transacción guardada correctamente.');
-            redirect('savings_accounts/savings_account_transactions');
+
+            $actor = (int)($this->session->userdata('person_id') ?: 0);
+
+            // Flag de verificación del titular (si no existe, false)
+            $require_owner_auth = (bool)($this->require_owner_auth ?? false);
+
+            // Si es retiro o transferencia => validar contraseña del titular (o bypass temporal)
+            if (in_array($trans_type, ['withdraw','transfer'], true)) {
+
+                if ($require_owner_auth) {
+                    $owner_pass = (string)($this->input->post('owner_password') ?? '');
+
+                    // Traemos el hash/texto de customers.password por el owner de la cuenta
+                    $row = $this->db->query("
+                        SELECT c.password
+                        FROM {$this->db->dbprefix('savings_accounts')} sa
+                        JOIN {$this->db->dbprefix('customers')} c
+                            ON c.person_id = sa.person_id
+                        WHERE sa.savings_account_id = ?
+                        LIMIT 1
+                    ", [$account_id])->row();
+
+                    $stored = $row->password ?? '';
+                    $valid = false;
+                    if ($stored !== '') {
+                        if (preg_match('/^\$2y\$/', $stored) || preg_match('/^\$argon2/', $stored)) {
+                            $valid = password_verify($owner_pass, $stored);
+                        } elseif (strlen($stored) === 32 && ctype_xdigit($stored)) {
+                            $valid = (md5($owner_pass) === strtolower($stored));
+                        } else {
+                            $valid = hash_equals($stored, $owner_pass); // texto plano (temporal)
+                        }
+                    }
+
+                    if (!$valid) {
+                        $this->session->set_flashdata('error', 'Contraseña del titular inválida.');
+                        $data = compact('account_options','type_options');
+                        if ($id) $data['tx'] = $this->Savings_account_transactions_model->get($id);
+                        return $this->load->view('savings_accounts/savings_account_transactions/form', $data);
+                    }
+                } else {
+                    // BYPASS TEMPORAL: deja una marca en la descripción para auditoría
+                    $desc = trim($desc . ' [VERIFICACIÓN DE PIN DESACTIVADA]');
+                }
+            }
+
+            // Transferencia (usa método atómico del modelo)
+            if ($trans_type === 'transfer') {
+                $dst_id = (int)$this->input->post('dst_account_id');
+
+                if ($dst_id <= 0 || $dst_id === $account_id || $amount <= 0 || $account_id <= 0) {
+                    $this->session->set_flashdata('error','Datos inválidos para la transferencia.');
+                    $data = compact('account_options','type_options');
+                    if ($id) $data['tx'] = $this->Savings_account_transactions_model->get($id);
+                    return $this->load->view('savings_accounts/savings_account_transactions/form', $data);
+                }
+
+                $res = $this->Savings_account_transactions_model->create_transfer(
+                    $account_id, $dst_id, $amount, $desc, $branch_id, $actor
+                );
+
+                if (is_array($res) && !empty($res['withdraw_id']) && !empty($res['deposit_id'])) {
+                    $this->session->set_flashdata('success','Transferencia realizada correctamente.');
+                    // >>>>> AQUÍ EL TRUCO: guardamos ids en flashdata y volvemos a la lista
+                    $this->session->set_flashdata(
+                        'pdf_url',
+                        site_url('savings_accounts/savings_account_transactions/voucher_transfer/'.$res['withdraw_id'].'/'.$res['deposit_id'])
+                    );
+                    return redirect('savings_accounts/savings_account_transactions');
+                } else {
+                    $this->session->set_flashdata(
+                        'error',
+                        'No se pudo completar la transferencia (saldo insuficiente, cuenta inactiva o plazo fijo no vencido).'
+                    );
+                    $data = compact('account_options','type_options');
+                    if ($id) $data['tx'] = $this->Savings_account_transactions_model->get($id);
+                    return $this->load->view('savings_accounts/savings_account_transactions/form', $data);
+                }
+            }
+
+            // Depósito / Retiro: validaciones mínimas
+            if (!in_array($trans_type, ['deposit','withdraw'], true) || $account_id <= 0 || $amount <= 0) {
+                $this->session->set_flashdata('error','Datos inválidos.');
+                $data = compact('account_options','type_options');
+                if ($id) $data['tx'] = $this->Savings_account_transactions_model->get($id);
+                return $this->load->view('savings_accounts/savings_account_transactions/form', $data);
+            }
+
+            // DEPÓSITO: depositante y documento obligatorios
+            if ($trans_type === 'deposit') {
+                $this->load->library('form_validation');
+                $this->form_validation->set_rules('depositor_name','Depositante','required|trim');
+                $this->form_validation->set_rules('depositor_document','Documento','required|trim');
+                if (!$this->form_validation->run()) {
+                    $this->session->set_flashdata('error','Completa depositante y documento.');
+                    $data = compact('account_options','type_options');
+                    if ($id) $data['tx'] = $this->Savings_account_transactions_model->get($id);
+                    return $this->load->view('savings_accounts/savings_account_transactions/form', $data);
+                }
+            }
+
+            // Armar payload y postear
+            $payload = [
+                'savings_account_id' => $account_id,
+                'trans_type'         => $trans_type,
+                'amount'             => $amount,
+                'trans_date'         => $trans_dt,
+                'description'        => $desc,
+                'branch_id'          => $branch_id,
+                'depositor_name'     => trim($this->input->post('depositor_name') ?? ''),
+                'depositor_document' => trim($this->input->post('depositor_document') ?? ''),
+            ];
+
+            $tx_id = (int)$this->Savings_account_transactions_model->post_simple($payload);
+
+            if ($tx_id > 0) {
+                $msg = ($trans_type === 'deposit') ? 'Depósito' : 'Retiro';
+                $this->session->set_flashdata('success', "$msg registrado correctamente.");
+                // >>>>> AQUÍ EL TRUCO: guardamos id en flashdata y volvemos a la lista
+                $this->session->set_flashdata( 'pdf_url',
+                site_url('savings_accounts/savings_account_transactions/voucher/'.$tx_id));
+                return redirect('savings_accounts/savings_account_transactions');
+            } else {
+                $this->session->set_flashdata(
+                    'error',
+                    'No se pudo completar la operación (saldo insuficiente, cuenta inactiva o plazo fijo no vencido).'
+                );
+                $data = compact('account_options','type_options');
+                if ($id) $data['tx'] = $this->Savings_account_transactions_model->get($id);
+                return $this->load->view('savings_accounts/savings_account_transactions/form', $data);
+            }
         }
 
-        $data['tx'] = $id
-            ? $this->Savings_account_transactions_model->get($id)
-            : NULL;
+        // ------- GET: pintar formulario -------
+        $data = compact('account_options','type_options');
+        if ($id) {
+            $data['tx'] = $this->Savings_account_transactions_model->get($id);
+        }
+
+        // Helper URL
+        $this->load->helper('url');
+
+        // Si estás editando, ya cargaste $data['tx'] arriba
+        $tx_row = isset($data['tx']) ? $data['tx'] : null;
+
+        // Prioridad: POST > edición > 0
+        $selected_acc_id = (int) ($this->input->post('savings_account_id')
+            ?: ($tx_row && isset($tx_row->savings_account_id) ? $tx_row->savings_account_id : 0));
+
+        // Defaults para la vista
+        $data['owner'] = [
+            'full_name' => '',
+            'id_no'     => '',
+            'photo_url' => base_url('assets/img/avatar.png'),
+        ];
+
+        $data['owner_photo_url'] = '';
+
+        if ($selected_acc_id > 0) {
+            $owner = $this->db->select('sa.person_id, p.first_name, p.last_name, p.photo_url, l.id_no')
+                ->from($this->db->dbprefix('savings_accounts').' sa')
+                ->join($this->db->dbprefix('people').' p', 'p.person_id = sa.person_id', 'left')
+                ->join($this->db->dbprefix('leads').' l', 'l.customer_id = sa.person_id', 'left')
+                ->where('sa.savings_account_id', $selected_acc_id)
+                ->get()->row();
+
+            if ($owner) {
+                $data['owner'] = [
+                    'full_name' => trim(($owner->first_name ?? '').' '.($owner->last_name ?? '')),
+                    'id_no'     => (string)($owner->id_no ?? ''),
+                    'photo_url' => $this->_photo_url((int)$owner->person_id, (string)($owner->photo_url ?? '')),
+                ];
+                $data['owner_photo_url'] = $data['owner']['photo_url'];
+            }
+        }
 
         $this->load->view('savings_accounts/savings_account_transactions/form', $data);
     }
 
+    /** helper privado en el mismo controlador **/
+    private function _photo_url($person_id, $filename)
+    {
+        if ($filename && file_exists(FCPATH."uploads/profile-$person_id/$filename")) {
+            // ¡OJO!: base_url, no site_url
+        return base_url("uploads/profile-$person_id/$filename");
+        }
+        // fallback local si tienes un avatar por defecto en tu tema
+        return base_url('assets/img/avatar.png'); // ajusta la ruta si tu proyecto usa otra
+    }
+
     public function delete($id = NULL)
     {
+        // Por ahora: soft-delete de la transacción (no revierte saldos).
+        // Si quieres reversar saldos al “eliminar”, lo hacemos en un paso siguiente.
         if (is_null($id)) $id = $this->uri->segment(4);
         if ($id && $this->Savings_account_transactions_model->delete($id)) {
             $this->session->set_flashdata('success','Transacción deshabilitada.');
+        } else {
+            $this->session->set_flashdata('error','No fue posible deshabilitar la transacción.');
         }
         redirect('savings_accounts/savings_account_transactions');
     }
 
-    /**
-     * Formulario y lógica de depósito.
-     */
+    /* ==========================================================
+       Los siguientes métodos son opcionales si más adelante
+       decides separar formularios. Por ahora no se usan.
+       ========================================================== */
+
     public function deposit($tx_id = NULL)
     {
-        // 1) Dropdown de cuentas
         $accounts = $this->Savings_accounts_model->get_all();
         $opts = [];
         foreach ($accounts as $a) {
-            $opts[$a->savings_account_id] = 
-                $a->account_number . ' – ' . $a->first_name . ' ' . $a->last_name;
+            $owner = trim(($a->first_name ?? '').' '.($a->last_name ?? ''));
+            $opts[$a->savings_account_id] = ($a->account_number ?: 'CA-'.$a->savings_account_id).' – '.$owner;
         }
         $data['account_options'] = $opts;
 
         if ($this->input->post()) {
-            // recogen todos los campos del form
             $post = $this->input->post();
-            if ($this->Savings_account_transactions_model->deposit($post)) {
+            if ($this->Savings_account_transactions_model->insert($post)) {
                 $this->session->set_flashdata('success','Depósito registrado correctamente.');
                 redirect('savings_accounts/savings_account_transactions/index');
+                return;
             } else {
                 $this->session->set_flashdata('error','Error al procesar el depósito.');
             }
         }
 
-        $data['tx'] = $tx_id
-            ? $this->Savings_account_transactions_model->get($tx_id)
-            : NULL;
-
+        $data['tx'] = $tx_id ? $this->Savings_account_transactions_model->get($tx_id) : NULL;
         $this->load->view('savings_accounts/savings_account_transactions/deposit_form', $data);
     }
+
+    public function form_transfer()
+    {
+        $data['accounts'] = $this->Savings_accounts_model->get_all();
+        $this->load->view('savings_accounts/savings_account_transactions/form_transfer', $data);
+    }
+
+    public function store_transfer()
+    {
+        $src  = (int)$this->input->post('src_account_id');
+        $dst  = (int)$this->input->post('dst_account_id');
+        $amt  = (float)$this->input->post('amount');
+        $desc = trim($this->input->post('description'));
+        $branch_id = (int)($this->input->post('branch_id') ?? 0);
+        $actor = (int)($this->session->userdata('person_id') ?: 0);
+
+        if ($src <= 0 || $dst <= 0 || $src === $dst || $amt <= 0) {
+            $this->session->set_flashdata('error', 'Datos inválidos para la transferencia.');
+            return redirect('savings_accounts/savings_account_transactions/form_transfer');
+        }
+
+        $ok = $this->Savings_account_transactions_model->create_transfer($src, $dst, $amt, $desc, $branch_id, $actor);
+
+        if ($ok) {
+            $this->session->set_flashdata('success', 'Transferencia realizada correctamente.');
+            return redirect('savings_accounts/savings_account_transactions');
+        } else {
+            $this->session->set_flashdata('error', 'No se pudo completar la transferencia (saldo insuficiente, cuenta inactiva o plazo fijo no vencido).');
+            return redirect('savings_accounts/savings_account_transactions/form_transfer');
+        }
+    }
+
+    public function voucher($transaction_id)
+    {
+        $tx_id = (int)$transaction_id;
+
+        // --- DATA ---
+        $sql = "
+        SELECT 
+            tx.*,
+            sa.account_number, sa.savings_account_id, sa.person_id AS owner_id,
+            sat.name AS account_type_name,
+            p.first_name, p.last_name,
+            l.id_no,
+            b.branch_name,
+            op.first_name AS op_first, op.last_name AS op_last
+        FROM {$this->db->dbprefix('savings_account_transactions')} tx
+        LEFT JOIN {$this->db->dbprefix('savings_accounts')} sa 
+                ON sa.savings_account_id = tx.savings_account_id
+        LEFT JOIN {$this->db->dbprefix('savings_account_types')} sat
+                ON sat.savings_account_type_id = sa.savings_account_type_id
+        LEFT JOIN {$this->db->dbprefix('people')} p 
+                ON p.person_id = sa.person_id
+        LEFT JOIN {$this->db->dbprefix('leads')} l 
+                ON l.customer_id = sa.person_id
+        LEFT JOIN {$this->db->dbprefix('branches')} b 
+                ON b.id = tx.branch_id
+        LEFT JOIN {$this->db->dbprefix('people')} op 
+                ON op.person_id = tx.registered_by
+        WHERE tx.transaction_id = ?
+        LIMIT 1
+        ";
+        $row = $this->db->query($sql, [$tx_id])->row();
+        if (!$row) show_error('Transacción no encontrada', 404);
+
+        // --- HTML ---
+        $html = $this->load->view('savings_accounts/vouchers/voucher_simple', ['tx'=>$row], TRUE);
+        $html = $this->_clean_html($html);
+
+        // --- PDF ---
+        $mpdf = $this->_mpdf_load('P');
+
+        $css = 'body{font-family:sans-serif;font-size:11px}
+                .h1{font-size:16px;font-weight:bold;margin-bottom:6px}
+                .muted{color:#666}.right{text-align:right}.box{border:1px solid #ddd;padding:8px;border-radius:6px}';
+
+        // Silenciar avisos del mPDF legacy y limpiar buffers
+        $old_level = error_reporting();
+        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
+
+        $mpdf->WriteHTML($css, 1);
+        $mpdf->WriteHTML($html, 2);
+
+        $filename = sprintf(
+            'voucher_%s_%s_%s.pdf',
+            $row->account_number ?: 'CTA',
+            (int)$row->owner_id,
+            date('Ymd_His', strtotime($row->trans_date))
+        );
+        $mpdf->Output($filename, 'I');
+
+        error_reporting($old_level);
+        exit;
+    }
+
+    public function voucher_transfer($withdraw_id, $deposit_id)
+    {
+        $w = (int)$withdraw_id;
+        $d = (int)$deposit_id;
+
+        $sql = function($id){
+            return $this->db->query("
+                SELECT 
+                    tx.*,
+                    sa.account_number, sa.savings_account_id, sa.person_id AS owner_id,
+                    p.first_name, p.last_name,
+                    b.branch_name
+                FROM {$this->db->dbprefix('savings_account_transactions')} tx
+                LEFT JOIN {$this->db->dbprefix('savings_accounts')} sa ON sa.savings_account_id=tx.savings_account_id
+                LEFT JOIN {$this->db->dbprefix('people')} p ON p.person_id=sa.person_id
+                LEFT JOIN {$this->db->dbprefix('branches')} b ON b.id=tx.branch_id
+                WHERE tx.transaction_id=? LIMIT 1
+            ", [$id])->row();
+        };
+
+        $rowW = $sql($w); // retiro (origen)
+        $rowD = $sql($d); // depósito (destino)
+        if (!$rowW || !$rowD) show_error('Transacciones de transferencia no encontradas',404);
+
+        $html = $this->load->view('savings_accounts/vouchers/voucher_transfer', ['w'=>$rowW,'d'=>$rowD], TRUE);
+        $html = $this->_clean_html($html);
+
+        $mpdf = $this->_mpdf_load('P');
+
+        $old_level = error_reporting();
+        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
+
+        $mpdf->WriteHTML('body{font-family:sans-serif;font-size:11px}.h1{font-size:16px;font-weight:bold}', 1);
+        $mpdf->WriteHTML($html, 2);
+
+        $filename = sprintf(
+            'voucher_transfer_%s_to_%s_%s.pdf',
+            $rowW->account_number ?: 'CTA_ORIG',
+            $rowD->account_number ?: 'CTA_DEST',
+            date('Ymd_His', strtotime($rowW->trans_date))
+        );
+        $mpdf->Output($filename, 'I');
+
+        error_reporting($old_level);
+        exit;
+    }
+
+    public function export_csv()
+    {
+        $filters = $this->input->get(NULL, TRUE);
+        // Trae TODO lo que cumpla filtros (sin paginar)
+        $rows = $this->Savings_account_transactions_model->get_all($filters, 100000, 0);
+
+        // Cálculo de saldos del período si se filtra por cuenta
+        $account_id = !empty($filters['account_id']) ? (int)$filters['account_id'] : 0;
+        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
+        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+
+        $saldo_inicial_periodo = null;
+        $saldo_final_periodo   = null;
+        $seed_running          = null; // saldo al “momento” de la primera fila (DESC)
+
+        if ($account_id) {
+            $acc = $this->Savings_accounts_model->get($account_id);
+            $now_balance = (float)($acc->current_balance ?? 0);
+
+            if ($end_dt) {
+                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+                $saldo_final_periodo = $now_balance - $newer;
+            } else {
+                $saldo_final_periodo = $now_balance;
+            }
+
+            if ($start_dt) {
+                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($start_dt), $filters);
+                $saldo_inicial_periodo = $now_balance - $newer;
+            }
+
+            // Como el export no pagina, el seed es el saldo final del período
+            $seed_running = $saldo_final_periodo;
+        }
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        $fileSuffix = '';
+        if ($account_id) {
+            $acc = $this->Savings_accounts_model->get($account_id);
+            if ($acc) $fileSuffix = '_'.$acc->account_number.'_'.$acc->person_id;
+        }
+        header('Content-Disposition: attachment; filename="transacciones'.$fileSuffix.'_'.date('Ymd').'.csv"');
+
+        $out = fopen('php://output','w');
+
+        // Encabezado extra (opcional) con saldos del período
+        if ($account_id) {
+            fputcsv($out, ['Saldo inicial del período', (isset($saldo_inicial_periodo)?number_format($saldo_inicial_periodo,2,'.',''):'')]);
+            fputcsv($out, ['Saldo final del período',   (isset($saldo_final_periodo)?number_format($saldo_final_periodo,2,'.',''):'')]);
+            fputcsv($out, ['']); // línea en blanco
+        }
+
+        // Cabeceras de tabla
+        fputcsv($out, ['Fecha','Cuenta','Cliente','Tipo','Monto','Saldo después','Descripción'], ';');
+
+        $running = $seed_running;
+        foreach ($rows as $r) {
+            $cliente = trim(($r->first_name ?? '').' '.($r->last_name ?? ''));
+            $saldo_despues = '';
+            if ($account_id && $running !== null) {
+                $saldo_despues = number_format((float)$running, 2, '.', '');
+                $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                $running -= $sign * (float)$r->amount;
+            }
+
+            fputcsv($out, [
+                date('Y-m-d H:i', strtotime($r->trans_date)),
+                (string)$r->account_number,
+                $cliente,
+                (string)$r->trans_type,
+                number_format((float)$r->amount, 2, '.', ''),
+                $saldo_despues,
+                (string)$r->description,
+            ], ';');
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    public function export_pdf()
+    {
+        $filters = $this->input->get(NULL, TRUE);
+        $rows = $this->Savings_account_transactions_model->get_all($filters, 100000, 0);
+
+        // mPDF legacy
+        $this->load->library('pdf');
+        $mpdf = $this->pdf->load('"en-GB-x","A4","","",10,10,10,10,6,3,"P"');
+
+        // Silenciar y limpiar buffers
+        $old_level = error_reporting();
+        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
+
+        // Saldos del período si hay cuenta
+        $account_id = !empty($filters['account_id']) ? (int)$filters['account_id'] : 0;
+        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
+        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+        $saldo_inicial_periodo = null;
+        $saldo_final_periodo   = null;
+        $seed_running          = null;
+
+        $account_header = '';
+        if ($account_id) {
+            $acc = $this->Savings_accounts_model->get($account_id);
+            $now_balance = (float)($acc->current_balance ?? 0);
+
+            if ($end_dt) {
+                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+                $saldo_final_periodo = $now_balance - $newer;
+            } else {
+                $saldo_final_periodo = $now_balance;
+            }
+            if ($start_dt) {
+                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($start_dt), $filters);
+                $saldo_inicial_periodo = $now_balance - $newer;
+            }
+            $seed_running = $saldo_final_periodo;
+
+            $account_header = '<p><b>Cuenta:</b> '.htmlspecialchars($acc->account_number).' &nbsp; '
+                            . '<b>Titular ID:</b> '.(int)$acc->person_id.'</p>';
+        }
+
+        $html  = '<html><head><meta charset="utf-8"></head><body>';
+        $html .= '<h3>Reporte de Transacciones</h3>';
+        if ($account_id) {
+            $html .= $account_header;
+            $html .= '<p><b>Saldo inicial del período:</b> '
+                . (isset($saldo_inicial_periodo)?number_format($saldo_inicial_periodo,2):'—')
+                . ' &nbsp; | &nbsp; <b>Saldo final del período:</b> '
+                . (isset($saldo_final_periodo)?number_format($saldo_final_periodo,2):'—')
+                . '</p>';
+        }
+
+        $html .= '<table border="1" cellpadding="6" cellspacing="0" width="100%">';
+        $html .= '<thead><tr>
+                    <th>Fecha</th>
+                    <th>Cuenta</th>
+                    <th>Cliente</th>
+                    <th>Tipo</th>
+                    <th>Monto</th>
+                    <th>Saldo después</th>
+                    <th>Descripción</th>
+                </tr></thead><tbody>';
+
+        $running = $seed_running;
+        foreach ($rows as $r) {
+            $cliente = trim(($r->first_name ?? '').' '.($r->last_name ?? ''));
+            $saldo_despues = '—';
+            if ($account_id && $running !== null) {
+                $saldo_despues = number_format((float)$running, 2);
+                $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                $running -= $sign * (float)$r->amount;
+            }
+
+            $html .= '<tr>'
+                .  '<td>'.htmlspecialchars(date('d/m/Y H:i', strtotime($r->trans_date)), ENT_QUOTES, 'UTF-8').'</td>'
+                .  '<td>'.htmlspecialchars((string)$r->account_number, ENT_QUOTES, 'UTF-8').'</td>'
+                .  '<td>'.htmlspecialchars($cliente, ENT_QUOTES, 'UTF-8').'</td>'
+                .  '<td>'.htmlspecialchars(ucfirst($r->trans_type), ENT_QUOTES, 'UTF-8').'</td>'
+                .  '<td align="right">'.number_format((float)$r->amount, 2).'</td>'
+                .  '<td align="right">'.$saldo_despues.'</td>'
+                .  '<td>'.htmlspecialchars((string)$r->description, ENT_QUOTES, 'UTF-8').'</td>'
+                .  '</tr>';
+        }
+        $html .= '</tbody></table>';
+        $html .= '</body></html>';
+
+        $mpdf->WriteHTML($html, 2);
+
+        $accSuffix = '';
+        if ($account_id) {
+            $acc = $this->Savings_accounts_model->get($account_id);
+            if ($acc) $accSuffix = '_'.$acc->account_number.'_'.$acc->person_id;
+        }
+        $filename = 'transacciones'.$accSuffix.'_'.date('Ymd').'.pdf';
+        $mpdf->Output($filename, 'I');
+
+        error_reporting($old_level);
+        exit;
+    }
+
+    /** Carga mPDF con librería Pdf y sanea HTML */
+    private function _mpdf_load($orientation = 'P')
+    {
+        // Evita que warnings viejos de mPDF rompan cabeceras
+        ini_set('display_errors','0');
+
+        $this->load->library('pdf'); // usa application/libraries/Pdf.php
+        // Tu Pdf::load recibe una cadena con parámetros (idioma,tamaño,márgenes,orientación)
+        // Mantengo A4 y orientación variable:
+        $params = '"en-GB-x","A4","","",8,8,8,8,4,3,"'.($orientation === 'L' ? 'L' : 'P').'"';
+        $mpdf = $this->pdf->load($params);
+
+        // Opcionales, ayudan con imágenes y avisos
+        $mpdf->showImageErrors = false;
+        return $mpdf;
+    }
+
+    private function _clean_html($html)
+    {
+        // quita BOM y bytes raros que a veces mete la vista si hay espacios/echo antes
+        $html = preg_replace('/^\xEF\xBB\xBF/', '', $html); // BOM UTF-8
+        $html = str_replace(["\0","\x00"], '', $html);
+        return $html;
+    }
+
 }

@@ -37,24 +37,44 @@ class Savings_account_types extends MX_Controller
 
     public function form($id = NULL)
     {
+        $this->load->library('form_validation');
+
+        $this->form_validation->set_rules('name','Nombre','required|trim');
+        $this->form_validation->set_rules('interest_rate','Tasa de interés','required|numeric');
+        $this->form_validation->set_rules('is_fixed_term','¿Plazo Fijo?','in_list[0,1]');
+        // term_days será validado a posteriori si is_fixed_term=1
+
         if ($this->input->post()) {
             $post = $this->input->post();
-            unset($post['code']);
 
-            if ($id) {
-                $this->Savings_account_types_model->update($id, $post);
-            } else {
-                $this->Savings_account_types_model->insert($post);
+            if ((int)($post['is_fixed_term'] ?? 0) === 1 && (int)($post['term_days'] ?? 0) <= 0) {
+                $this->form_validation->set_rules('term_days','Plazo (días)','required|integer|greater_than[0]');
             }
-            $this->session->set_flashdata('success', 'Tipo guardado correctamente.');
-            redirect('savings_accounts/savings_account_types');
+
+            if ($this->form_validation->run()) {
+                if ($id) {
+                    $ok = $this->Savings_account_types_model->update($id, $post);
+                } else {
+                    $ok = $this->Savings_account_types_model->insert($post);
+                }
+
+                if ($ok) {
+                    $this->session->set_flashdata('success', 'Tipo de cuenta guardado correctamente.');
+                    return redirect('savings_accounts/savings_account_types');
+                } else {
+                    $db_err = $this->db->error();
+                    $this->session->set_flashdata('error', 'No se pudo guardar. ' .
+                        (!empty($db_err['message']) ? ('DB: '.$db_err['message']) : ''));
+                }
+            } else {
+                $this->session->set_flashdata('error', validation_errors(' ', ' '));
+            }
         }
 
-        $data['type'] = $id 
-            ? $this->Savings_account_types_model->get($id) 
-            : NULL;
+        $data['type'] = $id ? $this->Savings_account_types_model->get($id) : NULL;
         $this->load->view('savings_account_types/form', $data);
     }
+
 
     public function delete($id = NULL)
     {

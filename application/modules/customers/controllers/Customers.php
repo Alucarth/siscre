@@ -566,6 +566,10 @@ class Customers extends Person_controller {
 
     function save($customer_id = -1)
     {
+        $this->output->set_content_type('application/json');
+        log_message('debug','POST /customers/save: '.print_r($this->input->post(NULL,true),true));
+        log_message('debug','FILES /customers/save: '.print_r($_FILES,true));
+
         $employer_id = $this->input->post("employer");
         
         $person_data = array(

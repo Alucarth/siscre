@@ -1,35 +1,36 @@
 <?php
+class Pdf {
 
-class pdf {
-
-    function pdf()
+    public function __construct()
     {
         $CI = & get_instance();
-        log_message('Debug', 'mPDF class is loaded.');
+        log_message('debug', 'mPDF wrapper (Pdf) loaded');
     }
 
-    function load($params = NULL)
+    public function load($params = NULL)
     {
-        include_once APPPATH . '/third_party/mpdf/mpdf.php';
+        // Carga el mPDF legacy
+        include_once APPPATH . 'third_party/mpdf/mpdf.php';
 
-        if ($params == NULL)
-        {
-            $params = '"en-GB-x","A4","","",10,10,10,10,6,3,"L"';
+        // Soporta string viejo y/o array nuevo
+        if ($params === NULL) {
+            // valores por defecto “seguros” (A5 vertical, márgenes pequeños)
+            $params = ['en-GB-x','A5','','',8,8,8,8,0,0,'P'];
+        } elseif (is_string($params)) {
+            $tmp = explode(',', $params);
+            $params = [];
+            foreach ($tmp as $row) {
+                $params[] = trim(str_replace('"','', $row));
+            }
         }
-        
-        $tmp = explode(",", $params);
-        
-        $param = ["en-GB-x","A4","","",10,10,10,10,6,3,"P"];
-        $i=0;
-        foreach($tmp as $row)
-        {
-            $param[$i] = trim(str_replace('"','',$row));
-            $i++;
-        }
-        
-        return new mPDF($param[0],$param[1],$param[2],$param[3],$param[4],$param[5],$param[6],$param[7],$param[8],$param[9],$param[10]);
+
+        // Asegura 11 parámetros
+        $params = array_pad($params, 11, '');
+        return new mPDF(
+            $params[0], $params[1], $params[2], $params[3],
+            $params[4], $params[5], $params[6], $params[7],
+            $params[8], $params[9], $params[10]
+        );
     }
-
 }
 
-?>
