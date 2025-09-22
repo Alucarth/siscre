@@ -8,77 +8,89 @@
 <div class="section">
   <!-- Filtros -->
   <div class="card">
+    <div class="form-group">
+      <a href="<?= site_url('savings_accounts/savings_account_transactions/form') ?>" class="btn btn-success">
+        <span class="glyphicon glyphicon-plus"></span> Nueva transacción
+      </a>
+    </div>
+    
     <div class="card-block">
+      
       <?= form_open(current_url(), ['method'=>'get','class'=>'form-horizontal']) ?>
 
-        <div class="form-group">
-          <?= form_label('Cuenta','account_id',['class'=>'col-sm-2 control-label']) ?>
-          <div class="col-sm-6">
+        <div class="form-group row">
+          <?= form_label('Cuenta:','account_id',['class'=>'col-sm-1 control-label']) ?>
+          <div class="col-sm-5">
             <?= form_dropdown('account_id', $account_options, $filters['account_id'] ?? '', 'class="form-control"') ?>
           </div>
-
-          <?= form_label('Tipo','trans_type',['class'=>'col-sm-2 control-label']) ?>
+          <?= form_label('Tipo:','trans_type',['class'=>'col-sm-1 control-label']) ?>
           <div class="col-sm-2">
             <?= form_dropdown('trans_type', $type_options, $filters['trans_type'] ?? '', 'class="form-control"') ?>
           </div>
+          <div class="col-sm-3"></div>
         </div>
 
-        <div class="form-group">
-          <?= form_label('Desde','date_from',['class'=>'col-sm-2 control-label']) ?>
+        <div class="form-group row">
+          <?= form_label('Desde:','date_from',['class'=>'col-sm-1 control-label']) ?>
           <div class="col-sm-2">
             <input type="date" name="date_from" value="<?= html_escape($filters['date_from'] ?? '') ?>" class="form-control">
           </div>
 
-          <?= form_label('Hasta','date_to',['class'=>'col-sm-1 control-label']) ?>
+          <?= form_label('Hasta:','date_to',['class'=>'col-sm-1 control-label']) ?>
           <div class="col-sm-2">
             <input type="date" name="date_to" value="<?= html_escape($filters['date_to'] ?? '') ?>" class="form-control">
           </div>
 
-          <?= form_label('Sucursal','branch_id',['class'=>'col-sm-2 control-label']) ?>
-          <div class="col-sm-3">
+          <?= form_label('Sucursal:','branch_id',['class'=>'col-sm-1 control-label']) ?>
+          <div class="col-sm-2">
             <?= form_dropdown('branch_id', $branch_options, $filters['branch_id'] ?? '', 'class="form-control"') ?>
           </div>
+
+          <div class="col-sm-3"></div>
         </div>
 
-        <div class="form-group">
-          <?= form_label('Operador','registered_by',['class'=>'col-sm-2 control-label']) ?>
-          <div class="col-sm-3">
+        <div class="form-group row">
+          <?= form_label('Operador:','registered_by',['class'=>'col-sm-1 control-label']) ?>
+          <div class="col-sm-2">
             <?= form_dropdown('registered_by', $operator_options, $filters['registered_by'] ?? '', 'class="form-control"') ?>
           </div>
 
-          <?= form_label('Estado','status',['class'=>'col-sm-2 control-label']) ?>
+          <?= form_label('Estado:','status',['class'=>'col-sm-1 control-label']) ?>
           <div class="col-sm-2">
             <?= form_dropdown('status', $status_options, $filters['status'] ?? '', 'class="form-control"') ?>
           </div>
 
-          <?= form_label('Buscar','q',['class'=>'col-sm-1 control-label']) ?>
+          <?= form_label('Buscar:','q',['class'=>'col-sm-1 control-label']) ?>
           <div class="col-sm-2">
             <input type="text" name="q" value="<?= html_escape($filters['q'] ?? '') ?>" class="form-control" placeholder="Nombre, cuenta o ID">
           </div>
+
+          <div class="col-sm-3"></div>
+        </div>
+        <div class="form-group col-sm-2">
+          <button class="btn btn-primary"><span class="glyphicon glyphicon-search"></span> Filtrar</button>
+          <a href="<?= site_url('savings_accounts/savings_account_transactions') ?>" class="btn btn-default">Limpiar</a>
         </div>
 
         <div class="form-group">
           <?= form_label('Mostrar','limit',['class'=>'col-sm-2 control-label']) ?>
-          <div class="col-sm-2">
-            <select name="limit" class="form-control">
-              <?php foreach ([25,50,100,200] as $opt): ?>
-                <option value="<?= $opt ?>" <?= (int)$limit===$opt?'selected':'' ?>><?= $opt ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="col-sm-8 text-right">
-            <a href="<?= site_url('savings_accounts/savings_account_transactions/form') ?>" class="btn btn-success">
-              <span class="glyphicon glyphicon-plus"></span> Nueva transacción
-            </a>
-            <a href="<?= $export_csv_url ?>" class="btn btn-default">
-              <span class="glyphicon glyphicon-download"></span> Exportar CSV
-            </a>
-            <a href="<?= $export_pdf_url ?>" target="_blank" class="btn btn-default">
-              <span class="glyphicon glyphicon-print"></span> Exportar PDF
-            </a>
-            <button class="btn btn-primary"><span class="glyphicon glyphicon-search"></span> Filtrar</button>
-            <a href="<?= site_url('savings_accounts/savings_account_transactions') ?>" class="btn btn-default">Limpiar</a>
+          <div class="row">
+            <div class="col-sm-2">
+              <select name="limit" class="form-control">
+                <?php foreach ([25,50,100,200] as $opt): ?>
+                  <option value="<?= $opt ?>" <?= (int)$limit===$opt?'selected':'' ?>><?= $opt ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          
+            <div class="col-sm-8">
+              <a href="<?= $export_csv_url ?>" class="btn btn-default">
+                <span class="glyphicon glyphicon-download"></span> Exportar CSV
+             </a>
+              <a href="<?= $export_pdf_url ?>" target="_blank" class="btn btn-default">
+                <span class="glyphicon glyphicon-print"></span> Exportar PDF
+              </a>
+            </div>
           </div>
         </div>
 
@@ -178,19 +190,19 @@
       </tfoot>
     </table>
 
-    <?php if (!empty($filters['account_id']) && ($filters['date_from'] || $filters['date_to'])): ?>
-      <div class="alert alert-info" style="margin-bottom:15px">
+    <?php if (!empty($filters['account_id']) && !empty($filters['date_from']) && !empty($filters['date_to'])): ?>
+      <div class="alert alert-info" style="margin-top:10px">
         <strong>Resumen del período</strong><br>
-        <?php if ($filters['date_from']): ?>
-          Saldo inicial al <?= html_escape($filters['date_from']) ?>: 
-          <b><?= $opening_balance!==null ? number_format($opening_balance,2) : '—' ?></b><br>
+        Saldo inicial al <?= html_escape($filters['date_from']) ?>:
+          <strong><?= number_format((float)($opening_balance ?? 0),2) ?></strong><br>
+        Depósitos: <strong><?= number_format((float)($period_totals['deposit'] ?? 0),2) ?></strong>  ·
+        Retiros: <strong><?= number_format((float)($period_totals['withdraw'] ?? 0),2) ?></strong>  ·
+        Neto: <strong><?= number_format((float)(($period_totals['deposit'] ?? 0) - ($period_totals['withdraw'] ?? 0)),2) ?></strong><br>
+        <?php if (isset($period_interest)): ?>
+          Interés estimado del período: <strong><?= number_format((float)$period_interest,2) ?></strong><br>
         <?php endif; ?>
-        Depósitos: <b><?= number_format($period_totals['deposit'],2) ?></b> &nbsp;·&nbsp;
-        Retiros: <b><?= number_format($period_totals['withdraw'],2) ?></b> &nbsp;·&nbsp;
-        Neto: <b><?= number_format($period_totals['net'],2) ?></b><br>
-        <?php if ($closing_balance!==null): ?>
-          Saldo final del período: <b><?= number_format($closing_balance,2) ?></b>
-        <?php endif; ?>
+        Saldo final al <?= html_escape($filters['date_to']) ?>:
+          <strong><?= number_format((float)($closing_balance ?? 0),2) ?></strong>
       </div>
     <?php endif; ?>
 

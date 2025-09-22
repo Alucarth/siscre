@@ -5,7 +5,7 @@
   <div class="clearfix"></div>
 </div>
 
-<div class="section">
+<div class="section col-12">
   <div class="card">
     <div class="card-block">
       <?php
@@ -13,31 +13,34 @@
                 . (isset($tx) ? "/{$tx->transaction_id}" : '');
         echo form_open($action, ['class'=>'form-horizontal']);
       ?>
-
-      <!-- Cuenta -->
-      <div class="form-group">
-        <?= form_label('Cuenta', 'savings_account_id', ['class'=>'col-sm-2 control-label']) ?>
-        <div class="col-sm-6">
-          <?= form_dropdown(
-               'savings_account_id',
-               $account_options,
-               set_value('savings_account_id',$tx->savings_account_id ?? ''),
-               'class="form-control" required'
-             ) ?>
+      
+      <!-- Cuenta + Tipo en la misma fila (2 columnas iguales) -->
+      <div class="row">
+        <div class="col-sm-5">
+          <div class="form-group" style="margin-bottom:12px">
+            <label for="savings_account_id" class="control-label">Cuenta</label>
+            <?= form_dropdown(
+                'savings_account_id',
+                $account_options,
+                set_value('savings_account_id',$tx->savings_account_id ?? ''),
+                'class="form-control" id="savings_account_id" required'
+              ) ?>
+          </div>
         </div>
-      </div>
 
-      <!-- Tipo -->
-      <div class="form-group">
-        <?= form_label('Tipo', 'trans_type', ['class'=>'col-sm-2 control-label']) ?>
-        <div class="col-sm-4">
-          <?= form_dropdown(
-               'trans_type',
-               $type_options,
-               set_value('trans_type',$tx->trans_type ?? 'deposit'),
-               'class="form-control" id="trans_type" required'
-             ) ?>
+        <div class="col-sm-2">
+          <div class="form-group" style="margin-bottom:12px">
+            <label for="trans_type" class="control-label">Tipo</label>
+            <?= form_dropdown(
+                'trans_type',
+                $type_options,
+                set_value('trans_type',$tx->trans_type ?? 'deposit'),
+                'class="form-control" id="trans_type" required'
+              ) ?>
+          </div>
         </div>
+
+        <div class="col-sm-4"></div>
       </div>
       
       <?php $is_deposit = (set_value('trans_type', $tx->trans_type ?? 'deposit') === 'deposit'); ?>
@@ -83,51 +86,56 @@
         </div>
       </div>
 
-      <!-- Verificación del titular (visible en retiro/transferencia) -->
-      <div id="owner-verify" style="display:none">
+      <!-- Verificación del titular (lado izq: datos | lado der: foto grande) -->
+      <div id="owner-verify" class="row" style="display:none; margin-top:10px">
         <?php
-          // Evita notices si $owner no está set
           $owner = isset($owner) && is_array($owner) ? $owner : ['full_name'=>'','id_no'=>'','photo_url'=>''];
-          $owner_name = trim($owner['full_name'] ?? '');
-          $owner_idno = trim($owner['id_no'] ?? '');
+          $owner_name  = trim($owner['full_name'] ?? '');
+          $owner_idno  = trim($owner['id_no'] ?? '');
           $owner_photo = $owner['photo_url'] ?? '';
         ?>
 
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Titular</label>
-          <div class="col-sm-6" id="owner_name">
-            <?= $owner_name !== '' ? htmlspecialchars($owner_name) : '<em>—</em>' ?>
-          </div>
+        <!-- IZQUIERDA: datos del titular -->
+        <div class="col-sm-4">
+          <dl class="dl-horizontal" style="margin-bottom:10px">
+            <dt style="width:140px">Titular</dt>
+            <dd id="owner_name">
+              <?= $owner_name !== '' ? htmlspecialchars($owner_name) : '<em>—</em>' ?>
+            </dd>
+
+            <dt style="width:140px">Documento (ID)</dt>
+            <dd id="owner_idno">
+              <?= $owner_idno !== '' ? htmlspecialchars($owner_idno) : '<em>—</em>' ?>
+            </dd>
+          </dl>
+
+          <?php if (!empty($require_owner_auth)): ?>
+            <div class="form-group" style="margin-bottom:0">
+              <?= form_label('Contraseña del titular', 'owner_password', ['class'=>'control-label', 'style'=>'width:140px']) ?>
+              <div style="margin-left:160px">
+                <input type="password" name="owner_password" id="owner_password" class="form-control" autocomplete="off" />
+              </div>
+            </div>
+          <?php endif; ?>
         </div>
 
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Documento (ID)</label>
-          <div class="col-sm-6" id="owner_idno">
-            <?= $owner_idno !== '' ? htmlspecialchars($owner_idno) : '<em>—</em>' ?>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <?= form_label('Foto del titular', '', ['class'=>'col-sm-2 control-label']) ?>
-          <div class="col-sm-6">
+        <!-- DERECHA: foto ocupando toda la altura -->
+        <div class="col-sm-4">
+          <div style="
+            border:1px solid #e5e5e5; border-radius:6px; background:#fafafa;
+            padding:10px; min-height:260px;
+            display:flex; align-items:center; justify-content:center;">
             <img
               id="owner_photo_img"
               src="<?= $owner_photo ? htmlspecialchars($owner_photo) : '' ?>"
               alt="Foto del titular"
-              style="max-height:120px;border-radius:6px;<?= $owner_photo ? '' : 'display:none' ?>"
+              style="max-width:100%; max-height:240px; border-radius:6px; <?= $owner_photo ? '' : 'display:none' ?>"
             >
             <em id="owner_photo_na" style="<?= $owner_photo ? 'display:none' : '' ?>">Sin foto disponible</em>
           </div>
         </div>
 
-        <?php if (!empty($require_owner_auth)): // <-- solo si está activo ?>
-        <div class="form-group">
-          <?= form_label('Contraseña del titular', 'owner_password', ['class'=>'col-sm-2 control-label']) ?>
-          <div class="col-sm-4">
-            <input type="password" name="owner_password" id="owner_password" class="form-control" autocomplete="off" />
-          </div>
-        </div>
-        <?php endif; ?>
+        <div class="col-sm-4"></div>
       </div>
 
       <script>

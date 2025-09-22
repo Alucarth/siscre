@@ -251,6 +251,51 @@ class Savings_account_transactions extends MX_Controller
             'net'      => (float)($pt->dep ?? 0) - (float)($pt->wit ?? 0),
         ];
 
+        // ================================
+        // Resumen del período (solo si hay cuenta y al menos un límite de fecha)
+        // ================================
+        $opening_balance = null;
+        $closing_balance = null;
+        $period_totals   = null;
+
+        if (!empty($filters['account_id']) && ($start_dt || $end_dt)) {
+            $acc_id = (int)$filters['account_id'];
+
+            // 1) Saldos inicial/final ya calculados arriba
+            $opening_balance = $saldo_inicial_periodo;  // puede ser null si no hay date_from
+            $closing_balance = $saldo_final_periodo;    // nunca null (toma now si no hay date_to)
+
+            // 2) Totales del período (depósitos / retiros dentro del rango)
+            $conds = [];
+            $conds[] = "savings_account_id = ".$acc_id;
+            if ($start_dt) { $conds[] = "trans_date >= ".$this->db->escape($start_dt); }
+            if ($end_dt)   { $conds[] = "trans_date <= ".$this->db->escape($end_dt); }
+
+            // Si deseas respetar 'status' del filtro en el resumen, descomenta:
+            if ($filters['status'] !== null && $filters['status'] !== '') {
+                $conds[] = "status = ".((int)$filters['status']);
+            }
+
+            $where = implode(' AND ', $conds);
+
+            $sql_tot = "
+                SELECT
+                  SUM(CASE WHEN trans_type = 'deposit'  THEN amount ELSE 0 END) AS dep,
+                  SUM(CASE WHEN trans_type = 'withdraw' THEN amount ELSE 0 END) AS wd
+                FROM {$this->db->dbprefix('savings_account_transactions')}
+                WHERE {$where}
+            ";
+            $tot = $this->db->query($sql_tot)->row();
+            $dep = (float)($tot->dep ?? 0);
+            $wd  = (float)($tot->wd  ?? 0);
+
+            $period_totals = [
+                'deposit'  => $dep,
+                'withdraw' => $wd,
+                'net'      => $dep - $wd,
+            ];
+        }
+
         // --- URLs de exportación conservando filtros (sin la paginación) ---
         $qs = $this->input->get(NULL, TRUE);
         unset($qs['page']);
@@ -259,6 +304,12 @@ class Savings_account_transactions extends MX_Controller
         // Aliases para compatibilidad con la vista (solo si es 1 cuenta tiene sentido mostrarlos)
         $opening_balance = $saldo_inicial_periodo;
         $closing_balance = $saldo_final_periodo;
+
+        // --- Interés estimado del período (solo si hay UNA cuenta y rango completo) ---
+        $period_interest = null;
+        if (!empty($filters['account_id']) && $start_dt && $end_dt) {
+            $period_interest = $this->_interest_preview((int)$filters['account_id'], $start_dt, $end_dt);
+        }
 
         $data = [
             'filters'           => $filters,
@@ -279,6 +330,8 @@ class Savings_account_transactions extends MX_Controller
             'saldo_final_periodo'   => $saldo_final_periodo,
             'opening_balance'       => $opening_balance,
             'closing_balance'       => $closing_balance,
+
+            'period_interest'       => $period_interest,
 
             'page_totals'       => $page_totals,
             'period_totals'     => $period_totals,
@@ -783,138 +836,172 @@ class Savings_account_transactions extends MX_Controller
 
     public function export_csv()
     {
-        $filters = $this->input->get(NULL, TRUE);
-        // Trae TODO lo que cumpla filtros (sin paginar)
-        $rows = $this->Savings_account_transactions_model->get_all($filters, 100000, 0);
+        // ---------- 1) Normalizar filtros ----------
+        $in = $this->input->get(NULL, TRUE) ?: [];
+        $filters = array_merge([
+            'account_id'    => null,
+            'trans_type'    => null,
+            'date_from'     => null,
+            'date_to'       => null,
+            'branch_id'     => null,
+            'registered_by' => null,
+            'status'        => null,
+            'q'             => null,
+        ], $in);
 
-        // Cálculo de saldos del período si se filtra por cuenta
-        $account_id = !empty($filters['account_id']) ? (int)$filters['account_id'] : 0;
-        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
-        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+        // ---------- 2) Silenciar notices y limpiar buffers ----------
+        $old_level = error_reporting();
+        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
 
-        $saldo_inicial_periodo = null;
-        $saldo_final_periodo   = null;
-        $seed_running          = null; // saldo al “momento” de la primera fila (DESC)
+        // Cerrar TODOS los buffers abiertos (por seguridad)
+        if (function_exists('ob_get_level')) {
+            while (ob_get_level() > 0) { @ob_end_clean(); }
+        }
 
-        if ($account_id) {
-            $acc = $this->Savings_accounts_model->get($account_id);
+        // ---------- 3) Traer datos ----------
+        // Límite sano para exportar (ajusta si lo necesitas)
+        $rows = $this->Savings_account_transactions_model->get_all($filters, 10000, 0);
+
+        // ¿Calculamos running balance? Solo si hay UNA cuenta seleccionada
+        $running_by_row = [];
+        if (!empty($filters['account_id'])) {
+            // Semilla: saldo después de la transacción más reciente del set exportado
+            $acc_id = (int)$filters['account_id'];
+            $acc    = $this->Savings_accounts_model->get($acc_id);
             $now_balance = (float)($acc->current_balance ?? 0);
 
+            // Si hay tope superior del período, calcula saldo a esa fecha; si no, es el actual
+            $end_dt = !empty($filters['date_to']) ? $filters['date_to'].' 23:59:59' : null;
             if ($end_dt) {
-                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($end_dt), $filters);
-                $saldo_final_periodo = $now_balance - $newer;
+                $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+                $closing_period = $now_balance - $sum_newer_than_end;
             } else {
-                $saldo_final_periodo = $now_balance;
+                $closing_period = $now_balance;
             }
 
-            if ($start_dt) {
-                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($start_dt), $filters);
-                $saldo_inicial_periodo = $now_balance - $newer;
-            }
+            // Orden de exportación es el mismo que en pantalla (desc): calculamos de nuevo el seed
+            if (!empty($rows)) {
+                $first = $rows[0];
+                $conds = [];
+                $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)
+                        ." OR (trans_date = ".$this->db->escape($first->trans_date)
+                        ." AND transaction_id > ".(int)$first->transaction_id."))";
 
-            // Como el export no pagina, el seed es el saldo final del período
-            $seed_running = $saldo_final_periodo;
+                if (!empty($filters['date_from'])) $conds[] = "trans_date >= ".$this->db->escape($filters['date_from'].' 00:00:00');
+                if ($end_dt)                         $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+
+                // Para el seed ignoramos el filtro por tipo; el saldo depende de TODOS
+                $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
+                $seed = $closing_period - $sum_newer_in_period;
+
+                // Construir running balance para cada fila (desc)
+                $running = $seed;
+                foreach ($rows as $r) {
+                    $running_by_row[$r->transaction_id] = $running; // saldo después de esa transacción
+                    $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                    $running -= ($sign * (float)$r->amount);
+                }
+            }
         }
 
+        // ---------- 4) Enviar CSV ----------
         header('Content-Type: text/csv; charset=UTF-8');
-        $fileSuffix = '';
-        if ($account_id) {
-            $acc = $this->Savings_accounts_model->get($account_id);
-            if ($acc) $fileSuffix = '_'.$acc->account_number.'_'.$acc->person_id;
-        }
-        header('Content-Disposition: attachment; filename="transacciones'.$fileSuffix.'_'.date('Ymd').'.csv"');
+        header('Content-Disposition: attachment; filename="transacciones'.(
+            !empty($filters['account_id'])
+                ? ('_'.$this->Savings_accounts_model->get((int)$filters['account_id'])->account_number.'_'.$this->Savings_accounts_model->get((int)$filters['account_id'])->person_id)
+                : ''
+        ).'_'.date('Ymd').'.csv"');
+
+        // BOM para Excel (opcional pero útil)
+        echo "\xEF\xBB\xBF";
 
         $out = fopen('php://output','w');
+        // Usa “;” si tu Excel regional lo prefiere, si no cambia a “,”
+        $sep = ';';
 
-        // Encabezado extra (opcional) con saldos del período
-        if ($account_id) {
-            fputcsv($out, ['Saldo inicial del período', (isset($saldo_inicial_periodo)?number_format($saldo_inicial_periodo,2,'.',''):'')]);
-            fputcsv($out, ['Saldo final del período',   (isset($saldo_final_periodo)?number_format($saldo_final_periodo,2,'.',''):'')]);
-            fputcsv($out, ['']); // línea en blanco
-        }
+        // Cabecera
+        fputcsv($out, ['Fecha','Cuenta','Cliente','Tipo','Monto','Saldo resultante','Descripción'], $sep);
 
-        // Cabeceras de tabla
-        fputcsv($out, ['Fecha','Cuenta','Cliente','Tipo','Monto','Saldo después','Descripción'], ';');
-
-        $running = $seed_running;
         foreach ($rows as $r) {
             $cliente = trim(($r->first_name ?? '').' '.($r->last_name ?? ''));
-            $saldo_despues = '';
-            if ($account_id && $running !== null) {
-                $saldo_despues = number_format((float)$running, 2, '.', '');
-                $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
-                $running -= $sign * (float)$r->amount;
+            $saldo   = '';
+            if (!empty($filters['account_id']) && isset($running_by_row[$r->transaction_id])) {
+                $saldo = number_format((float)$running_by_row[$r->transaction_id], 2, '.', '');
             }
-
             fputcsv($out, [
                 date('Y-m-d H:i', strtotime($r->trans_date)),
                 (string)$r->account_number,
                 $cliente,
-                (string)$r->trans_type,
+                ucfirst((string)$r->trans_type),
                 number_format((float)$r->amount, 2, '.', ''),
-                $saldo_despues,
+                $saldo,
                 (string)$r->description,
-            ], ';');
+            ], $sep);
         }
-
         fclose($out);
+
+        // ---------- 5) Restaurar nivel de errores y salir ----------
+        error_reporting($old_level);
         exit;
     }
 
     public function export_pdf()
     {
         $filters = $this->input->get(NULL, TRUE);
-        $rows = $this->Savings_account_transactions_model->get_all($filters, 100000, 0);
+        $rows    = $this->Savings_account_transactions_model->get_all($filters, 1000, 0);
 
-        // mPDF legacy
+        // Running balance si hay una cuenta
+        $opening = $closing = $totals = null;
+        if (!empty($filters['account_id'])) {
+            list($rows, $opening, $closing, $totals) = $this->_with_running_balance($rows, $filters);
+        } else {
+            foreach ($rows as &$r) { $r->running_balance = null; } unset($r);
+        }
+
+        // Cargar mPDF legacy
         $this->load->library('pdf');
         $mpdf = $this->pdf->load('"en-GB-x","A4","","",10,10,10,10,6,3,"P"');
 
-        // Silenciar y limpiar buffers
+        // Blindaje mPDF legacy
         $old_level = error_reporting();
         error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
         if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
 
-        // Saldos del período si hay cuenta
-        $account_id = !empty($filters['account_id']) ? (int)$filters['account_id'] : 0;
-        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
-        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
-        $saldo_inicial_periodo = null;
-        $saldo_final_periodo   = null;
-        $seed_running          = null;
-
-        $account_header = '';
-        if ($account_id) {
-            $acc = $this->Savings_accounts_model->get($account_id);
-            $now_balance = (float)($acc->current_balance ?? 0);
-
-            if ($end_dt) {
-                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($end_dt), $filters);
-                $saldo_final_periodo = $now_balance - $newer;
-            } else {
-                $saldo_final_periodo = $now_balance;
+        // Encabezado amigable
+        $title = 'Reporte de Transacciones';
+        $subtitle = '';
+        if (!empty($filters['account_id'])) {
+            $acc = $this->Savings_accounts_model->get((int)$filters['account_id']);
+            if ($acc) {
+                $subtitle = 'Cuenta: '.htmlspecialchars($acc->account_number).' · Cliente ID: '.(int)$acc->person_id;
             }
-            if ($start_dt) {
-                $newer = $this->_sum_signed($account_id, "trans_date > ".$this->db->escape($start_dt), $filters);
-                $saldo_inicial_periodo = $now_balance - $newer;
-            }
-            $seed_running = $saldo_final_periodo;
-
-            $account_header = '<p><b>Cuenta:</b> '.htmlspecialchars($acc->account_number).' &nbsp; '
-                            . '<b>Titular ID:</b> '.(int)$acc->person_id.'</p>';
+        }
+        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
+            $subtitle .= ($subtitle ? ' · ' : '');
+            $subtitle .= 'Período: '
+                    . (!empty($filters['date_from']) ? $filters['date_from'] : '—')
+                    . ' a '
+                    . (!empty($filters['date_to'])   ? $filters['date_to']   : '—');
         }
 
+        // HTML simple (sin <style>)
         $html  = '<html><head><meta charset="utf-8"></head><body>';
-        $html .= '<h3>Reporte de Transacciones</h3>';
-        if ($account_id) {
-            $html .= $account_header;
-            $html .= '<p><b>Saldo inicial del período:</b> '
-                . (isset($saldo_inicial_periodo)?number_format($saldo_inicial_periodo,2):'—')
-                . ' &nbsp; | &nbsp; <b>Saldo final del período:</b> '
-                . (isset($saldo_final_periodo)?number_format($saldo_final_periodo,2):'—')
-                . '</p>';
+        $html .= '<h3>'.$title.'</h3>';
+        if ($subtitle) $html .= '<div>'.$subtitle.'</div>';
+
+        // Resumen del período si aplica
+        if (!empty($filters['account_id'])) {
+            $html .= '<div><strong>Saldo inicial:</strong> '.($opening!==null?number_format($opening,2):'—')
+                .' &nbsp; | &nbsp; <strong>Saldo final:</strong> '.($closing!==null?number_format($closing,2):'—').'</div>';
+            if (is_array($totals)) {
+                $html .= '<div><strong>Depósitos:</strong> '.number_format($totals['deposit'],2)
+                    .' &nbsp; · &nbsp; <strong>Retiros:</strong> '.number_format($totals['withdraw'],2)
+                    .' &nbsp; · &nbsp; <strong>Neto:</strong> '.number_format($totals['net'],2).'</div>';
+            }
+            $html .= '<br>';
         }
 
+        // Tabla
         $html .= '<table border="1" cellpadding="6" cellspacing="0" width="100%">';
         $html .= '<thead><tr>
                     <th>Fecha</th>
@@ -922,27 +1009,19 @@ class Savings_account_transactions extends MX_Controller
                     <th>Cliente</th>
                     <th>Tipo</th>
                     <th>Monto</th>
-                    <th>Saldo después</th>
+                    <th>Saldo resultante</th>
                     <th>Descripción</th>
                 </tr></thead><tbody>';
 
-        $running = $seed_running;
         foreach ($rows as $r) {
             $cliente = trim(($r->first_name ?? '').' '.($r->last_name ?? ''));
-            $saldo_despues = '—';
-            if ($account_id && $running !== null) {
-                $saldo_despues = number_format((float)$running, 2);
-                $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
-                $running -= $sign * (float)$r->amount;
-            }
-
             $html .= '<tr>'
                 .  '<td>'.htmlspecialchars(date('d/m/Y H:i', strtotime($r->trans_date)), ENT_QUOTES, 'UTF-8').'</td>'
                 .  '<td>'.htmlspecialchars((string)$r->account_number, ENT_QUOTES, 'UTF-8').'</td>'
                 .  '<td>'.htmlspecialchars($cliente, ENT_QUOTES, 'UTF-8').'</td>'
-                .  '<td>'.htmlspecialchars(ucfirst($r->trans_type), ENT_QUOTES, 'UTF-8').'</td>'
+                .  '<td>'.htmlspecialchars(ucfirst((string)$r->trans_type), ENT_QUOTES, 'UTF-8').'</td>'
                 .  '<td align="right">'.number_format((float)$r->amount, 2).'</td>'
-                .  '<td align="right">'.$saldo_despues.'</td>'
+                .  '<td align="right">'.($r->running_balance!==null ? number_format((float)$r->running_balance,2) : '').'</td>'
                 .  '<td>'.htmlspecialchars((string)$r->description, ENT_QUOTES, 'UTF-8').'</td>'
                 .  '</tr>';
         }
@@ -951,16 +1030,295 @@ class Savings_account_transactions extends MX_Controller
 
         $mpdf->WriteHTML($html, 2);
 
-        $accSuffix = '';
-        if ($account_id) {
-            $acc = $this->Savings_accounts_model->get($account_id);
-            if ($acc) $accSuffix = '_'.$acc->account_number.'_'.$acc->person_id;
+        // Nombre de archivo amigable
+        $filename = 'transacciones_'.date('Ymd').'.pdf';
+        if (!empty($filters['account_id']) && !empty($acc)) {
+            $filename = sprintf('transacciones_%s_%s_%s.pdf',
+                $acc->account_number, $acc->person_id, date('Ymd'));
         }
-        $filename = 'transacciones'.$accSuffix.'_'.date('Ymd').'.pdf';
-        $mpdf->Output($filename, 'I');
 
+        $mpdf->Output($filename, 'I');
         error_reporting($old_level);
         exit;
+    }
+
+    public function interest_accrue()
+    {
+        $account_id = (int)$this->input->get_post('account_id');
+        $date_from  = $this->input->get_post('date_from'); // Y-m-d
+        $date_to    = $this->input->get_post('date_to');   // Y-m-d
+        $preview    = (int)$this->input->get_post('preview' , TRUE) ?: (int)$this->input->get('preview' , TRUE);
+
+        if ($account_id <= 0 || !$date_from || !$date_to) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false,'error'=>'Parámetros incompletos']));
+        }
+
+        // Normalizamos a límites del día
+        $start_dt = $date_from.' 00:00:00';
+        $end_dt   = $date_to.' 23:59:59';
+
+        // Traemos cuenta y tipo con tasa
+        $acc = $this->db->select('sa.*, sat.interest_rate_apy')
+            ->from($this->db->dbprefix('savings_accounts').' sa')
+            ->join($this->db->dbprefix('savings_account_types').' sat','sat.savings_account_type_id=sa.savings_account_type_id','left')
+            ->where('sa.savings_account_id', $account_id)
+            ->get()->row();
+
+        if (!$acc) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false,'error'=>'Cuenta no encontrada']));
+        }
+
+        $apy = (float)($acc->interest_rate_apy ?? 0);
+        if ($apy <= 0) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false,'error'=>'La cuenta no tiene tasa configurada']));
+        }
+
+        // 1) Saldo al inicio y movimientos del período
+        $opening = $this->_opening_balance_at($account_id, $start_dt);
+        $txs     = $this->_tx_in_period_asc($account_id, $start_dt, $end_dt);
+
+        // 2) Construir segmentos por cambio de saldo
+        $segments = [];
+        $curr_balance = (float)$opening;
+        $curr_from    = $start_dt;
+
+        foreach ($txs as $t) {
+            $ts = $t->trans_date; // Y-m-d H:i:s
+            // segmento desde curr_from hasta la fecha de esta transacción
+            $segments[] = ['from'=>$curr_from, 'to'=>$ts, 'balance'=>$curr_balance];
+
+            // aplicar la transacción
+            $sign = (strtolower($t->trans_type) === 'withdraw') ? -1 : 1;
+            $curr_balance += $sign * (float)$t->amount;
+
+            // siguiente segmento arranca desde este timestamp
+            $curr_from = $ts;
+        }
+        // último segmento hasta fin del período
+        $segments[] = ['from'=>$curr_from, 'to'=>$end_dt, 'balance'=>$curr_balance];
+
+        // 3) Promedio diario (ADB) y días
+        $total_days = 0.0;
+        $weighted   = 0.0;
+        foreach ($segments as $s) {
+            $d = $this->_days_between($s['from'], $s['to']);
+            if ($d > 0) {
+                $total_days += $d;
+                $weighted   += $s['balance'] * $d;
+            }
+        }
+        // En períodos cortos sin movimientos, total_days podría ser 0 si from>=to (validamos)
+        if ($total_days <= 0) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false,'error'=>'Período sin días efectivos']));
+        }
+
+        $adb = $weighted / $total_days;
+
+        // 4) Interés simple por día: APY/365, sin capitalización intra-período
+        $interest = $adb * ($apy / 365.0) * $total_days;
+
+        // Redondeo a 2 decimales (ajústalo si usas más precisión)
+        $interest = round($interest, 2);
+
+        // PREVIEW
+        if ($preview) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode([
+                    'ok'          => true,
+                    'account_id'  => $account_id,
+                    'date_from'   => $date_from,
+                    'date_to'     => $date_to,
+                    'days'        => $total_days,
+                    'apy'         => $apy,
+                    'opening'     => round($opening,2),
+                    'adb'         => round($adb,2),
+                    'interest'    => $interest,
+                ]));
+        }
+
+        // 5) Registrar el abono como transacción (depósito)
+        if ($interest <= 0) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false,'error'=>'Interés calculado no positivo']));
+        }
+
+        // branch_id y actor desde sesión (igual que en form())
+        $branch_id = (int)($this->session->userdata('branch_id') ?: 0);
+        if ($branch_id === 0) {
+            $emp = $this->Employee->get_logged_in_employee_info();
+            if (is_object($emp) && isset($emp->branch_id)) {
+                $branch_id = (int)$emp->branch_id;
+            }
+        }
+        $actor = (int)($this->session->userdata('person_id') ?: 0);
+
+        $payload = [
+            'savings_account_id' => $account_id,
+            'trans_type'         => 'deposit', // abono por interés
+            'amount'             => $interest,
+            'trans_date'         => $end_dt,   // abonamos al cierre del período
+            'description'        => sprintf('Interés del %s al %s (ADB %.2f; %s días; APY %.4f)',
+                                            $date_from, $date_to, $adb, $total_days, $apy),
+            'branch_id'          => $branch_id,
+            'depositor_name'     => 'Sistema de Intereses',
+            'depositor_document' => 'N/A',
+        ];
+
+        $ok_id = $this->Savings_account_transactions_model->post_simple($payload);
+
+        if ($ok_id) {
+            // Actualiza last_interest_calc si corresponde (opcional)
+            $this->db->where('savings_account_id', $account_id)
+                    ->update($this->db->dbprefix('savings_accounts'), ['last_interest_calc' => $date_to]);
+
+            // Ponemos flash para abrir voucher automáticamente desde el index (ya lo tienes)
+            $this->session->set_flashdata('print_tx_id', $ok_id);
+
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>true,'transaction_id'=>$ok_id,'interest'=>$interest]));
+        } else {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false,'error'=>'No se pudo registrar el abono de interés']));
+        }
+    }
+
+    public function monthly_interest_batch($yyyymm = null)
+    {
+        // Mes objetivo: por defecto el mes anterior (en hora del servidor)
+        if (!$yyyymm) {
+            $yyyymm = date('Ym', strtotime('first day of last month'));
+        }
+        $year = (int)substr($yyyymm, 0, 4);
+        $month = (int)substr($yyyymm, 4, 2);
+
+        // Rango: 1er día 00:00:00 al último día 23:59:59
+        $date_from = date('Y-m-01', strtotime("$year-$month-01"));
+        $date_to   = date('Y-m-t',  strtotime("$year-$month-01"));
+
+        // Cuentas con tasa > 0 (y que quieras considerar activas)
+        $accs = $this->db->select('sa.savings_account_id, sat.interest_rate_apy')
+            ->from($this->db->dbprefix('savings_accounts').' sa')
+            ->join($this->db->dbprefix('savings_account_types').' sat','sat.savings_account_type_id=sa.savings_account_type_id','left')
+            ->where('IFNULL(sat.interest_rate_apy,0) >', 0)
+            ->where('sa.deleted', 0)  // ajusta si tienes flag de inactividad
+            ->get()->result();
+
+        $ok = 0; $fail = 0; $log = [];
+
+        foreach ($accs as $a) {
+            // Reusamos la misma acción vía método interno para evitar HTTP:
+            $_POST = [
+                'account_id' => $a->savings_account_id,
+                'date_from'  => $date_from,
+                'date_to'    => $date_to,
+                'preview'    => 0
+            ];
+
+            ob_start(); // capturamos la salida JSON
+            $this->interest_accrue();
+            $json = ob_get_clean();
+            $res = json_decode($json, true);
+
+            if (is_array($res) && !empty($res['ok'])) {
+                $ok++;
+            } else {
+                $fail++;
+                $log[] = ['account_id'=>$a->savings_account_id, 'error'=>$res['error'] ?? 'unknown'];
+            }
+        }
+
+        // Salida para cron/log
+        header('Content-Type: application/json');
+        echo json_encode([
+            'period' => $yyyymm,
+            'processed' => count($accs),
+            'ok' => $ok,
+            'fail' => $fail,
+            'errors' => $log
+        ]);
+        exit;
+    }
+
+    /**
+     * Interés estimado del período [start_dt, end_dt]
+     * - Usa APY del tipo de cuenta (interest_rate_apy)
+     * - Base 365 días (fácil de cambiar)
+     * - Recorre los movimientos del período para integrar saldo-tiempo
+     * - Signo: withdraw = negativo; cualquier otro = positivo (dep/transfer-in)
+     */
+    private function _interest_preview(int $acc_id, string $start_dt, string $end_dt): float
+    {
+        // Tasa APY
+        $row = $this->db->select('sa.current_balance, sat.interest_rate_apy')
+            ->from($this->db->dbprefix('savings_accounts').' sa')
+            ->join($this->db->dbprefix('savings_account_types').' sat','sat.savings_account_type_id=sa.savings_account_type_id','left')
+            ->where('sa.savings_account_id', $acc_id)
+            ->limit(1)->get()->row();
+
+        if (!$row) return 0.0;
+
+        $rate = (float)($row->interest_rate_apy ?? 0);
+        if ($rate <= 0) return 0.0;
+
+        $now_balance = (float)$row->current_balance;
+
+        // Saldo de apertura al inicio del período (balance justo antes de start_dt)
+        $sum_after_start = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($start_dt), ['trans_type'=>null]);
+        $opening = $now_balance - $sum_after_start;
+
+        // Transacciones dentro del período (ascendente)
+        $txs = $this->db->select('transaction_id, trans_date, trans_type, amount')
+            ->from($this->db->dbprefix('savings_account_transactions'))
+            ->where('savings_account_id', $acc_id)
+            ->where('trans_date >=', $start_dt)
+            ->where('trans_date <=', $end_dt)
+            ->where('status', 1) // ajusta si usas otro flag
+            ->order_by('trans_date ASC, transaction_id ASC')
+            ->get()->result();
+
+        $seconds_per_day = 86400.0;
+        $year_base = 365.0;
+
+        $interest = 0.0;
+        $running  = $opening;
+        $last_ts  = strtotime($start_dt);
+        $end_ts   = strtotime($end_dt);
+
+        foreach ($txs as $t) {
+            $t_ts = strtotime($t->trans_date);
+            if ($t_ts > $end_ts) $t_ts = $end_ts;
+
+            if ($t_ts > $last_ts) {
+                $days = ($t_ts - $last_ts) / $seconds_per_day;
+                if ($days > 0) {
+                    $interest += $running * ($days / $year_base) * $rate;
+                }
+                $last_ts = $t_ts;
+            }
+
+            // Aplica el movimiento
+            $sign = (strtolower($t->trans_type) === 'withdraw') ? -1 : 1;
+            $running += $sign * (float)$t->amount;
+
+            if ($last_ts >= $end_ts) break;
+        }
+
+        // Último tramo hasta end_dt
+        if ($last_ts < $end_ts) {
+            $days = ($end_ts - $last_ts) / $seconds_per_day;
+            if ($days > 0) {
+                $interest += $running * ($days / $year_base) * $rate;
+            }
+        }
+
+        // Nunca negativo
+        if ($interest < 0) $interest = 0.0;
+
+        return round($interest, 2);
     }
 
     /** Carga mPDF con librería Pdf y sanea HTML */
@@ -986,6 +1344,122 @@ class Savings_account_transactions extends MX_Controller
         $html = preg_replace('/^\xEF\xBB\xBF/', '', $html); // BOM UTF-8
         $html = str_replace(["\0","\x00"], '', $html);
         return $html;
+    }
+
+    /** 
+     * Calcula running_balance por fila (orden esperado: DESC por fecha, tie-break por ID).
+     * Devuelve [$rows_con_balance, $opening_balance, $closing_balance, $period_totals]
+     */
+    private function _with_running_balance(array $rows, array $filters)
+    {
+        if (empty($filters['account_id']) || empty($rows)) {
+            // Sin cuenta única o sin filas: no hay running balance ni resumen.
+            foreach ($rows as &$r) { $r->running_balance = null; }
+            unset($r);
+            return [$rows, null, null, null];
+        }
+
+        $acc_id  = (int)$filters['account_id'];
+        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
+        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+
+        // Estado actual de la cuenta
+        $acc         = $this->Savings_accounts_model->get($acc_id);
+        $now_balance = (float)($acc->current_balance ?? 0);
+
+        // Saldo final del período (a la fecha_to si existe; si no, es el saldo actual)
+        if ($end_dt) {
+            $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+            $closing_balance    = $now_balance - $sum_newer_than_end;
+        } else {
+            $closing_balance    = $now_balance;
+        }
+
+        // Saldo inicial del período (justo antes del date_from)
+        $opening_balance = null;
+        if ($start_dt) {
+            $sum_newer_than_start = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($start_dt), $filters);
+            $opening_balance      = $now_balance - $sum_newer_than_start;
+        }
+
+        // Totales del período (depósitos/retiros en el rango)
+        $conds = ["savings_account_id = ".$acc_id];
+        if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
+        if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+        if ($filters['status'] !== null && $filters['status'] !== '') {
+            $conds[] = "status = ".((int)$filters['status']);
+        }
+        $where = implode(' AND ', $conds);
+        $sql_tot = "
+            SELECT
+            SUM(CASE WHEN trans_type='deposit'  THEN amount ELSE 0 END) AS dep,
+            SUM(CASE WHEN trans_type='withdraw' THEN amount ELSE 0 END) AS wd
+            FROM {$this->db->dbprefix('savings_account_transactions')}
+            WHERE {$where}
+        ";
+        $tot = $this->db->query($sql_tot)->row();
+        $period_totals = [
+            'deposit'  => (float)($tot->dep ?? 0),
+            'withdraw' => (float)($tot->wd  ?? 0),
+            'net'      => (float)($tot->dep ?? 0) - (float)($tot->wd ?? 0),
+        ];
+
+        // Seed (lo que NO ves porque está más nuevo que la primera fila mostrada)
+        $first = $rows[0];
+        $conds_pg = [];
+        $conds_pg[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
+        if ($start_dt) $conds_pg[] = "trans_date >= ".$this->db->escape($start_dt);
+        if ($end_dt)   $conds_pg[] = "trans_date <= ".$this->db->escape($end_dt);
+
+        // ¡Importante!: ignoramos trans_type del filtro para saldo real
+        $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds_pg), array_merge($filters, ['trans_type'=>null]));
+
+        $seed    = $closing_balance - $sum_newer_in_period;
+        $running = $seed;
+
+        foreach ($rows as &$r) {
+            $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+            $r->running_balance = $running;            // saldo luego de aplicar TODO lo más nuevo que no ves + lo ya aplicado arriba
+            $running -= ($sign * (float)$r->amount);   // preparamos para la siguiente (más antigua)
+        }
+        unset($r);
+
+        return [$rows, $opening_balance, $closing_balance, $period_totals];
+    }
+
+    /** Saldo justo ANTES de $start_dt (Y-m-d H:i:s) */
+    private function _opening_balance_at($account_id, $start_dt)
+    {
+        $acc = $this->Savings_accounts_model->get((int)$account_id);
+        $now_balance = (float)($acc->current_balance ?? 0);
+
+        if (!$start_dt) return $now_balance; // sin fecha, devolvemos actual
+
+        // Suma firmada de transacciones posteriores a $start_dt (no filtramos por tipo)
+        $sum_newer = $this->_sum_signed((int)$account_id, "trans_date > ".$this->db->escape($start_dt), ['trans_type'=>null]);
+
+        // Saldo al inicio = saldo actual - lo que pasó después de ese inicio
+        return $now_balance - $sum_newer;
+    }
+
+    /** Transacciones del período [start_dt, end_dt] orden ASC */
+    private function _tx_in_period_asc($account_id, $start_dt, $end_dt)
+    {
+        $this->db->from($this->db->dbprefix('savings_account_transactions'))
+                ->where('savings_account_id', (int)$account_id);
+        if ($start_dt) $this->db->where('trans_date >=', $start_dt);
+        if ($end_dt)   $this->db->where('trans_date <=', $end_dt);
+        $this->db->order_by('trans_date','ASC')->order_by('transaction_id','ASC');
+        return $this->db->get()->result();
+    }
+
+    /** Días exactos (UTC naive) entre dos timestamps Y-m-d H:i:s */
+    private function _days_between($from, $to)
+    {
+        $t1 = strtotime($from);
+        $t2 = strtotime($to);
+        if ($t2 <= $t1) return 0.0;
+        return ($t2 - $t1) / 86400.0;
     }
 
 }

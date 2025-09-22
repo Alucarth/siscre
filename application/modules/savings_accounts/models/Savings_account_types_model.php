@@ -27,6 +27,7 @@ class Savings_account_types_model extends CI_Model
         $row = [
             'name'           => trim($data['name'] ?? ''),
             'interest_rate'  => (float)($data['interest_rate'] ?? 0),
+            'interest_rate_apy' => $this->calc_apy($row['interest_rate']),
             'description'    => $data['description'] ?? null,
             'status'         => isset($data['status']) ? (int)$data['status'] : 1,
             'is_fixed_term'  => isset($data['is_fixed_term']) ? (int)$data['is_fixed_term'] : 0,
@@ -52,6 +53,7 @@ class Savings_account_types_model extends CI_Model
         $row = [
             'name'           => trim($data['name'] ?? ''),
             'interest_rate'  => (float)($data['interest_rate'] ?? 0),
+            'interest_rate_apy' => $this->calc_apy($row['interest_rate']),
             'description'    => $data['description'] ?? null,
             'status'         => isset($data['status']) ? (int)$data['status'] : 1,
             'is_fixed_term'  => isset($data['is_fixed_term']) ? (int)$data['is_fixed_term'] : 0,
@@ -100,4 +102,15 @@ class Savings_account_types_model extends CI_Model
         // Formato PREFIX-001
         return sprintf('%s-%03d', $prefix, $next);
     }
+
+    // 1) Agrega en la clase (por ejemplo debajo de generate_code):
+    private function calc_apy($apr_percent)
+    {
+        // $apr_percent viene como % anual (p.ej. 12.00)
+        $apr = max(0.0, (float)$apr_percent);
+        $daily = $apr / 100 / 365;                 // interés diario
+        $apy = pow(1 + $daily, 365) - 1;           // capitalización diaria
+        return round($apy, 4);                      // 4 decimales como en la columna
+    }
+
 }

@@ -94,6 +94,14 @@
               ]) ?>
             </div>
           </div>
+          <?php if (isset($type)): ?>
+            <div class="form-group">
+              <label class="col-sm-2 control-label">APY estimada</label>
+              <div class="col-sm-2" style="padding-top:7px">
+                <?= number_format((float)($type->interest_rate_apy ?? 0) * 100, 2) ?>%
+              </div>
+            </div>
+          <?php endif; ?>
 
           <div class="form-group">
             <?= form_label('¿Plazo Fijo?', 'is_fixed_term', ['class'=>'col-sm-2 control-label']) ?>
@@ -107,7 +115,7 @@
             </div>
           </div>
 
-          <div class="form-group" id="term-days-group" style="<?= (isset($type) && ($type->is_fixed_term ?? 0)) ? '' : 'display:none' ?>">
+          <div class="form-group" id="term-days-group" style="<?= ((int)set_value('is_fixed_term', $type->is_fixed_term ?? 0) === 1) ? '' : 'display:none' ?>">
             <?= form_label('Plazo (días)', 'term_days', ['class'=>'col-sm-2 control-label']) ?>
             <div class="col-sm-2">
               <?= form_input([
@@ -120,17 +128,33 @@
           </div>
 
           <script>
-          (function(){
-            var sel = document.getElementById('is_fixed_term');
-            if (sel) {
-              var toggle = function(){
-                document.getElementById('term-days-group').style.display =
-                  (sel.value === '1') ? '' : 'none';
-              };
-              sel.addEventListener('change', toggle);
-              toggle();
-            }
-          })();
+            (function(){
+              function toggleTermDays(){
+                var val = document.getElementById('is_fixed_term')?.value;
+                var group = document.getElementById('term-days-group');
+                if(!group) return;
+                group.style.display = (val === '1') ? '' : 'none';
+
+                // (opcional) forzar requerido cuando es plazo fijo
+                var termInput = document.querySelector('[name="term_days"]');
+                if (termInput) termInput.required = (val === '1');
+              }
+
+              // Estado inicial
+              toggleTermDays();
+
+              // Escuchar cambios normales…
+              var sel = document.getElementById('is_fixed_term');
+              if (sel) sel.addEventListener('change', toggleTermDays);
+
+              // …y también eventos de Select2 (si está activo)
+              if (window.jQuery) {
+                var $sel = jQuery('#is_fixed_term');
+                if ($sel && $sel.on) {
+                  $sel.on('select2:select', toggleTermDays);
+                }
+              }
+            })();
           </script>
 
           <div class="form-group">
