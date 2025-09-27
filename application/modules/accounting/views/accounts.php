@@ -14,6 +14,91 @@
     .dataTables_info {
         float:left;
     }
+    
+    /* Estilos para pestañas con hover */
+    .tabs-container {
+        position: relative;
+    }
+    
+    .nav-sidebar {
+        width: 40px; /* Ancho mínimo - solo iconos */
+        transition: width 0.3s ease;
+        overflow: hidden;
+        position: relative;
+        background: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+    }
+    
+    .nav-sidebar:hover {
+        width: 200px; /* Ancho expandido */
+    }
+    
+    .nav-sidebar .nav-link {
+        white-space: nowrap;
+        padding: 12px 8px;
+        position: relative;
+        color: #495057;
+        border: none;
+        border-radius: 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .nav-sidebar .nav-link:before {
+        content: '';
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        text-align: center;
+        line-height: 20px;
+        font-size: 14px;
+        vertical-align: middle;
+    }
+    
+    /* Iniciales para cada pestaña */
+    .nav-sidebar .nav-link[href="#tab-asset"]:before {
+        content: 'A';
+        font-weight: bold;
+        color: inherit;
+    }
+    .nav-sidebar .nav-link[href="#tab-liability"]:before {
+        content: 'P';
+        font-weight: bold;
+        color: inherit;
+    }
+    .nav-sidebar .nav-link[href="#tab-equity"]:before {
+        content: 'Pt';
+        font-weight: bold;
+        color: inherit;
+    }
+    .nav-sidebar .nav-link[href="#tab-income"]:before {
+        content: 'I';
+        font-weight: bold;
+        color: inherit;
+    }
+    .nav-sidebar .nav-link[href="#tab-expenses"]:before {
+        content: 'E';
+        font-weight: bold;
+        color: inherit;
+    }
+    
+    .nav-sidebar .nav-link.active {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .nav-sidebar .nav-text {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .nav-sidebar:hover .nav-text {
+        opacity: 1;
+    }
+    
+    .content-area {
+        transition: margin-left 0.3s ease;
+    }
 </style>
 
 <script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
@@ -33,45 +118,70 @@
     </p>
 </div>
 
-
 <div class="section">
     <div class="row sameheight-container">
-
         <div class="col-lg-12">
             <div class="card" style="width:100%">
-
                 <div class="card-block">
-
                     <div class="inqbox-content table-responsive">
-
-                        <ul class="nav nav-tabs nav-tabs-bordered">
-                            <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#tab-asset">Activos</a></li>
-                            <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-liability">Pasivos</a></li>
-                            <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-equity">Patrimonio</a></li>
-                            <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-income">Ingresos</a></li>
-                            <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tab-expenses">Egresos</a></li>
-                        </ul>
-                        <div class="tab-content" style="min-height:250px;">
-                            <div id="tab-asset" class="tab-pane fade in active show">
-                                <div id="div-asset"></div>
+                        
+                        <!-- PESTAÑAS VERTICALES CON HOVER -->
+                        <div class="tabs-container d-flex">
+                            <!-- Sidebar de pestañas colapsable -->
+                            <div class="nav-sidebar">
+                                <ul class="nav nav-pills flex-column h-100">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" data-toggle="pill" href="#tab-asset">
+                                            <span class="nav-text">Activos</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-toggle="pill" href="#tab-liability">
+                                            <span class="nav-text">Pasivos</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-toggle="pill" href="#tab-equity">
+                                            <span class="nav-text">Patrimonio</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-toggle="pill" href="#tab-income">
+                                            <span class="nav-text">Ingresos</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-toggle="pill" href="#tab-expenses">
+                                            <span class="nav-text">Egresos</span>
+                                        </a>
+                                    </li>
+                                </ul>
                             </div>
-                            <div id="tab-liability" class="tab-pane fade">
-                                <div id="div-liability"></div>
-                            </div>
-                            <div id="tab-equity" class="tab-pane fade">
-                                <div id="div-equity"></div>
-                            </div>
-                            <div id="tab-income" class="tab-pane fade">
-                                <div id="div-income"></div>
-                            </div>
-                            <div id="tab-expenses" class="tab-pane fade">
-                                <div id="div-expenses"></div>
+                            
+                            <!-- Área de contenido -->
+                            <div class="content-area flex-grow-1">
+                                <div class="tab-content p-3" style="min-height:250px;">
+                                    <div id="tab-asset" class="tab-pane fade in active show">
+                                        <div id="div-asset"></div>
+                                    </div>
+                                    <div id="tab-liability" class="tab-pane fade">
+                                        <div id="div-liability"></div>
+                                    </div>
+                                    <div id="tab-equity" class="tab-pane fade">
+                                        <div id="div-equity"></div>
+                                    </div>
+                                    <div id="tab-income" class="tab-pane fade">
+                                        <div id="div-income"></div>
+                                    </div>
+                                    <div id="tab-expenses" class="tab-pane fade">
+                                        <div id="div-expenses"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
+                        <!-- FIN DEL CAMBIO -->
+                        
                     </div>
-
-
                 </div>
             </div>
         </div>
@@ -92,79 +202,65 @@
             $("#div-asset").html(data);
         });
                 
+        // CAMBIO: data-toggle="pill" en lugar de "tab"
         $("a[href='#tab-asset']").click(function(){
             $("#div-asset").html('');
-//            if ( $("#div-asset").html() == '' )
-//            {
-                var url = '<?=site_url('accounting/ajax');?>';
-                var params = {
-                    softtoken:$("input[name='softtoken']").val(),
-                    type:5
-                };
-                $.post(url, params, function(data){
-                    $("#div-asset").html(data);
-                });
-//            }
+            var url = '<?=site_url('accounting/ajax');?>';
+            var params = {
+                softtoken:$("input[name='softtoken']").val(),
+                type:5
+            };
+            $.post(url, params, function(data){
+                $("#div-asset").html(data);
+            });
         });
         
         $("a[href='#tab-liability']").click(function(){
             $("#div-liability").html('');
-//            if ( $("#div-liability").html() == '' )
-//            {
-                var url = '<?=site_url('accounting/ajax');?>';
-                var params = {
-                    softtoken:$("input[name='softtoken']").val(),
-                    type:6
-                };
-                $.post(url, params, function(data){
-                    $("#div-liability").html(data);
-                });
-//            }
+            var url = '<?=site_url('accounting/ajax');?>';
+            var params = {
+                softtoken:$("input[name='softtoken']").val(),
+                type:6
+            };
+            $.post(url, params, function(data){
+                $("#div-liability").html(data);
+            });
         });
         
         $("a[href='#tab-equity']").click(function(){
             $("#div-equity").html('');
-//            if ( $("#div-equity").html() == '' )
-//            {
-                var url = '<?=site_url('accounting/ajax');?>';
-                var params = {
-                    softtoken:$("input[name='softtoken']").val(),
-                    type:7
-                };
-                $.post(url, params, function(data){
-                    $("#div-equity").html(data);
-                });
-//            }
+            var url = '<?=site_url('accounting/ajax');?>';
+            var params = {
+                softtoken:$("input[name='softtoken']").val(),
+                type:7
+            };
+            $.post(url, params, function(data){
+                $("#div-equity").html(data);
+            });
         });
         
         $("a[href='#tab-income']").click(function(){
             $("#div-income").html('');
-//            if ( $("#div-income").html() == '' )
-//            {
-                var url = '<?=site_url('accounting/ajax');?>';
-                var params = {
-                    softtoken:$("input[name='softtoken']").val(),
-                    type:8
-                };
-                $.post(url, params, function(data){
-                    $("#div-income").html(data);
-                });
-//            }
+            var url = '<?=site_url('accounting/ajax');?>';
+            var params = {
+                softtoken:$("input[name='softtoken']").val(),
+                type:8
+            };
+            $.post(url, params, function(data){
+                $("#div-income").html(data);
+            });
         });
         
         $("a[href='#tab-expenses']").click(function(){
             $("#div-expenses").html('');
-//            if ( $("#div-expenses").html() == '' )
-//            {
-                var url = '<?=site_url('accounting/ajax');?>';
-                var params = {
-                    softtoken:$("input[name='softtoken']").val(),
-                    type:9
-                };
-                $.post(url, params, function(data){
-                    $("#div-expenses").html(data);
-                });
-//            }
+            var url = '<?=site_url('accounting/ajax');?>';
+            var params = {
+                softtoken:$("input[name='softtoken']").val(),
+                type:9
+            };
+            $.post(url, params, function(data){
+                $("#div-expenses").html(data);
+            });
         });
     });
 </script>

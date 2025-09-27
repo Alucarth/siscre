@@ -772,4 +772,33 @@ class Accounting_model extends CI_Model
             return $outstanding_interest;
         }
     }
+    // FUNCIONES PARA COMPROBANTES CONTABLES (VOUCHERS)
+
+    function get_all_accounts()
+    {
+        $this->db->order_by('account_type, code_number');
+        return $this->db->get('c19_accounting_accounts');
+    }
+
+    function get_next_voucher_number()
+    {
+        $this->db->select_max('voucher_number');
+        $result = $this->db->get('c19_accounting_vouchers')->row();
+        return $result->voucher_number ? $result->voucher_number + 1 : 1;
+    }
+
+    function get_voucher($voucher_id)
+    {
+        $this->db->where('id', $voucher_id);
+        return $this->db->get('c19_accounting_vouchers')->row();
+    }
+
+    function get_voucher_details($voucher_id)
+    {
+        $this->db->select('avd.*, aa.account_name, aa.code_number');
+        $this->db->from('c19_accounting_voucher_details avd');
+        $this->db->join('c19_accounting_accounts aa', 'aa.id = avd.account_id');
+        $this->db->where('avd.voucher_id', $voucher_id);
+        return $this->db->get()->result();
+    }
 }

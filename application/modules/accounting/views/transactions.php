@@ -26,13 +26,19 @@
         <span style="float:left">Listado de Transacciones</span>
     </h3>
 
+   <!-- Botón para crear un nuevo comprobante -->
+    <div style="float:right;">
+        <a href="<?= site_url('accounting/voucher_create'); ?>" class="btn btn-primary">
+            <i class="fa fa-file-text-o"></i> Nuevo Comprobante
+        </a>
+    </div>
+
     <div style="clear:both;"></div>
 
     <p class="title-description">
         Crear, actualizar y borrar transacciones
     </p>
 </div>
-
 
 <div class="section">
     <div class="row sameheight-container">

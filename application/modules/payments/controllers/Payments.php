@@ -12,6 +12,7 @@ class Payments extends Secure_area implements iData_controller {
         
         $this->load->library('DataTableLib');
         $this->load->library('user_agent');
+        $this->load->model('general_ledger/general_ledger_model');
     }
 
     function index()
@@ -315,6 +316,83 @@ class Payments extends Secure_area implements iData_controller {
         }
     }
 
+    private function _find_schedule_entry($loan_info, $lookup_date = null, $lookup_amount = null)
+    {
+        $result = ['found' => false, 'capital' => 0.0, 'interest' => 0.0, 'payment_amount' => 0.0, 'payment_date' => ''];
+
+        if (empty($loan_info->periodic_loan_table)) {
+            log_message('error', 'Loan schedule JSON vacío para loan_id: ' . $loan_info->loan_id);
+            return $result;
+        }
+
+        $scheds = json_decode($loan_info->periodic_loan_table);
+        if (!$scheds || !is_array($scheds)) {
+            log_message('error', 'No se pudo decodificar periodic_loan_table para loan_id: ' . $loan_info->loan_id);
+            return $result;
+        }
+
+        // Normalizar lookup_date a dd/mm/YYYY si es posible
+        if ($lookup_date) {
+            if (is_numeric($lookup_date)) {
+                $lookup_date = date('d/m/Y', (int)$lookup_date);
+            } else {
+                // si viene en formato Y-m-d -> convertir
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $lookup_date)) {
+                    $lookup_date = date('d/m/Y', strtotime($lookup_date));
+                } else {
+                    // ya puede estar en d/m/Y (formulario), dejar tal cual
+                    $lookup_date = trim($lookup_date);
+                }
+            }
+        }
+
+        // 1) Intentar coincidencia por fecha exacta (más confiable si el formulario trae payment_due)
+        if ($lookup_date) {
+            foreach ($scheds as $sched) {
+                $sched_date = trim($sched->payment_date); // el JSON tiene "31/05/2023"
+                if ($sched_date === $lookup_date) {
+                    $result['found'] = true;
+                    $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
+                    $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
+                    $result['payment_amount'] = isset($sched->payment_amount) ? (float)$sched->payment_amount : 0.0;
+                    $result['payment_date'] = $sched_date;
+                    return $result;
+                }
+            }
+        }
+
+        // 2) Fallback: buscar por monto aproximado
+        if ($lookup_amount && is_numeric($lookup_amount)) {
+            $tol = 0.02; // tolerancia (2 centavos) — ajusta si necesitas
+            foreach ($scheds as $sched) {
+                $sched_amount = isset($sched->payment_amount) ? (float)$sched->payment_amount : 0.0;
+                if (abs($sched_amount - (float)$lookup_amount) <= $tol) {
+                    $result['found'] = true;
+                    $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
+                    $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
+                    $result['payment_amount'] = $sched_amount;
+                    $result['payment_date'] = isset($sched->payment_date) ? trim($sched->payment_date) : '';
+                    return $result;
+                }
+            }
+        }
+
+        // 3) Último recurso: devolver la primera cuota que no esté marcada como pagada (si existe campo 'paid' o similar),
+        //    o la primera cuota del arreglo.
+        foreach ($scheds as $sched) {
+            // Si en tu JSON hay un flag 'paid' o 'status', úsalo: if (isset($sched->paid) && !$sched->paid) { ... }
+            // Si no hay, tomamos la primera como fallback.
+            $result['found'] = true;
+            $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
+            $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
+            $result['payment_amount'] = isset($sched->payment_amount) ? (float)$sched->payment_amount : 0.0;
+            $result['payment_date'] = isset($sched->payment_date) ? trim($sched->payment_date) : '';
+            return $result;
+        }
+
+        return $result;
+    }
+    
     function save($payment_id = -1)
     {
         $branch_name = $this->input->post('branch_name');
@@ -332,13 +410,28 @@ class Payments extends Secure_area implements iData_controller {
             'modified_by' => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
             'payment_due' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('payment_due'))) : strtotime($this->input->post('payment_due')),
             'lpp_amount' => $this->input->post('lpp_amount'),
-            'branch_id' => $branch?$branch->id:null
+            'branch_id' => $branch ? $branch->id : null
         );
 
         if ($this->input->post("loan_payment_id") > 0)
         {
             $payment_data['loan_payment_id'] = $this->input->post('loan_payment_id');
         }
+
+        // Obtener información del préstamo para las transacciones contables
+        $loan_info = $this->Loan->get_info($payment_data['loan_id']);
+        $amount = floatval($payment_data['paid_amount']);
+        $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
+        $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
+
+        // Si no se encontró, sched_entry['found'] será false
+        $capital   = $sched_entry['found'] ? round($sched_entry['capital'], 2) : 0.00;
+        $intereses = $sched_entry['found'] ? round($sched_entry['interest'], 2) : 0.00;
+
+        $descripcion = "Pago de préstamo #" . $payment_data['loan_id'] . " - Cliente: " . $this->Customer->get_info($payment_data['customer_id'])->first_name . " " . $this->Customer->get_info($payment_data['customer_id'])->last_name;
+        $payment_methods = $this->input->post('payment_methods');
+        $employee_info = $this->Employee->get_logged_in_employee_info();
+        $added_by = $employee_info->first_name . ' ' . $employee_info->last_name;
 
         // transactional to make sure that everything is working well
         $this->db->trans_start();
@@ -355,13 +448,94 @@ class Payments extends Secure_area implements iData_controller {
             
             $this->Loan->update_balance($payment_data['loan_id']);
             
+            // ✅ Cálculos para transacciones contables
+            $it_amount = round($amount * 0.03, 2);
+            $iva_liability = round($intereses * 0.13, 2);
+            $it_liability  = round($amount * 0.03, 2);
+            $caja = round($amount - $it_amount, 2);
+
+            // Crear voucher manualmente sin llamar a voucher_save()
+            $voucher_data = array(
+                'voucher_number' => 'PAGO-' . $payment_data['loan_id'] . '-' . date('Ymd-His'),
+                'voucher_date' => date('Y-m-d H:i:s'),
+                'description' => $descripcion,
+                'total_debit' => $amount,
+                'total_credit' => $amount,
+                'added_by' => $this->Employee->get_logged_in_employee_info()->person_id,
+                'added_date' => date('Y-m-d H:i:s')
+            );
+            
+            if (is_plugin_active("branches")) {
+                $voucher_data["branch_id"] = $this->session->userdata("branch_id");
+            }
+            
+            $this->db->insert('c19_accounting_vouchers', $voucher_data);
+            $voucher_id = $this->db->insert_id();
+            
+            $transaction_date = date('Y-m-d H:i:s');
+            
+            // Definir transacciones para el voucher
+            $transaction_entries = [
+                // Débitos
+                ['account_id' => 5,   'debit' => $it_amount, 'credit' => 0, 'description' => $descripcion . ' - IT'],
+                ['account_id' => 1,   'debit' => $caja, 'credit' => 0, 'description' => $descripcion . ' - Caja'],
+                ['account_id' => 101, 'debit' => $capital, 'credit' => 0, 'description' => $descripcion . ' - Capital'],
+                ['account_id' => 403, 'debit' => $intereses, 'credit' => 0, 'description' => $descripcion . ' - Interés'],
+                
+                // Créditos
+                ['account_id' => 2,   'debit' => 0, 'credit' => $iva_liability, 'description' => $descripcion . ' - IVA'],
+                ['account_id' => 2,   'debit' => 0, 'credit' => $it_liability, 'description' => $descripcion . ' - IT']
+            ];
+
+            // Insertar transacciones en c19_accounting_transactions
+            foreach ($transaction_entries as $entry) {
+                if ($entry['debit'] > 0 || $entry['credit'] > 0) {
+                    $amount = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
+                    $transaction_type = $entry['debit'] > 0 ? 'debit' : 'credit';
+                    
+                    $transaction_data = array(
+                        'account_id' => $entry['account_id'],
+                        'amount' => $amount,
+                        'description' => $entry['description'],
+                        'added_date' => $transaction_date,
+                        'added_by' => $this->Employee->get_logged_in_employee_info()->person_id,
+                        'transaction_type' => $transaction_type,
+                        'voucher_id' => $voucher_id,
+                        'payment_methods' => $payment_methods,
+                        'invoice_number' => 'PAGO-' . $payment_data['loan_id'],
+                        'purchased_date' => $transaction_date,
+                        'purchased_amount' => 0,
+                        'depreciate_amount' => 0
+                    );
+                    
+                    if (is_plugin_active("branches")) {
+                        $transaction_data["branch_id"] = $this->session->userdata("branch_id");
+                    }
+                    
+                    $this->db->insert('c19_accounting_transactions', $transaction_data);
+                    
+                    // También mantener las transacciones en el libro mayor existente
+                    $this->general_ledger_model->add_transaction([
+                        'account_id'  => $entry['account_id'],
+                        'amount'      => $amount,
+                        'description' => $entry['description'],
+                        'date'        => date('Y-m-d'),
+                        'transaction_type' => $transaction_type,
+                        'payment_methods'  => $payment_methods,
+                        'added_by'    => $added_by,
+                        'voucher_id'  => $voucher_id
+                    ]);
+                }
+            }
+
             //New Payment            
             if ($payment_id == -1)
             {
                 $return = array(
                     'success' => true, 
                     'message' => $this->lang->line('loans_successful_adding') . ' ' . $payment_data['loan_payment_id'], 
-                    'loan_payment_id' => $payment_data['loan_payment_id']
+                    'loan_payment_id' => $payment_data['loan_payment_id'],
+                    'voucher_id' => $voucher_id
                 );
                 
                 $payment_id = $payment_data['loan_payment_id'];
@@ -371,7 +545,8 @@ class Payments extends Secure_area implements iData_controller {
                 $return = array(
                     'success' => true, 
                     'message' => $this->lang->line('loans_successful_updating') . ' ' . $payment_data['loan_payment_id'], 
-                    'loan_payment_id' => $payment_id
+                    'loan_payment_id' => $payment_id,
+                    'voucher_id' => $voucher_id
                 );
             }
             

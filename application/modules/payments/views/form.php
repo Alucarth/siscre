@@ -164,6 +164,20 @@
                                         </div>
                                     </div>
                                     <div class="hr-line-dashed"></div>
+                                    <div class="form-group row">
+                                        <Label class="col-sm-2 control-label">
+                                            Tipo de pago:
+                                        </Label>
+                                        <div class="col-sm-10">
+                                            <select id="payment_methods" name="payment_methods" class="form-control">
+                                                <option value="">Elegir</option>
+                                                <option value="efectivo" <?= ($payment_info->payment_methods == 'efectivo') ? 'selected' : '' ?>>Efectivo</option>
+                                                <option value="qr" <?= ($payment_info->payment_methods == 'qr') ? 'selected' : '' ?>>QR</option>
+                                                <option value="transferencia" <?= ($payment_info->payment_methods == 'transferencia') ? 'selected' : '' ?>>Transferencia</option>
+                                                <option value="deposito" <?= ($payment_info->payment_methods == 'deposito') ? 'selected' : '' ?>>Depósito</option>
+                                            </select>
+                                        </div>
+                                    </div>
 
                                     <script>
                                         $(document).ready(function () {

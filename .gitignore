@@ -1,0 +1,50 @@
+# --- SISTEMA ---
+/vendor/
+/node_modules/
+/downloads/
+/uploads/
+/storage/
+/tmp/
+/cache/
+/logs/
+/error_log
+
+# --- ARCHIVOS TEMPORALES ---
+*.log
+*.tmp
+*.swp
+*.bak
+*.old
+*.cache
+
+# --- ARCHIVOS DEL SISTEMA OPERATIVO ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- ARCHIVOS DE IDE / EDITORES ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# --- ARCHIVOS GENERADOS ---
+*.pdf
+*.docx
+*.xlsx
+*.odt
+*.odp
+*.ods
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.zip
+*.rar
+*.tar.gz
+
+# --- CONFIGURACIONES LOCALES ---
+.env
+.env.local
+*.ini

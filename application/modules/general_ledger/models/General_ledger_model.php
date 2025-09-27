@@ -10,66 +10,105 @@ class General_ledger_model extends CI_Model {
 
     function get_accounting_transactions($filters = [])
     {
-        $where = '';
-        if ( isset($filters["date_from"]) && trim($filters["date_from"]) != '' )
-        {
-            $where .= " AND a.added_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
+        // Primero: Obtener todos los vouchers en el rango de fechas
+        $where_vouchers = ' WHERE 1=1';
+        
+        if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
+            $date_from = date("Y-m-d", $filters["date_from"]);
+            $where_vouchers .= " AND DATE(v.voucher_date) >= '$date_from'";
         }
         
-        if ( isset($filters["date_to"]) && trim($filters["date_to"]) != '' )
-        {
-            $where .= " AND a.added_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
+        if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
+            $date_to = date("Y-m-d", $filters["date_to"]);
+            $where_vouchers .= " AND DATE(v.voucher_date) <= '$date_to'";
         }
         
-        if (is_plugin_active("branches"))
-        {
-            $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
+        if (is_plugin_active("branches")) {
+            $branch_id = $this->session->userdata("branch_id");
+            $where_vouchers .= " AND v.branch_id = $branch_id";
         }
         
-        $sql = "
-                SELECT 	b.account_name,
-                        b.code_number,
-			b.account_type, 
-			a.amount,
-                        a.added_date
-                FROM c19_accounting_transactions a
-                LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-                WHERE 1 $where
-                ORDER BY a.added_date
+        $sql_vouchers = "
+            SELECT 
+                v.id as voucher_id,
+                v.voucher_number,
+                v.voucher_date,
+                v.description as voucher_description,
+                v.total_debit,
+                v.total_credit
+            FROM c19_accounting_vouchers v
+            $where_vouchers
+            ORDER BY v.voucher_date DESC, v.voucher_number DESC
+        ";
+        
+        $query_vouchers = $this->db->query($sql_vouchers);
+    
+    $vouchers = [];
+    
+    if ($query_vouchers && $query_vouchers->num_rows() > 0) {
+        foreach ($query_vouchers->result() as $voucher_row) {
+            $voucher_id = $voucher_row->voucher_id;
+            
+            // Inicializar el voucher
+            $vouchers[$voucher_id] = new stdClass();
+            $vouchers[$voucher_id]->voucher_info = new stdClass();
+            $vouchers[$voucher_id]->voucher_info->voucher_number = $voucher_row->voucher_number;
+            $vouchers[$voucher_id]->voucher_info->voucher_date = $voucher_row->voucher_date;
+            $vouchers[$voucher_id]->voucher_info->voucher_description = $voucher_row->voucher_description;
+            $vouchers[$voucher_id]->voucher_info->total_debit = $voucher_row->total_debit;
+            $vouchers[$voucher_id]->voucher_info->total_credit = $voucher_row->total_credit;
+            $vouchers[$voucher_id]->transactions = [];
+            
+            // Segundo: Obtener las transacciones de ESTE voucher específico
+            $sql_transactions = "
+                SELECT 
+                    t.id as transaction_id,
+                    t.amount,
+                    t.description as transaction_description,
+                    t.added_date,
+                    t.transaction_type,
+                    a.account_name,
+                    a.code_number as account_number,
+                    a.account_type
+                FROM c19_accounting_transactions t
+                LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
+                WHERE t.voucher_id = $voucher_id
+                ORDER BY t.added_date
             ";
-        
-        $query = $this->db->query( $sql );
-        
-        $return = [];
-        if ( $query && $query->num_rows() > 0 )
-        {
-            foreach ( $query->result() as $row )
-            {
-                $obj = new stdClass();
-                $obj->date = date($this->config->item("date_format"), strtotime($row->added_date));
-                $obj->explanation = "";
-                $obj->account_name = $row->account_name;
-                $obj->account_number = $row->code_number;
-                
-                if ( in_array($row->account_type, ['asset', 'expenses']) )
-                {
-                    $obj->debit = $row->amount;
-                    $obj->credit = 0;
-                    $obj->balance = $row->amount;
+            
+            $query_transactions = $this->db->query($sql_transactions);
+            
+            if ($query_transactions && $query_transactions->num_rows() > 0) {
+                foreach ($query_transactions->result() as $trans_row) {
+                    $transaction = new stdClass();
+                    $transaction->date = date($this->config->item("date_format"), strtotime($trans_row->added_date));
+                    $transaction->voucher_date = date($this->config->item("date_format"), strtotime($voucher_row->voucher_date));
+                    $transaction->voucher_number = $voucher_row->voucher_number;
+                    $transaction->explanation = $trans_row->transaction_description;
+                    $transaction->account_name = $trans_row->account_name;
+                    $transaction->account_number = $trans_row->account_number;
+                    $transaction->account_type = $trans_row->account_type;
+                    $transaction->amount = $trans_row->amount;
+                    
+                    // Determinar debe/haber según transaction_type
+                    if ($trans_row->transaction_type == 'debit') {
+                        $transaction->debit = $trans_row->amount;
+                        $transaction->credit = 0;
+                    } else {
+                        $transaction->debit = 0;
+                        $transaction->credit = $trans_row->amount;
+                    }
+                    
+                    $transaction->balance = $trans_row->amount;
+                    
+                    $vouchers[$voucher_id]->transactions[] = $transaction;
                 }
-                else
-                {
-                    $obj->debit = 0;
-                    $obj->credit = $row->amount;
-                    $obj->balance = $row->amount;
-                }
-                
-                $return[] = $obj;
             }
         }
-        
-        return $return;
     }
+    
+    return $vouchers;
+}
 
     function get_account_transactions($filters = [])
     {
@@ -265,4 +304,59 @@ class General_ledger_model extends CI_Model {
         return $return;
     }
 
+    public function add_transaction($data)
+    {
+        // ============================
+        // Validaciones básicas
+        // ============================
+        if (!isset($data['account_id']) || empty($data['account_id'])) {
+            return false;
+        }
+
+        if (!isset($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
+            return false;
+        }
+
+        if (!isset($data['description']) || strlen(trim($data['description'])) < 3) {
+            return false;
+        }
+
+        // Defaults si faltan valores
+        $transaction_type = $data['transaction_type'] ?? 'general';
+        $payment_methods  = $data['payment_methods'] ?? 'N/A';
+        $added_by         = $data['added_by'] ?? 'sistema';
+
+        // Si el controlador no manda fecha, usamos timestamp completo
+        $added_date = isset($data['date']) && !empty($data['date'])
+            ? date('Y-m-d H:i:s', strtotime($data['date']))
+            : date('Y-m-d H:i:s');
+
+        // branch_id → si viene en data lo usamos, si no tomamos de sesión, fallback = 1
+        $branch_id = $data['branch_id'] ?? ($this->session->userdata('branch_id') ?? 1);
+
+        // ============================
+        // Datos a insertar
+        // ============================
+        $insert_data = [
+            'account_id'       => $data['account_id'],
+            'amount'           => $data['amount'],
+            'added_date'       => $added_date,
+            'description'      => $data['description'],
+            'branch_id'        => $branch_id,
+            'transaction_type' => $transaction_type,
+            'payment_methods'  => $payment_methods,
+            'added_by'         => $added_by,
+        ];
+
+        // ============================
+        // Insertar en la tabla contable
+        // ============================
+        $result = $this->db->insert('c19_accounting_transactions', $insert_data);
+
+        if (!$result) {
+            return false;
+        }
+
+        return $this->db->insert_id();
+    }
 }

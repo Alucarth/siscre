@@ -20,11 +20,20 @@ class General_ledger extends Secure_area implements iData_controller {
     function generate()
     {
         $filters = [];
-        $filters["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
-        $filters["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        $filters["date_from"] = $this->config->item('date_format') == 'd/m/Y' 
+            ? strtotime(uk_to_isodate($this->input->post('date_from'))) 
+            : strtotime($this->input->post('date_from'));
+            
+        $filters["date_to"] = $this->config->item('date_format') == 'd/m/Y' 
+            ? strtotime(uk_to_isodate($this->input->post('date_to'))) 
+            : strtotime($this->input->post('date_to'));
         
         $data = [];
+        
+        // Obtener transacciones contables
         $data["accounting_transactions"] = $this->general_ledger_model->get_accounting_transactions($filters);
+        
+        // Mantener métodos existentes para compatibilidad
         $data["account_transactions"] = $this->general_ledger_model->get_account_transactions($filters);
         $data["loan_transactions"] = $this->general_ledger_model->get_loan_transactions($filters);
         $data["loan_interest_transactions"] = $this->general_ledger_model->get_loan_interest_transactions($filters);
@@ -91,7 +100,7 @@ class General_ledger extends Secure_area implements iData_controller {
         $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
         $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
 
-        $html = $this->load->view('general_ledger/reports/' . $report_type, $data, true); // render the view into HTML
+        $html = $this->load->view('general_ledger/reports/' . $report_type, $data, true);
 
         $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
 
@@ -112,8 +121,8 @@ class General_ledger extends Secure_area implements iData_controller {
         }
 
         $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
-        $pdf->WriteHTML($html); // write the HTML into the PDF
-        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+        $pdf->WriteHTML($html);
+        $pdf->Output($pdfFilePath, 'F');
 
         redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
     }
