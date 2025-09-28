@@ -644,7 +644,7 @@
 
                                     <?php else: ?>
 
-                                        <img src="http://via.placeholder.com/80x80" alt="" class="img media-object img-circle" />
+                                        <img src="https://via.placeholder.com/80x80" alt="" class="img media-object img-circle" />
 
                                     <?php endif; ?>
 

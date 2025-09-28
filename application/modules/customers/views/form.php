@@ -656,58 +656,47 @@
 
         });
 
-
-
         $('#customer_form').on("submit", function (e) {
-
             e.preventDefault();
 
-
-
             var $this = $(this);
+            var formData = new FormData(this);
 
-            var formData = new FormData( this );
-
-
+            // --- BLOQUE: filtrar foto grande (1.5 MB) ---
+            var fileInput = document.getElementById('photo_url');
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                var f = fileInput.files[0];
+                if (f.size > 1.5 * 1024 * 1024) { // 1.5 MB
+                set_feedback('La foto es muy grande (máximo 1.5 MB). Por favor, seleccione una imagen más pequeña.', 'error_message', true);
+                return; // no enviamos nada
+                }
+            }
+            // --- FIN BLOQUE ---
 
             $.ajax({
-
                 url: $this.attr("action"),
-
                 type: 'POST',
-
                 data: formData,
-
-                success: function (data) {
-
-                    var data = $.parseJSON(data);
-
-                    if (!data.success)
-
-                    {
-
-                        set_feedback(data.message, 'error_message', true);
-
-                    } else
-
-                    {
-
-                        set_feedback(data.message, 'success_message', false);
-
-                        window.location.href = '<?=site_url('customers/view/')?>' + data.person_id;
-
-                    }
-
-                },
-
+                dataType: 'json',          // <--- clave
                 cache: false,
-
                 contentType: false,
-
-                processData: false
-
+                processData: false,
+                timeout: 120000 // 120s por si la red móvil es lenta
+            })
+            .done(function (resp) {
+                if (!resp || resp.success !== true) {
+                set_feedback(resp && resp.message ? resp.message : 'No se pudo guardar.', 'error_message', true);
+                return;
+                }
+                set_feedback(resp.message || 'Guardado correctamente.', 'success_message', false);
+                // Bloquear formulario como en prod
+                $('#customer_form :input').prop('disabled', true);
+                // Redirección más “fuerte” (mejor en mobile)
+                window.location.replace('<?=site_url('customers/view/')?>' + resp.person_id);
+            })
+            .fail(function () {
+                set_feedback('No se pudo guardar (posible conexión lenta o archivo muy grande). Intenta sin foto o con una imagen más pequeña.', 'error_message', true);
             });
-
         });
 
     });

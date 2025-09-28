@@ -442,7 +442,7 @@
                                                         <?php if (trim($this->config->item("app_logo")) !== "" && file_exists(FCPATH . "/uploads/app/" . $this->config->item("app_logo"))): ?>
                                                             <img id="img-app-logo" style="max-width:240px" src="<?= base_url("uploads/app/" . $this->config->item("app_logo")); ?>"/>
                                                         <?php else: ?>
-                                                            <img id="img-app-logo" style="max-width:240px" src="http://via.placeholder.com/240x80"/>
+                                                            <img id="img-app-logo" style="max-width:240px" src="https://via.placeholder.com/240x80"/>
                                                         <?php endif; ?>
 
                                                         <div>

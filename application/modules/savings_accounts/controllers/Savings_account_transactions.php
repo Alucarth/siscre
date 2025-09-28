@@ -728,70 +728,66 @@ class Savings_account_transactions extends MX_Controller
 
         // --- DATA ---
         $sql = "
-        SELECT 
-            tx.*,
-            sa.account_number, sa.savings_account_id, sa.person_id AS owner_id,
-            sat.name AS account_type_name,
-            p.first_name, p.last_name,
-            l.id_no,
-            b.branch_name,
-            op.first_name AS op_first, op.last_name AS op_last
-        FROM {$this->db->dbprefix('savings_account_transactions')} tx
-        LEFT JOIN {$this->db->dbprefix('savings_accounts')} sa 
+            SELECT 
+                tx.*,
+                sa.account_number, sa.savings_account_id, sa.person_id AS owner_id,
+                sat.name AS account_type_name,
+                p.first_name, p.last_name,
+                l.id_no,
+                b.branch_name,
+                op.first_name AS op_first, op.last_name AS op_last
+            FROM {$this->db->dbprefix('savings_account_transactions')} tx
+            LEFT JOIN {$this->db->dbprefix('savings_accounts')} sa 
                 ON sa.savings_account_id = tx.savings_account_id
-        LEFT JOIN {$this->db->dbprefix('savings_account_types')} sat
+            LEFT JOIN {$this->db->dbprefix('savings_account_types')} sat
                 ON sat.savings_account_type_id = sa.savings_account_type_id
-        LEFT JOIN {$this->db->dbprefix('people')} p 
+            LEFT JOIN {$this->db->dbprefix('people')} p 
                 ON p.person_id = sa.person_id
-        LEFT JOIN {$this->db->dbprefix('leads')} l 
+            LEFT JOIN {$this->db->dbprefix('leads')} l 
                 ON l.customer_id = sa.person_id
-        LEFT JOIN {$this->db->dbprefix('branches')} b 
+            LEFT JOIN {$this->db->dbprefix('branches')} b 
                 ON b.id = tx.branch_id
-        LEFT JOIN {$this->db->dbprefix('people')} op 
+            LEFT JOIN {$this->db->dbprefix('people')} op 
                 ON op.person_id = tx.registered_by
-        WHERE tx.transaction_id = ?
-        LIMIT 1
+            WHERE tx.transaction_id = ?
+            LIMIT 1
         ";
         $row = $this->db->query($sql, [$tx_id])->row();
-        if (!$row) show_error('Transacción no encontrada', 404);
+        // Asegura cargar la librería Pdf ANTES de usarla
+        if (!isset($this->pdf) || !is_object($this->pdf)) {
+            $this->load->library('pdf');   // Clase application/libraries/Pdf.php (P mayúscula)
+        }
 
-        // --- HTML ---
+        // Si antes usabas $this->_mpdf_load('P'), elimínalo y usa:
+        $mpdf = $this->pdf->load(['utf-8','A5','','',8,8,10,10,0,0,'P']);
+
+        // Escribe el HTML 1 sola vez (no inyectes CSS adicional aquí)
         $html = $this->load->view('savings_accounts/vouchers/voucher_simple', ['tx'=>$row], TRUE);
-        $html = $this->_clean_html($html);
 
-        // --- PDF ---
-        $mpdf = $this->_mpdf_load('P');
-
-        $css = 'body{font-family:sans-serif;font-size:11px}
-                .h1{font-size:16px;font-weight:bold;margin-bottom:6px}
-                .muted{color:#666}.right{text-align:right}.box{border:1px solid #ddd;padding:8px;border-radius:6px}';
-
-        // Silenciar avisos del mPDF legacy y limpiar buffers
-        $old_level = error_reporting();
-        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        // Limpia buffers ruidosos
+        $old = error_reporting();
+        error_reporting($old & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
         if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
 
-        $mpdf->WriteHTML($css, 1);
-        $mpdf->WriteHTML($html, 2);
+        $mpdf->SetDisplayMode('fullwidth');
+        $mpdf->SetAutoPageBreak(true, 8);
+        $mpdf->shrink_tables_to_fit = 1;
 
-        $filename = sprintf(
-            'voucher_%s_%s_%s.pdf',
-            $row->account_number ?: 'CTA',
-            (int)$row->owner_id,
-            date('Ymd_His', strtotime($row->trans_date))
-        );
+        $mpdf->WriteHTML($html);
+
+        $filename = 'voucher_'.($row->account_number ?: 'CTA').'_'.$row->owner_id.'_'.date('Ymd_His', strtotime($row->trans_date)).'.pdf';
         $mpdf->Output($filename, 'I');
 
-        error_reporting($old_level);
+        error_reporting($old);
         exit;
     }
 
     public function voucher_transfer($withdraw_id, $deposit_id)
     {
-        $w = (int)$withdraw_id;
-        $d = (int)$deposit_id;
+        $wId = (int)$withdraw_id;
+        $dId = (int)$deposit_id;
 
-        $sql = function($id){
+        $fetch = function($id){
             return $this->db->query("
                 SELECT 
                     tx.*,
@@ -806,31 +802,31 @@ class Savings_account_transactions extends MX_Controller
             ", [$id])->row();
         };
 
-        $rowW = $sql($w); // retiro (origen)
-        $rowD = $sql($d); // depósito (destino)
-        if (!$rowW || !$rowD) show_error('Transacciones de transferencia no encontradas',404);
+        $rowW = $fetch($wId);
+        $rowD = $fetch($dId);
+        if (!$rowW || !$rowD) show_error('Transacciones de transferencia no encontradas', 404);
 
         $html = $this->load->view('savings_accounts/vouchers/voucher_transfer', ['w'=>$rowW,'d'=>$rowD], TRUE);
-        $html = $this->_clean_html($html);
 
-        $mpdf = $this->_mpdf_load('P');
+        $this->load->library('pdf');
+        $mpdf = $this->pdf->load(['utf-8','Letter','',8,8,8,8,0,0,'P']);
 
-        $old_level = error_reporting();
-        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        $old = error_reporting();
+        error_reporting($old & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
         if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
 
-        $mpdf->WriteHTML('body{font-family:sans-serif;font-size:11px}.h1{font-size:16px;font-weight:bold}', 1);
-        $mpdf->WriteHTML($html, 2);
+        $mpdf->SetAutoPageBreak(true, 8);
+        $mpdf->shrink_tables_to_fit = 1;
+        $mpdf->WriteHTML('<style>body{font-family:sans-serif;font-size:12px}</style>',1);
+        $mpdf->WriteHTML($html,2);
 
-        $filename = sprintf(
-            'voucher_transfer_%s_to_%s_%s.pdf',
+        $filename = sprintf('voucher_transfer_%s_to_%s_%s.pdf',
             $rowW->account_number ?: 'CTA_ORIG',
             $rowD->account_number ?: 'CTA_DEST',
             date('Ymd_His', strtotime($rowW->trans_date))
         );
         $mpdf->Output($filename, 'I');
-
-        error_reporting($old_level);
+        error_reporting($old);
         exit;
     }
 

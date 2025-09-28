@@ -12,7 +12,7 @@
                         <?php if (trim(trim($person_info->photo_url) !== "") && file_exists(FCPATH . "/uploads/profile-" . $person_info->person_id . "/" . $person_info->photo_url)): ?>
                             <img id="img-pic" src="<?= base_url("uploads/profile-" . $person_info->person_id . "/" . $person_info->photo_url); ?>" style="height:99px" />
                         <?php else: ?>
-                            <img id="img-pic" src="http://via.placeholder.com/80x80" style="height:99px" />
+                            <img id="img-pic" src="https://via.placeholder.com/80x80" style="height:99px" />
                         <?php endif; ?>
                         <div id="filelist"></div>
                         <div id="progress" class="overlay"></div>

@@ -586,6 +586,36 @@ class Customers extends Person_controller {
             'comments' => $this->input->post('comments'),
             'role_id' => CUSTOMER_ROLE_ID
         );
+
+        // === Requeridos mínimos ===
+        $first_name = trim($person_data['first_name'] ?? '');
+        $last_name  = trim($person_data['last_name'] ?? '');
+        $email      = trim($person_data['email'] ?? '');
+        $phone      = trim($person_data['phone_number'] ?? '');
+        $id_no      = trim($this->input->post('id_no'));
+
+        if ($first_name === '' || $last_name === '' || $id_no === '' || $email === '' || $phone === '') {
+        echo json_encode(['success'=>false,'message'=>'Complete: Nombres, Apellidos, CI, Email y Teléfono.']);
+        return;
+        }
+
+        // === Unicidad CI (leads.id_no) ===
+        $this->db->from($this->db->dbprefix('leads'));
+        $this->db->where('id_no', $id_no);
+        if ($customer_id != -1) $this->db->where('customer_id !=', (int)$customer_id);
+        if ($this->db->get()->row()) {
+        echo json_encode(['success'=>false,'message'=>'El CI ya está registrado en otro prestatario.']);
+        return;
+        }
+
+        // === Unicidad Email (people.email) ===
+        $this->db->from($this->db->dbprefix('people'));
+        $this->db->where('email', $email);
+        if ($customer_id != -1) $this->db->where('person_id !=', (int)$customer_id);
+        if ($this->db->get()->row()) {
+        echo json_encode(['success'=>false,'message'=>'El correo electrónico ya está registrado en otro prestatario.']);
+        return;
+        }
         
         if ( trim($this->input->post("password")) != trim($this->input->post("repassword")))
         {
