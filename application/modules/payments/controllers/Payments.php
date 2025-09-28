@@ -340,16 +340,13 @@ class Payments extends Secure_area implements iData_controller {
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $lookup_date)) {
                     $lookup_date = date('d/m/Y', strtotime($lookup_date));
                 } else {
-                    // ya puede estar en d/m/Y (formulario), dejar tal cual
                     $lookup_date = trim($lookup_date);
                 }
             }
         }
-
-        // 1) Intentar coincidencia por fecha exacta (más confiable si el formulario trae payment_due)
         if ($lookup_date) {
             foreach ($scheds as $sched) {
-                $sched_date = trim($sched->payment_date); // el JSON tiene "31/05/2023"
+                $sched_date = trim($sched->payment_date);
                 if ($sched_date === $lookup_date) {
                     $result['found'] = true;
                     $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
@@ -361,7 +358,6 @@ class Payments extends Secure_area implements iData_controller {
             }
         }
 
-        // 2) Fallback: buscar por monto aproximado
         if ($lookup_amount && is_numeric($lookup_amount)) {
             $tol = 0.02; // tolerancia (2 centavos) — ajusta si necesitas
             foreach ($scheds as $sched) {
@@ -377,11 +373,7 @@ class Payments extends Secure_area implements iData_controller {
             }
         }
 
-        // 3) Último recurso: devolver la primera cuota que no esté marcada como pagada (si existe campo 'paid' o similar),
-        //    o la primera cuota del arreglo.
         foreach ($scheds as $sched) {
-            // Si en tu JSON hay un flag 'paid' o 'status', úsalo: if (isset($sched->paid) && !$sched->paid) { ... }
-            // Si no hay, tomamos la primera como fallback.
             $result['found'] = true;
             $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
             $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
@@ -399,169 +391,130 @@ class Payments extends Secure_area implements iData_controller {
         $branch = $this->Payment->getBranchByName($branch_name);
 
         $payment_data = array(
-            'account' => $this->input->post('account'),
-            'loan_id' => $this->input->post('loan_id'),
-            'customer_id' => $this->input->post('customer'),
-            'paid_amount' => $this->input->post('paid_amount'),
+            'account'        => $this->input->post('account'),
+            'loan_id'        => $this->input->post('loan_id'),
+            'customer_id'    => $this->input->post('customer'),
+            'paid_amount'    => $this->input->post('paid_amount'),
             'balance_amount' => $this->input->post('balance_amount'),
-            'date_paid' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_paid'))) : strtotime($this->input->post('date_paid')),
-            'remarks' => $this->input->post('remarks'),
-            'teller_id' => $this->input->post('teller'),
-            'modified_by' => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
-            'payment_due' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('payment_due'))) : strtotime($this->input->post('payment_due')),
-            'lpp_amount' => $this->input->post('lpp_amount'),
-            'branch_id' => $branch ? $branch->id : null
+            'date_paid'      => date('Y-m-d H:i:s', strtotime($this->input->post('date_paid'))),
+            'remarks'        => $this->input->post('remarks'),
+            'teller_id'      => $this->input->post('teller'),
+            'modified_by'    => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
+            'payment_due'    => date('Y-m-d H:i:s', strtotime($this->input->post('payment_due'))),
+            'lpp_amount'     => $this->input->post('lpp_amount'),
+            'branch_id'      => $branch ? $branch->id : null
         );
 
-        if ($this->input->post("loan_payment_id") > 0)
-        {
+        if ($this->input->post("loan_payment_id") > 0) {
             $payment_data['loan_payment_id'] = $this->input->post('loan_payment_id');
         }
 
-        // Obtener información del préstamo para las transacciones contables
         $loan_info = $this->Loan->get_info($payment_data['loan_id']);
         $amount = floatval($payment_data['paid_amount']);
         $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
         $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
 
-        // Si no se encontró, sched_entry['found'] será false
         $capital   = $sched_entry['found'] ? round($sched_entry['capital'], 2) : 0.00;
         $intereses = $sched_entry['found'] ? round($sched_entry['interest'], 2) : 0.00;
 
-        $descripcion = "Pago de préstamo #" . $payment_data['loan_id'] . " - Cliente: " . $this->Customer->get_info($payment_data['customer_id'])->first_name . " " . $this->Customer->get_info($payment_data['customer_id'])->last_name;
+        $customer = $this->Customer->get_info($payment_data['customer_id']);
+        $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name}";
+
         $payment_methods = $this->input->post('payment_methods');
-        $employee_info = $this->Employee->get_logged_in_employee_info();
-        $added_by = $employee_info->first_name . ' ' . $employee_info->last_name;
 
-        // transactional to make sure that everything is working well
         $this->db->trans_start();
-        
-        if ($this->Payment->save($payment_data, $payment_id))
-        {
-            $wallet_data["amount"] = $payment_data["paid_amount"];
-            $wallet_data["wallet_type"] = "debit";
-            $wallet_data["trans_date"] = strtotime(date("Y-m-d H:i:s"));
-            $wallet_data["added_by"] = $this->Employee->get_logged_in_employee_info()->person_id;
-            $wallet_data["descriptions"] = "In payments for <a href='" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "' target='_blank'>" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "</a>";
-            
-            $this->My_wallet->save($wallet_data);
-            
-            $this->Loan->update_balance($payment_data['loan_id']);
-            
-            // ✅ Cálculos para transacciones contables
-            $it_amount = round($amount * 0.03, 2);
-            $iva_liability = round($intereses * 0.13, 2);
-            $it_liability  = round($amount * 0.03, 2);
-            $caja = round($amount - $it_amount, 2);
 
-            // Crear voucher manualmente sin llamar a voucher_save()
-            $voucher_data = array(
-                'voucher_number' => 'PAGO-' . $payment_data['loan_id'] . '-' . date('Ymd-His'),
+        if ($this->Payment->save($payment_data, $payment_id)) {
+            // Actualizar billetera y balance
+            $wallet_data = [
+                "amount"       => $payment_data["paid_amount"],
+                "wallet_type"  => "debit",
+                "trans_date"   => strtotime(date("Y-m-d H:i:s")),
+                "added_by"     => $this->Employee->get_logged_in_employee_info()->person_id,
+                "descriptions" => "In payments for <a href='" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "' target='_blank'>" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "</a>"
+            ];
+            $this->My_wallet->save($wallet_data);
+            $this->Loan->update_balance($payment_data['loan_id']);
+
+            // Cálculos contables
+            $it_amount     = round($amount * 0.03, 2);
+            $iva_liability = round($intereses * 0.13, 2);
+            $it_liability  = $it_amount;
+            $caja          = round($amount - $it_amount, 2);
+
+            // Voucher
+            $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
-                'description' => $descripcion,
-                'total_debit' => $amount,
+                'description'  => $descripcion,
+                'total_debit'  => $amount,
                 'total_credit' => $amount,
-                'added_by' => $this->Employee->get_logged_in_employee_info()->person_id,
-                'added_date' => date('Y-m-d H:i:s')
-            );
-            
+                'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
+                'added_date'   => date('Y-m-d H:i:s')
+            ];
             if (is_plugin_active("branches")) {
                 $voucher_data["branch_id"] = $this->session->userdata("branch_id");
             }
-            
             $this->db->insert('c19_accounting_vouchers', $voucher_data);
             $voucher_id = $this->db->insert_id();
-            
+
             $transaction_date = date('Y-m-d H:i:s');
-            
-            // Definir transacciones para el voucher
+
             $transaction_entries = [
-                // Débitos
-                ['account_id' => 5,   'debit' => $it_amount, 'credit' => 0, 'description' => $descripcion . ' - IT'],
-                ['account_id' => 1,   'debit' => $caja, 'credit' => 0, 'description' => $descripcion . ' - Caja'],
-                ['account_id' => 101, 'debit' => $capital, 'credit' => 0, 'description' => $descripcion . ' - Capital'],
-                ['account_id' => 403, 'debit' => $intereses, 'credit' => 0, 'description' => $descripcion . ' - Interés'],
-                
-                // Créditos
-                ['account_id' => 2,   'debit' => 0, 'credit' => $iva_liability, 'description' => $descripcion . ' - IVA'],
-                ['account_id' => 2,   'debit' => 0, 'credit' => $it_liability, 'description' => $descripcion . ' - IT']
+                ['account_id' => 520118,   'debit' => $it_amount, 'credit' => 0,              'description' => $descripcion . ' - IT',       'transaction_type' => 'expense'],
+                ['account_id' => 110102,   'debit' => $caja,      'credit' => 0,              'description' => $descripcion . ' - Caja',     'transaction_type' => 'asset'],
+                ['account_id' => 130303, 'debit' => 0,          'credit' => $capital,       'description' => $descripcion . ' - Capital',  'transaction_type' => 'asset'],
+                ['account_id' => 410103, 'debit' => 0,          'credit' => $intereses,     'description' => $descripcion . ' - Interés',  'transaction_type' => 'income'],
+                ['account_id' => 210304,   'debit' => 0,          'credit' => $iva_liability, 'description' => $descripcion . ' - IVA',      'transaction_type' => 'liability'],
+                ['account_id' => 520118,   'debit' => 0,          'credit' => $it_liability,  'description' => $descripcion . ' - IT',       'transaction_type' => 'liability']
             ];
 
-            // Insertar transacciones en c19_accounting_transactions
             foreach ($transaction_entries as $entry) {
                 if ($entry['debit'] > 0 || $entry['credit'] > 0) {
                     $amount = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
-                    $transaction_type = $entry['debit'] > 0 ? 'debit' : 'credit';
-                    
-                    $transaction_data = array(
-                        'account_id' => $entry['account_id'],
-                        'amount' => $amount,
-                        'description' => $entry['description'],
-                        'added_date' => $transaction_date,
-                        'added_by' => $this->Employee->get_logged_in_employee_info()->person_id,
-                        'transaction_type' => $transaction_type,
-                        'voucher_id' => $voucher_id,
-                        'payment_methods' => $payment_methods,
-                        'invoice_number' => 'PAGO-' . $payment_data['loan_id'],
-                        'purchased_date' => $transaction_date,
+                    $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
+
+                    $transaction_data = [
+                        'account_id'       => $entry['account_id'],
+                        'amount'           => $amount,
+                        'description'      => $entry['description'],
+                        'added_date'       => $transaction_date,
+                        'added_by'         => $this->Employee->get_logged_in_employee_info()->person_id,
+                        'transaction_type' => $entry['transaction_type'],
+                        'movement_type'    => $movement_type,
+                        'voucher_id'       => $voucher_id,
+                        'payment_methods'  => $payment_methods,
+                        'invoice_number'   => 'PAGO-' . $payment_data['loan_id'],
+                        'purchased_date'   => $transaction_date,
                         'purchased_amount' => 0,
-                        'depreciate_amount' => 0
-                    );
-                    
+                        'depreciate_amount'=> 0
+                    ];
                     if (is_plugin_active("branches")) {
                         $transaction_data["branch_id"] = $this->session->userdata("branch_id");
                     }
-                    
                     $this->db->insert('c19_accounting_transactions', $transaction_data);
-                    
-                    // También mantener las transacciones en el libro mayor existente
-                    $this->general_ledger_model->add_transaction([
-                        'account_id'  => $entry['account_id'],
-                        'amount'      => $amount,
-                        'description' => $entry['description'],
-                        'date'        => date('Y-m-d'),
-                        'transaction_type' => $transaction_type,
-                        'payment_methods'  => $payment_methods,
-                        'added_by'    => $added_by,
-                        'voucher_id'  => $voucher_id
-                    ]);
                 }
             }
 
-            //New Payment            
-            if ($payment_id == -1)
-            {
-                $return = array(
-                    'success' => true, 
-                    'message' => $this->lang->line('loans_successful_adding') . ' ' . $payment_data['loan_payment_id'], 
-                    'loan_payment_id' => $payment_data['loan_payment_id'],
-                    'voucher_id' => $voucher_id
-                );
-                
-                $payment_id = $payment_data['loan_payment_id'];
-            }
-            else //previous loan
-            {
-                $return = array(
-                    'success' => true, 
-                    'message' => $this->lang->line('loans_successful_updating') . ' ' . $payment_data['loan_payment_id'], 
-                    'loan_payment_id' => $payment_id,
-                    'voucher_id' => $voucher_id
-                );
-            }
-            
-        }
-        else//failure
-        {
-            $return = array(
-                'success' => false, 
-                'message' => $this->lang->line('loans_error_adding_updating') . ' ' . $payment_data['loan_payment_id'], 
+            $return = [
+                'success'        => true,
+                'message'        => ($payment_id == -1 ? $this->lang->line('loans_successful_adding') : $this->lang->line('loans_successful_updating')) . ' ' . $payment_data['loan_payment_id'],
+                'loan_payment_id'=> $payment_id == -1 ? $payment_data['loan_payment_id'] : $payment_id,
+                'voucher_id'     => $voucher_id
+            ];
+        } else {
+            $return = [
+                'success' => false,
+                'message' => $this->lang->line('loans_error_adding_updating') . ' ' . $payment_data['loan_payment_id'],
                 'loan_payment_id' => -1
-            );
+            ];
         }
-        
+
         $this->db->trans_complete();
-        
+
+        if ($this->db->trans_status() === FALSE) {
+            $return = ['success' => false, 'message' => 'Error en transacción de BD'];
+        }
+
         send($return);
     }
 

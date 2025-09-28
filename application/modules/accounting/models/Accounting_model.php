@@ -780,11 +780,17 @@ class Accounting_model extends CI_Model
         return $this->db->get('c19_accounting_accounts');
     }
 
-    function get_next_voucher_number()
+    function get_next_voucher_id()
     {
-        $this->db->select_max('voucher_number');
+        $this->db->select_max('id');
         $result = $this->db->get('c19_accounting_vouchers')->row();
-        return $result->voucher_number ? $result->voucher_number + 1 : 1;
+        
+        if ($result && isset($result->id)) 
+        {
+            return $result->id + 1;
+        } else {
+            return;
+        }
     }
 
     function get_voucher($voucher_id)

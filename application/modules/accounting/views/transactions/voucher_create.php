@@ -36,8 +36,8 @@
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Número de Comprobante</label>
-                                    <input type="text" class="form-control" name="voucher_number" 
-                                           value="<?php echo $next_voucher_number; ?>" 
+                                    <input type="text" class="form-control" name="voucher_id" 
+                                           value="<?php echo $next_voucher_id; ?>" 
                                            readonly>
                                 </div>
                             </div>
@@ -53,6 +53,18 @@
                                     <label>Descripción</label>
                                     <input type="text" class="form-control" name="description" required>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>Método de Pago</label>
+                                <select class="form-control" name="payment_methods" required>
+                                    <option value="">Seleccionar</option>
+                                    <option value="efectivo">Efectivo</option>
+                                    <option value="QR">QR</option>
+                                    <option value="transferencia">Transferencia</option>
+                                    <option value="deposito">Deposito</option>
+                                </select>
                             </div>
                         </div>
 
@@ -96,19 +108,6 @@
                                                 <label>Haber</label>
                                                 <input type="number" class="form-control credit-amount" name="credits[]" 
                                                        step="0.01" min="0" value="0">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <div class="form-group">
-                                                <label>Método de Pago</label>
-                                                <select class="form-control" name="payment_methods[]">
-                                                    <option value="">Seleccionar</option>
-                                                    <option value="cash">Efectivo</option>
-                                                    <option value="transfer">QR</option>
-                                                    <option value="check">Transferencia</option>
-                                                    <option value="card">Deposito</option>
-
-                                                </select>
                                             </div>
                                         </div>
                                         <div class="col-md-3">

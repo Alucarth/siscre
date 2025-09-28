@@ -76,16 +76,6 @@
                     <label>Descripcion:</label>
                     <textarea class="form-control" id="description" name="description"></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Asociar a:</label>
-                    <div>
-                        <label><input type="radio" name="account_map" value="" checked="checked" /> Ninguno</label> &nbsp;&nbsp;
-                        <label><input type="radio" name="account_map" value="cash" /> Efectivo</label> &nbsp;&nbsp;
-                        <label><input type="radio" name="account_map" value="bank" /> Bancos</label> &nbsp;&nbsp;
-                        <label><input type="radio" name="account_map" value="loan" /> Prestamos</label> &nbsp;&nbsp;
-                        <label><input type="radio" name="account_map" value="loan_loss_reserve" /> Reserva por perdidas</label>
-                    </div>
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>

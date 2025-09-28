@@ -107,8 +107,7 @@
             <!-- ENCABEZADO DEL VOUCHER -->
             <div class="voucher-header">
                 <h4 style="margin: 0; color: white;">
-                    Voucher #<?= $voucher_info->voucher_number ?> 
-                    <small style="font-size: 14px;">(ID: <?= $voucher_id ?>)</small>
+                    Voucher ID: <?= $voucher_id ?>
                 </h4>
                 <table style="width: 100%; color: white; margin-top: 10px;">
                     <tr>
@@ -232,102 +231,7 @@
                     </tbody>
                 </table>
             </div>
-        <?php endforeach; ?>
-        
+        <?php endforeach; ?>        
     <?php else: ?>
-        <div class="no-transactions">
-            <h4>No se encontraron transacciones de cuentas</h4>
-        </div>
     <?php endif; ?>
-
-    <!-- SECCIÓN DE PRÉSTAMOS -->
-    <div class="voucher-section">
-        <table style="width:100%" class="tbl-ledger-head">
-            <tr>
-                <td><b>Nombre de Cuenta:</b></td>
-                <td>Préstamos</td>
-                <td><b>Numero de Cuenta:</b></td>
-                <td>1101</td>
-            </tr>
-        </table>
-
-        <table class="table table-bordered tbl-ledger">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Descripción</th>
-                    <th>Debe</th>
-                    <th>Haber</th>
-                    <th>Saldo</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($loan_transactions)): ?>
-                    <?php foreach ($loan_transactions as $row): ?>
-                        <tr>
-                            <td><?= $row->date ?></td>
-                            <td><?= $row->explanation ?></td>
-                            <td><?= to_currency($row->debit); ?></td>
-                            <td>&nbsp;</td>
-                            <td><?= to_currency($row->debit); ?></td>
-                        </tr>
-                        <tr>
-                            <td>&nbsp;</td>
-                            <td>Repagos</td>
-                            <td>&nbsp;</td>
-                            <td><?= to_currency($row->credit); ?></td>
-                            <td><?= to_currency($row->debit - $row->credit); ?></td>
-                        </tr>                
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="5" class="no-transactions">No se encontraron registros de préstamos.</td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- SECCIÓN DE INTERESES DE PRÉSTAMOS -->
-    <div class="voucher-section">
-        <table style="width:100%" class="tbl-ledger-head">
-            <tr>
-                <td><b>Nombre de Cuenta:</b></td>
-                <td>Intereses de préstamos</td>
-                <td><b>Numero de Cuenta:</b></td>
-                <td>4001</td>
-            </tr>
-        </table>
-
-        <table class="table table-bordered tbl-ledger">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Descripción</th>
-                    <th>Debe</th>
-                    <th>Haber</th>
-                    <th>Saldo</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($loan_interest_transactions)): ?>
-                    <?php foreach ($loan_interest_transactions as $row): ?>
-                        <?php $balance = $row->credit - $row->debit; ?>
-                        <tr>
-                            <td><?= $row->date; ?></td>
-                            <td><?= $row->explanation; ?></td>
-                            <td><?= to_currency($row->debit); ?></td>
-                            <td><?= to_currency($row->credit); ?></td>
-                            <td><?= to_currency($balance); ?></td>
-                        </tr>            
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="5" class="no-transactions">No se encontraron registros de intereses de préstamos.</td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-
 </div>

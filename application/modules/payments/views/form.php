@@ -169,7 +169,7 @@
                                             Tipo de pago:
                                         </Label>
                                         <div class="col-sm-10">
-                                            <select id="payment_methods" name="payment_methods" class="form-control">
+                                            <select id="payment_methods" class="form-control" name="payment_methods" required>
                                                 <option value="">Elegir</option>
                                                 <option value="efectivo" <?= ($payment_info->payment_methods == 'efectivo') ? 'selected' : '' ?>>Efectivo</option>
                                                 <option value="qr" <?= ($payment_info->payment_methods == 'qr') ? 'selected' : '' ?>>QR</option>

@@ -66,7 +66,7 @@ class General_ledger_model extends CI_Model {
                     t.amount,
                     t.description as transaction_description,
                     t.added_date,
-                    t.transaction_type,
+                    t.movement_type,
                     a.account_name,
                     a.code_number as account_number,
                     a.account_type
@@ -90,8 +90,8 @@ class General_ledger_model extends CI_Model {
                     $transaction->account_type = $trans_row->account_type;
                     $transaction->amount = $trans_row->amount;
                     
-                    // Determinar debe/haber según transaction_type
-                    if ($trans_row->transaction_type == 'debit') {
+                    // Determinar debe/haber según movement_type
+                    if ($trans_row->movement_type == 'debit') {
                         $transaction->debit = $trans_row->amount;
                         $transaction->credit = 0;
                     } else {
@@ -302,61 +302,5 @@ class General_ledger_model extends CI_Model {
         }
         
         return $return;
-    }
-
-    public function add_transaction($data)
-    {
-        // ============================
-        // Validaciones básicas
-        // ============================
-        if (!isset($data['account_id']) || empty($data['account_id'])) {
-            return false;
-        }
-
-        if (!isset($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
-            return false;
-        }
-
-        if (!isset($data['description']) || strlen(trim($data['description'])) < 3) {
-            return false;
-        }
-
-        // Defaults si faltan valores
-        $transaction_type = $data['transaction_type'] ?? 'general';
-        $payment_methods  = $data['payment_methods'] ?? 'N/A';
-        $added_by         = $data['added_by'] ?? 'sistema';
-
-        // Si el controlador no manda fecha, usamos timestamp completo
-        $added_date = isset($data['date']) && !empty($data['date'])
-            ? date('Y-m-d H:i:s', strtotime($data['date']))
-            : date('Y-m-d H:i:s');
-
-        // branch_id → si viene en data lo usamos, si no tomamos de sesión, fallback = 1
-        $branch_id = $data['branch_id'] ?? ($this->session->userdata('branch_id') ?? 1);
-
-        // ============================
-        // Datos a insertar
-        // ============================
-        $insert_data = [
-            'account_id'       => $data['account_id'],
-            'amount'           => $data['amount'],
-            'added_date'       => $added_date,
-            'description'      => $data['description'],
-            'branch_id'        => $branch_id,
-            'transaction_type' => $transaction_type,
-            'payment_methods'  => $payment_methods,
-            'added_by'         => $added_by,
-        ];
-
-        // ============================
-        // Insertar en la tabla contable
-        // ============================
-        $result = $this->db->insert('c19_accounting_transactions', $insert_data);
-
-        if (!$result) {
-            return false;
-        }
-
-        return $this->db->insert_id();
     }
 }

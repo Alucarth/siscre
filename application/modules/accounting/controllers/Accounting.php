@@ -466,64 +466,63 @@ class Accounting extends Secure_area implements iData_controller {
     {
         // Cargar datos necesarios para la vista
         $data['accounts'] = $this->accounting_model->get_all_accounts()->result();
-        $data['next_voucher_number'] = $this->accounting_model->get_next_voucher_number();
+        $data['next_voucher_id'] = $this->accounting_model->get_next_voucher_id();
         
         $this->load->view('transactions/voucher_create', $data);
     }
 
     function voucher_save()
     {
-        // CORRECCIÓN 1: Guardar como DATETIME en lugar de DATE
         $voucher_date_input = $this->input->post('voucher_date');
         $voucher_timestamp = strtotime($voucher_date_input);
-        
-        // Validar que la fecha sea correcta
         if ($voucher_timestamp === false || $voucher_timestamp < 0) {
-            // Si la fecha es inválida, usar fecha actual
             $voucher_timestamp = time();
         }
-        
+
+        // Obtener el método de pago de la cabecera (único para todas las transacciones)
+        $payment_methods = $this->input->post('payment_methods');
+
         $voucher_data = array(
-            'voucher_number' => $this->input->post('voucher_number'),
-            // CORRECCIÓN: Guardar como DATETIME completo
             'voucher_date' => date('Y-m-d H:i:s', $voucher_timestamp),
-            'description' => $this->input->post('description'),
-            'total_debit' => $this->input->post('total_debit'),
+            'description'  => $this->input->post('description'),
+            'total_debit'  => $this->input->post('total_debit'),
             'total_credit' => $this->input->post('total_credit'),
-            'added_by' => $this->Employee->get_logged_in_employee_info()->person_id,
-            'added_date' => date('Y-m-d H:i:s')
+            'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
+            'added_date'   => date('Y-m-d H:i:s'),
         );
-        
+
         if (is_plugin_active("branches")) {
             $voucher_data["branch_id"] = $this->session->userdata("branch_id");
         }
-        
+
         $this->db->insert('c19_accounting_vouchers', $voucher_data);
         $voucher_id = $this->db->insert_id();
-        
-        // CORRECCIÓN 2: También en purchased_date si es DATETIME
+
+        // Fecha de transacción
         $transaction_date = date('Y-m-d H:i:s');
-        
-        // Guardar transacciones en c19_accounting_transactions
-        $accounts = $this->input->post('accounts');
-        $debits = $this->input->post('debits');
-        $credits = $this->input->post('credits');
-        $descriptions = $this->input->post('descriptions');
-        $payment_methods = $this->input->post('payment_methods');
-        $invoice_numbers = $this->input->post('invoice_numbers');
-        $purchased_dates = $this->input->post('purchased_dates');
-        $purchased_amounts = $this->input->post('purchased_amounts');
-        $depreciate_amounts = $this->input->post('depreciate_amounts');
-        
+
+        // Guardar transacciones
+        $accounts            = $this->input->post('accounts');
+        $debits              = $this->input->post('debits');
+        $credits             = $this->input->post('credits');
+        $descriptions        = $this->input->post('descriptions');
+        $invoice_numbers     = $this->input->post('invoice_numbers');
+        $purchased_dates     = $this->input->post('purchased_dates');
+        $purchased_amounts   = $this->input->post('purchased_amounts');
+        $depreciate_amounts  = $this->input->post('depreciate_amounts');
+
         for ($i = 0; $i < count($accounts); $i++) {
             if (!empty($accounts[$i]) && ($debits[$i] > 0 || $credits[$i] > 0)) {
-                $amount = $debits[$i] > 0 ? $debits[$i] : $credits[$i];
-                $transaction_type = $debits[$i] > 0 ? 'debit' : 'credit';
-                
-                $account_info = $this->db->get_where('c19_accounting_accounts', ['id' => $accounts[$i]])->row();
-                $account_type = $account_info ? $account_info->account_type : '';
-                
-                // CORRECCIÓN: purchased_date como DATETIME si corresponde
+                $amount        = $debits[$i] > 0 ? $debits[$i] : $credits[$i];
+                $movement_type = $debits[$i] > 0 ? 'debit' : 'credit';
+
+                $this->db->select('account_type');
+                $this->db->from('c19_accounting_accounts');
+                $this->db->where('id', $accounts[$i]);
+                $query = $this->db->get();
+                $account_row = $query->row();
+                $transaction_type = $account_row ? $account_row->account_type : 'unknown';
+
                 $purchased_date = $transaction_date;
                 if (!empty($purchased_dates[$i])) {
                     $purchased_timestamp = strtotime($purchased_dates[$i]);
@@ -531,32 +530,33 @@ class Accounting extends Secure_area implements iData_controller {
                         $purchased_date = date('Y-m-d H:i:s', $purchased_timestamp);
                     }
                 }
-                
+
                 $transaction_data = array(
-                    'account_id' => $accounts[$i],
-                    'amount' => $amount,
-                    'description' => $descriptions[$i],
-                    'added_date' => $transaction_date,
-                    'added_by' => $this->Employee->get_logged_in_employee_info()->person_id,
-                    'transaction_type' => $transaction_type, // CORRECCIÓN: Usar $transaction_type, no $account_type
-                    'voucher_id' => $voucher_id,
-                    'payment_methods' => $payment_methods[$i] ?? '',
-                    'invoice_number' => $invoice_numbers[$i] ?? '',
-                    'purchased_date' => $purchased_date,
-                    'purchased_amount' => $purchased_amounts[$i] ?? 0,
+                    'account_id'        => $accounts[$i],
+                    'amount'            => $amount,
+                    'description'       => $descriptions[$i],
+                    'added_date'        => $transaction_date,
+                    'added_by'          => $this->Employee->get_logged_in_employee_info()->person_id,
+                    'transaction_type'  => $transaction_type, // Se guarda el tipo de cuenta real
+                    'movement_type'     => $movement_type,    // Debe/Haber
+                    'voucher_id'        => $voucher_id,
+                    'payment_methods'    => $payment_methods,   // Usar el mismo método de pago para todas
+                    'invoice_number'    => $invoice_numbers[$i] ?? '',
+                    'purchased_date'    => $purchased_date,
+                    'purchased_amount'  => $purchased_amounts[$i] ?? 0,
                     'depreciate_amount' => $depreciate_amounts[$i] ?? 0
                 );
-                
+
                 if (is_plugin_active("branches")) {
                     $transaction_data["branch_id"] = $this->session->userdata("branch_id");
                 }
-                
+
                 $this->db->insert('c19_accounting_transactions', $transaction_data);
             }
         }
-        
-        $return["status"] = "OK";
-        $return["voucher_id"] = $voucher_id;
+
+        $return["status"]     = "OK";
+        $return["voucher_id"] = $voucher_id; // este será el número del comprobante
         send($return);
     }
 
