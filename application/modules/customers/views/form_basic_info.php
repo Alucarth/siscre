@@ -222,7 +222,7 @@
        
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
-                Calle/Puerta/Dpto. No:
+                Puerta/Dpto. No:
             </label>
             <div class="col-sm-9">
                 <input type="text" class="form-control" id="street_no" name="street_no" value="<?=$person_info->street_no;?>" />

@@ -295,18 +295,22 @@
                                             </div>
 
                                             <div class="form-group">
-                                                <label for="pin">PIN (4-6 dígitos numéricos)</label>
+                                                <label for="pin">PIN (exactamente 4 dígitos numéricos)</label>
                                                 <input type="password" class="form-control" id="pin" name="pin" 
-                                                    maxlength="6" pattern="\d{4,6}" 
-                                                    title="El PIN debe contener entre 4 y 6 dígitos numéricos">
+                                                    maxlength="4" pattern="\d{4}" 
+                                                    inputmode="numeric"
+                                                    title="El PIN debe contener exactamente 4 dígitos numéricos"
+                                                    required>
                                             </div>
+
                                             <div class="form-group">
                                                 <label for="confirm_pin">Confirmar PIN</label>
                                                 <input type="password" class="form-control" id="confirm_pin" name="confirm_pin" 
-                                                    maxlength="6" pattern="\d{4,6}"
-                                                    title="Debe coincidir con el PIN ingresado">
+                                                    maxlength="4" pattern="\d{4}"
+                                                    inputmode="numeric"
+                                                    title="Debe contener exactamente 4 dígitos y coincidir con el PIN ingresado"
+                                                    required>
                                             </div>
-
                                         </div>
 
                                         <?php if ($user_info->role_id != CUSTOMER_ROLE_ID):?>
