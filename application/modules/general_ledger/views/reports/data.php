@@ -109,6 +109,15 @@
                 <h4 style="margin: 0; color: white;">
                     Voucher ID: <?= $voucher_id ?>
                 </h4>
+                <div style="display: flex; gap: 10px;">
+                    <a href="<?= site_url('general_ledger/print_voucher/' . $voucher_id) ?>" 
+                       class="btn btn-sm" 
+                       style="background-color: #3a4652; color: white;"
+                       target="_blank"
+                       title="Imprimir Voucher">
+                       <i class="fa fa-print"></i> Imprimir
+                    </a>
+                </div>
                 <table style="width: 100%; color: white; margin-top: 10px;">
                     <tr>
                         <td style="width: 120px;"><strong>Fecha:</strong></td>
@@ -145,7 +154,6 @@
                             <th>Tipo</th>
                             <th>Debe</th>
                             <th>Haber</th>
-                            <th>Monto</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -168,9 +176,6 @@
                                 <td style="text-align: right; font-weight: <?= $transaction->credit > 0 ? 'bold' : 'normal' ?>;">
                                     <?= $transaction->credit > 0 ? to_currency($transaction->credit) : '---' ?>
                                 </td>
-                                <td style="text-align: right; font-weight: bold;">
-                                    <?= to_currency($transaction->amount) ?>
-                                </td>
                             </tr>
                         <?php endforeach; ?>
                         
@@ -179,7 +184,6 @@
                             <td colspan="3" style="text-align: right;"><strong>TOTALES DEL VOUCHER:</strong></td>
                             <td style="text-align: right;"><strong><?= to_currency($voucher_info->total_debit) ?></strong></td>
                             <td style="text-align: right;"><strong><?= to_currency($voucher_info->total_credit) ?></strong></td>
-                            <td style="text-align: right;"><strong><?= to_currency($voucher_info->total_debit + $voucher_info->total_credit) ?></strong></td>
                         </tr>
                     </tbody>
                 </table>

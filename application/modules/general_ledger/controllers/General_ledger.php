@@ -180,6 +180,42 @@ class General_ledger extends Secure_area implements iData_controller {
         return $data;
     }
 
+    public function print_voucher($voucher_id)
+    {
+        // Obtener datos básicos del voucher
+        $voucher_query = $this->db->get_where('c19_accounting_vouchers', ['id' => $voucher_id]);
+        
+        if ($voucher_query->num_rows() == 0) {
+            show_error('Voucher no encontrado con ID: ' . $voucher_id);
+        }
+        
+        $data['voucher_info'] = $voucher_query->row();
+        
+        $data['voucher_info']->added_by_name = 'Sistema';
+        if (!empty($data['voucher_info']->added_by)) {
+            $this->db->select('p.first_name, p.last_name');
+            $this->db->from('c19_employees e');
+            $this->db->join('c19_people p', 'p.person_id = e.person_id');
+            $this->db->where('e.person_id', $data['voucher_info']->added_by);
+            $employee_query = $this->db->get();
+            
+            if ($employee_query->num_rows() > 0) {
+                $employee = $employee_query->row();
+                $data['voucher_info']->added_by_name = trim($employee->first_name . ' ' . $employee->last_name);
+            }
+        }
+        
+        $this->db->select('t.*, a.code_number, a.account_name, a.account_type');
+        $this->db->from('c19_accounting_transactions t');
+        $this->db->join('c19_accounting_accounts a', 'a.id = t.account_id');
+        $this->db->where('t.voucher_id', $voucher_id);
+        $this->db->order_by('t.movement_type DESC, t.amount DESC');
+        $transactions_query = $this->db->get();
+        
+        $data['transactions'] = $transactions_query->result();
+        
+        $this->load->view('pdf/voucher_pdf', $data);
+    }
 }
 
 ?>

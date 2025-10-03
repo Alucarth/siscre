@@ -12,7 +12,6 @@ class Payments extends Secure_area implements iData_controller {
         
         $this->load->library('DataTableLib');
         $this->load->library('user_agent');
-        $this->load->model('general_ledger/general_ledger_model');
     }
 
     function index()
@@ -77,7 +76,7 @@ class Payments extends Secure_area implements iData_controller {
         $datatable->add_column('loan_balance', false);
         $datatable->add_column('trans_date', false);
         $datatable->add_column('payment_due', false);
-        //$datatable->add_column('overdue_days', false);
+        $datatable->add_column('overdue_days', false);
         $datatable->add_column('teller', false);
         
 
@@ -137,19 +136,14 @@ class Payments extends Secure_area implements iData_controller {
             $data_row = [];
             $data_row["DT_RowId"] = $payment->loan_payment_id;
             $data_row["actions"] = $actions;
-            
             $data_row["trans_id"] = $payment->loan_payment_id;
             $data_row["customer"] = ucwords($payment->customer_name);
             $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Individual") . " (" . to_currency($payment->loan_amount) . ")";
-            $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
             $data_row["payable_amount"] = to_currency($payment->paid_amount);
+            $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
             $data_row["trans_date"] = date($this->config->item('date_format'), $payment->date_paid);
             $data_row["payment_due"] = date($this->config->item('date_format'), $payment->payment_due);
-            // Calcula la diferencia
-            //$diferencia = $payment->payment_due->diff($payment->date_paid);
-            // Obtiene el número de días de diferencia
-            //$overdue_days = $diferencia->days;
-            //$data_row["overdue_days"] = $payment->payment_due->diff($payment->date_paid);
+            $data_row["overdue_days"] = $payment->date_paid - $payment->payment_due > 0 ? ($payment->date_paid - $payment->payment_due) / (60 * 60 * 24) : 0;
             $data_row["teller"] = ucwords($payment->teller_name);
             
             $tbl_balance += $payment->paid_amount;
@@ -230,6 +224,7 @@ class Payments extends Secure_area implements iData_controller {
         $data['collateral'] = $collateral;
         $data['count'] = $payment->loan_payment_id;
         $data['client'] = ucwords($customer->first_name." ".$customer->last_name);
+        $data['document_number'] = $payment->ci;
         $data['account'] = $loan->account;
         $data['branch_name'] = $branch->branch_name;
         //$data['loan'] = to_currency($loan->loan_amount);
@@ -275,9 +270,11 @@ class Payments extends Secure_area implements iData_controller {
                 $data['capital'] =  to_currency($object->payment_amount_capital);
                 //$data['capital'] =  to_currency($object->payment_amount_capital - $object->interest); // el payment_amount_capital tiene el interes sumando por lo cual se esta restando el interes revisar donde se guarda el valor o tener encuenta este datos siempre al momento de hacer consultas
                 $data['interest'] = to_currency($object->interest);
-                $data['operating_expenses_amount'] = to_currency($object->operating_expenses_amount);
-                $data['total'] = to_currency($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount+$lpp);
-                $data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount+$lpp), 2, '.', '')," BOLIVIANOS");
+                //$data['operating_expenses_amount'] = to_currency($object->operating_expenses_amount); //monto de ahorro
+                //$data['total'] = to_currency($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount+$lpp);
+                $data['total'] = to_currency($object->payment_amount_capital+$object->interest+$lpp); //actualización por solicitud no se debe mostrar el monto de ahorro
+                //$data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->interest+$object->operating_expenses_amount+$lpp), 2, '.', '')," BOLIVIANOS");
+                $data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->interest+$lpp), 2, '.', '')," BOLIVIANOS");
                 //$data['total'] = to_currency($object->payment_amount_capital+$object->operating_expenses_amount);// ense caso como se asume que esta el interes se le adiciona los gastos operativos
                 //$data["literal"] = Util::convertirNumeroLetra(number_format((float)($object->payment_amount_capital+$object->operating_expenses_amount), 2, '.', '')," Bs"); //mismo caso que la linea de arriba
                 $has_nextpay = true;
@@ -316,125 +313,112 @@ class Payments extends Secure_area implements iData_controller {
         }
     }
 
-    private function _find_schedule_entry($loan_info, $lookup_date = null, $lookup_amount = null)
-    {
-        $result = ['found' => false, 'capital' => 0.0, 'interest' => 0.0, 'payment_amount' => 0.0, 'payment_date' => ''];
-
-        if (empty($loan_info->periodic_loan_table)) {
-            log_message('error', 'Loan schedule JSON vacío para loan_id: ' . $loan_info->loan_id);
-            return $result;
-        }
-
-        $scheds = json_decode($loan_info->periodic_loan_table);
-        if (!$scheds || !is_array($scheds)) {
-            log_message('error', 'No se pudo decodificar periodic_loan_table para loan_id: ' . $loan_info->loan_id);
-            return $result;
-        }
-
-        // Normalizar lookup_date a dd/mm/YYYY si es posible
-        if ($lookup_date) {
-            if (is_numeric($lookup_date)) {
-                $lookup_date = date('d/m/Y', (int)$lookup_date);
-            } else {
-                // si viene en formato Y-m-d -> convertir
-                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $lookup_date)) {
-                    $lookup_date = date('d/m/Y', strtotime($lookup_date));
-                } else {
-                    $lookup_date = trim($lookup_date);
-                }
-            }
-        }
-        if ($lookup_date) {
-            foreach ($scheds as $sched) {
-                $sched_date = trim($sched->payment_date);
-                if ($sched_date === $lookup_date) {
-                    $result['found'] = true;
-                    $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
-                    $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
-                    $result['payment_amount'] = isset($sched->payment_amount) ? (float)$sched->payment_amount : 0.0;
-                    $result['payment_date'] = $sched_date;
-                    return $result;
-                }
-            }
-        }
-
-        if ($lookup_amount && is_numeric($lookup_amount)) {
-            $tol = 0.02; // tolerancia (2 centavos) — ajusta si necesitas
-            foreach ($scheds as $sched) {
-                $sched_amount = isset($sched->payment_amount) ? (float)$sched->payment_amount : 0.0;
-                if (abs($sched_amount - (float)$lookup_amount) <= $tol) {
-                    $result['found'] = true;
-                    $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
-                    $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
-                    $result['payment_amount'] = $sched_amount;
-                    $result['payment_date'] = isset($sched->payment_date) ? trim($sched->payment_date) : '';
-                    return $result;
-                }
-            }
-        }
-
-        foreach ($scheds as $sched) {
-            $result['found'] = true;
-            $result['capital'] = isset($sched->payment_amount_capital) ? (float)$sched->payment_amount_capital : (float)($sched->principal ?? 0);
-            $result['interest'] = isset($sched->interest) ? (float)$sched->interest : (float)($sched->interest_amount ?? 0);
-            $result['payment_amount'] = isset($sched->payment_amount) ? (float)$sched->payment_amount : 0.0;
-            $result['payment_date'] = isset($sched->payment_date) ? trim($sched->payment_date) : '';
-            return $result;
-        }
-
-        return $result;
-    }
-    
     function save($payment_id = -1)
     {
         $branch_name = $this->input->post('branch_name');
         $branch = $this->Payment->getBranchByName($branch_name);
 
         $payment_data = array(
-            'account'        => $this->input->post('account'),
-            'loan_id'        => $this->input->post('loan_id'),
-            'customer_id'    => $this->input->post('customer'),
-            'paid_amount'    => $this->input->post('paid_amount'),
+            'account' => $this->input->post('account'),
+            'loan_id' => $this->input->post('loan_id'),
+            'customer_id' => $this->input->post('customer'),
+            'paid_amount' => $this->input->post('paid_amount'),
             'balance_amount' => $this->input->post('balance_amount'),
-            'date_paid'      => date('Y-m-d H:i:s', strtotime($this->input->post('date_paid'))),
-            'remarks'        => $this->input->post('remarks'),
-            'teller_id'      => $this->input->post('teller'),
-            'modified_by'    => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
-            'payment_due'    => date('Y-m-d H:i:s', strtotime($this->input->post('payment_due'))),
-            'lpp_amount'     => $this->input->post('lpp_amount'),
-            'branch_id'      => $branch ? $branch->id : null
+            'date_paid' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_paid'))) : strtotime($this->input->post('date_paid')),
+            'remarks' => $this->input->post('remarks'),
+            'teller_id' => $this->input->post('teller'),
+            'modified_by' => $this->input->post('modified_by') > 0 ? $this->input->post('modified_by') : 0,
+            'payment_due' => $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('payment_due'))) : strtotime($this->input->post('payment_due')),
+            'lpp_amount' => $this->input->post('lpp_amount'),
+            'branch_id' => $branch?$branch->id:null
         );
 
-        if ($this->input->post("loan_payment_id") > 0) {
+        if ($this->input->post("loan_payment_id") > 0)
+        {
             $payment_data['loan_payment_id'] = $this->input->post('loan_payment_id');
         }
 
-        $loan_info = $this->Loan->get_info($payment_data['loan_id']);
-        $amount = floatval($payment_data['paid_amount']);
-        $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
-        $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
-
-        $capital   = $sched_entry['found'] ? round($sched_entry['capital'], 2) : 0.00;
-        $intereses = $sched_entry['found'] ? round($sched_entry['interest'], 2) : 0.00;
-
-        $customer = $this->Customer->get_info($payment_data['customer_id']);
-        $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name}";
-
-        $payment_methods = $this->input->post('payment_methods');
-
+        // transactional to make sure that everything is working well
         $this->db->trans_start();
-
-        if ($this->Payment->save($payment_data, $payment_id)) {
-            // Actualizar billetera y balance
-            $wallet_data = [
-                "amount"       => $payment_data["paid_amount"],
-                "wallet_type"  => "debit",
-                "trans_date"   => strtotime(date("Y-m-d H:i:s")),
-                "added_by"     => $this->Employee->get_logged_in_employee_info()->person_id,
-                "descriptions" => "In payments for <a href='" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "' target='_blank'>" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "</a>"
-            ];
+        
+        if ($this->Payment->save($payment_data, $payment_id))
+        {
+            $wallet_data["amount"] = $payment_data["paid_amount"];
+            $wallet_data["wallet_type"] = "debit";
+            $wallet_data["trans_date"] = strtotime(date("Y-m-d H:i:s"));
+            $wallet_data["added_by"] = $this->Employee->get_logged_in_employee_info()->person_id;
+            $wallet_data["descriptions"] = "In payments for <a href='" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "' target='_blank'>" . site_url("payments/view/" . $payment_data['loan_payment_id']) . "</a>";
+            
             $this->My_wallet->save($wallet_data);
+            
             $this->Loan->update_balance($payment_data['loan_id']);
+            
+            // Nueva funcionalidad: Crear voucher y transacciones si está habilitado
+            $voucher_id = $this->_create_payment_voucher($payment_data);
+            
+            //New Payment            
+            if ($payment_id == -1)
+            {
+                $return = array(
+                    'success' => true, 
+                    'message' => $this->lang->line('loans_successful_adding') . ' ' . $payment_data['loan_payment_id'], 
+                    'loan_payment_id' => $payment_data['loan_payment_id']
+                );
+                
+                $payment_id = $payment_data['loan_payment_id'];
+            }
+            else //previous loan
+            {
+                $return = array(
+                    'success' => true, 
+                    'message' => $this->lang->line('loans_successful_updating') . ' ' . $payment_data['loan_payment_id'], 
+                    'loan_payment_id' => $payment_id
+                );
+            }
+            
+            // Agregar voucher_id al return si se creó
+            if ($voucher_id) {
+                $return['voucher_id'] = $voucher_id;
+            }
+            
+        }
+        else//failure
+        {
+            $return = array(
+                'success' => false, 
+                'message' => $this->lang->line('loans_error_adding_updating') . ' ' . $payment_data['loan_payment_id'], 
+                'loan_payment_id' => -1
+            );
+        }
+        
+        $this->db->trans_complete();
+        
+        send($return);
+    }
+
+    private function _create_payment_voucher($payment_data)
+    {
+        // Verificar si el módulo contable está activo o si debemos crear el voucher
+        // Puedes agregar aquí una condición para activar/desactivar esta funcionalidad
+        if (!/* condición para activar contabilidad */ true) {
+            return null;
+        }
+        
+        try {
+            $loan_info = $this->Loan->get_info($payment_data['loan_id']);
+            $amount = floatval($payment_data['paid_amount']);
+            
+            // Buscar en el cronograma
+            $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
+            $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
+
+            $capital   = $sched_entry['found'] ? round($sched_entry['capital'], 2) : 0.00;
+            $intereses = $sched_entry['found'] ? round($sched_entry['interest'], 2) : 0.00;
+
+            $customer = $this->Customer->get_info($payment_data['customer_id']);
+            $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name}";
+
+            $payment_methods = $this->input->post('payment_methods');
 
             // Cálculos contables
             $it_amount     = round($amount * 0.03, 2);
@@ -451,21 +435,23 @@ class Payments extends Secure_area implements iData_controller {
                 'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
                 'added_date'   => date('Y-m-d H:i:s')
             ];
+            
             if (is_plugin_active("branches")) {
                 $voucher_data["branch_id"] = $this->session->userdata("branch_id");
             }
+            
             $this->db->insert('c19_accounting_vouchers', $voucher_data);
             $voucher_id = $this->db->insert_id();
 
             $transaction_date = date('Y-m-d H:i:s');
 
             $transaction_entries = [
-                ['account_id' => 520118,   'debit' => $it_amount, 'credit' => 0,              'description' => $descripcion . ' - IT',       'transaction_type' => 'expense'],
-                ['account_id' => 110102,   'debit' => $caja,      'credit' => 0,              'description' => $descripcion . ' - Caja',     'transaction_type' => 'asset'],
-                ['account_id' => 130303, 'debit' => 0,          'credit' => $capital,       'description' => $descripcion . ' - Capital',  'transaction_type' => 'asset'],
-                ['account_id' => 410103, 'debit' => 0,          'credit' => $intereses,     'description' => $descripcion . ' - Interés',  'transaction_type' => 'income'],
-                ['account_id' => 210304,   'debit' => 0,          'credit' => $iva_liability, 'description' => $descripcion . ' - IVA',      'transaction_type' => 'liability'],
-                ['account_id' => 520118,   'debit' => 0,          'credit' => $it_liability,  'description' => $descripcion . ' - IT',       'transaction_type' => 'liability']
+                ['account_id' => 165, 'debit' => $it_amount,      'credit' => 0,              'description' => $descripcion . ' - IT',       'transaction_type' => 'expense'],
+                ['account_id' => 5,   'debit' => $caja,           'credit' => 0,              'description' => $descripcion . ' - Caja',     'transaction_type' => 'asset'],
+                ['account_id' => 58,  'debit' => 0,               'credit' => $capital,       'description' => $descripcion . ' - Capital',  'transaction_type' => 'asset'],
+                ['account_id' => 128, 'debit' => 0,               'credit' => $intereses,     'description' => $descripcion . ' - Interés',  'transaction_type' => 'income'],
+                ['account_id' => 84,  'debit' => 0,               'credit' => $iva_liability, 'description' => $descripcion . ' - IVA',      'transaction_type' => 'liability'],
+                ['account_id' => 13,  'debit' => 0,               'credit' => $it_liability,  'description' => $descripcion . ' - IT',       'transaction_type' => 'liability']
             ];
 
             foreach ($transaction_entries as $entry) {
@@ -488,34 +474,112 @@ class Payments extends Secure_area implements iData_controller {
                         'purchased_amount' => 0,
                         'depreciate_amount'=> 0
                     ];
+                    
                     if (is_plugin_active("branches")) {
                         $transaction_data["branch_id"] = $this->session->userdata("branch_id");
                     }
+                    
                     $this->db->insert('c19_accounting_transactions', $transaction_data);
                 }
             }
 
-            $return = [
-                'success'        => true,
-                'message'        => ($payment_id == -1 ? $this->lang->line('loans_successful_adding') : $this->lang->line('loans_successful_updating')) . ' ' . $payment_data['loan_payment_id'],
-                'loan_payment_id'=> $payment_id == -1 ? $payment_data['loan_payment_id'] : $payment_id,
-                'voucher_id'     => $voucher_id
-            ];
+            return $voucher_id;
+            
+        } catch (Exception $e) {
+            // Log the error but don't break the main payment process
+            log_message('error', 'Error creating payment voucher: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Busca una entrada en el cronograma de pagos del préstamo
+     */
+    private function _find_schedule_entry($loan_info, $lookup_date, $amount)
+    {
+        $result = ['found' => false, 'capital' => 0, 'interest' => 0];
+        
+        if (!$loan_info || empty($loan_info->periodic_loan_table)) {
+            return $result;
+        }
+        
+        try {
+            $schedules = json_decode($loan_info->periodic_loan_table, true);
+            
+            if (!is_array($schedules)) {
+                return $result;
+            }
+            
+            // Convertir la fecha de búsqueda al formato correcto
+            if ($this->config->item('date_format') == 'd/m/Y') {
+                $lookup_date_formatted = date('d/m/Y', strtotime($lookup_date));
+            } else {
+                $lookup_date_formatted = date('Y-m-d', strtotime($lookup_date));
+            }
+            
+            foreach ($schedules as $schedule) {
+                $schedule_date = $schedule['payment_date'];
+                
+                // Comparar fechas (manejar diferentes formatos)
+                if ($schedule_date == $lookup_date_formatted || 
+                    strtotime($schedule_date) == strtotime($lookup_date)) {
+                    
+                    $result['found'] = true;
+                    $result['capital'] = isset($schedule['payment_amount_capital']) ? 
+                        floatval($schedule['payment_amount_capital']) : 0;
+                    $result['interest'] = isset($schedule['interest']) ? 
+                        floatval($schedule['interest']) : 0;
+                    break;
+                }
+            }
+            
+            // Si no se encuentra la fecha exacta, hacer una distribución proporcional
+            if (!$result['found'] && $amount > 0) {
+                $result = $this->_distribute_payment_amount($schedules, $amount);
+            }
+            
+        } catch (Exception $e) {
+            log_message('error', 'Error in _find_schedule_entry: ' . $e->getMessage());
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Distribuye el monto del pago proporcionalmente entre capital e intereses
+     * basado en el cronograma existente
+     */
+    private function _distribute_payment_amount($schedules, $amount)
+    {
+        $result = ['found' => true, 'capital' => 0, 'interest' => 0];
+        
+        // Calcular totales del cronograma pendiente
+        $total_capital = 0;
+        $total_interest = 0;
+        
+        foreach ($schedules as $schedule) {
+            $total_capital += isset($schedule['payment_amount_capital']) ? 
+                floatval($schedule['payment_amount_capital']) : 0;
+            $total_interest += isset($schedule['interest']) ? 
+                floatval($schedule['interest']) : 0;
+        }
+        
+        $total_payment = $total_capital + $total_interest;
+        
+        if ($total_payment > 0) {
+            // Distribuir proporcionalmente
+            $capital_ratio = $total_capital / $total_payment;
+            $interest_ratio = $total_interest / $total_payment;
+            
+            $result['capital'] = round($amount * $capital_ratio, 2);
+            $result['interest'] = round($amount * $interest_ratio, 2);
         } else {
-            $return = [
-                'success' => false,
-                'message' => $this->lang->line('loans_error_adding_updating') . ' ' . $payment_data['loan_payment_id'],
-                'loan_payment_id' => -1
-            ];
+            // Si no hay cronograma, distribución 50/50 como fallback
+            $result['capital'] = round($amount * 0.5, 2);
+            $result['interest'] = round($amount * 0.5, 2);
         }
-
-        $this->db->trans_complete();
-
-        if ($this->db->trans_status() === FALSE) {
-            $return = ['success' => false, 'message' => 'Error en transacción de BD'];
-        }
-
-        send($return);
+        
+        return $result;
     }
 
     function delete()
@@ -574,6 +638,7 @@ class Payments extends Secure_area implements iData_controller {
                 (trim($payment->loan_type) !== "" ? $payment->loan_type : "Flexible") . " (" . to_currency($payment->loan_amount) . ")",
                 to_currency($payment->balance_amount),
                 to_currency($payment->paid_amount),
+                to_currency($payment->operating_expenses_amount),
                 date($this->config->item('date_format'), $payment->date_paid),
                 date($this->config->item('date_format'), $payment->payment_due),
                 ucwords($payment->teller_name),
@@ -615,13 +680,14 @@ class Payments extends Secure_area implements iData_controller {
         echo json_encode($suggestion);
         exit;
     }
-    
+    /*old
     private function _check_loan_penalties()
     {
         $due_date = $this->input->post("due_date");
         $amount_to_pay = $this->input->post("amount_to_pay");
         $penalty_value = $this->input->post("penalty_value");
         $penalty_type = $this->input->post("penalty_type");
+        $loan_id = $this->input->post("loan_id");
         
         if ($this->config->item('date_format') == 'd/m/Y')
         {
@@ -629,6 +695,7 @@ class Payments extends Secure_area implements iData_controller {
         }
         
         $penalty_amount = 0;
+        $operating_expenses_amount = $this->input->post("operating_expenses_amount") ?: 0;//monto de ahorro
         if ( time() > strtotime($due_date) )
         {
             // penalize
@@ -644,13 +711,103 @@ class Payments extends Secure_area implements iData_controller {
             }
         }
         
+        // ——— Aquí extraemos los gastos operativos del JSON ———
+        $operating_expenses_amount = 0;
+        $loan_row = $this->db
+                        ->select('periodic_loan_table')
+                        ->from('loans')
+                        ->where('loan_id', $loan_id)
+                        ->get()
+                        ->row();
+
+        if ($loan_row && ! empty($loan_row->periodic_loan_table)) {
+            $scheds = json_decode($loan_row->periodic_loan_table);
+            foreach ($scheds as $sched) {
+                // Las fechas usan el mismo formato que en el <option>
+                if (trim($sched->payment_date) === trim($due_date)) {
+                    $operating_expenses_amount = (float)$sched->operating_expenses_amount;
+                    break;
+                }
+            }
+        }
+
         $return['status'] = "OK";
         $return['penalty_amount'] = $penalty_amount;
         $return['amount_to_pay'] = number_format($amount_to_pay, 2, '.', '');
+        $return['operating_expenses_amount'] = $operating_expenses_amount;
         
+        $return['__debug_scheds_json'] = $loan_row->periodic_loan_table;//prueba debug
+        log_message('debug', 'Comparando fechas: due_date='.$due_date);
+
         send($return);
     }
-    
+    */
+
+    private function _check_loan_penalties()
+    {
+        // 1) Recoge los parámetros
+        $raw_due_date      = $this->input->post("due_date");
+        $amount_to_pay     = (float)$this->input->post("amount_to_pay");
+        $penalty_value     = (float)$this->input->post("penalty_value");
+        $penalty_type      = $this->input->post("penalty_type");
+        $loan_id           = $this->input->post("loan_id");
+
+        // 2) Calcula el timestamp de due_date (independientemente del formato)
+        if ($this->config->item('date_format') == 'd/m/Y') {
+            $due_ts = strtotime( uk_to_isodate($raw_due_date) );
+        } else {
+            $due_ts = strtotime( $raw_due_date );
+        }
+
+        // 3) Penalización como antes, usando due_ts
+        $penalty_amount = 0;
+        if ( time() > $due_ts ) {
+            $pen = $penalty_type === 'percentage'
+                ? $amount_to_pay * ($penalty_value / 100)
+                : $penalty_value;
+            if ($pen > 0) {
+                $penalty_amount = $amount_to_pay + $pen;
+            }
+        }
+
+        // 4) Recupera el JSON de amortización
+        $loan_row = $this->db
+                        ->select('periodic_loan_table')
+                        ->from('loans')
+                        ->where('loan_id', $loan_id)
+                        ->get()
+                        ->row();
+
+        $operating_expenses_amount = 0;
+        if ($loan_row && $loan_row->periodic_loan_table) {
+            $scheds = json_decode($loan_row->periodic_loan_table);
+            foreach ($scheds as $sched) {
+                // 5) Para cada schedule, calcula también su timestamp
+                if ($this->config->item('date_format') == 'd/m/Y') {
+                    $sched_ts = strtotime( uk_to_isodate($sched->payment_date) );
+                } else {
+                    $sched_ts = strtotime( $sched->payment_date );
+                }
+
+                // 6) ¡La comparación ahora sí encaja!
+                if ($sched_ts === $due_ts) {
+                    $operating_expenses_amount = (float)$sched->operating_expenses_amount;
+                    break;
+                }
+            }
+        }
+
+        // 7) Devuelve todo en el JSON
+        $return = [
+            'status'                    => 'OK',
+            'penalty_amount'            => number_format($penalty_amount, 2, '.', ''),
+            'amount_to_pay'             => number_format($amount_to_pay,   2, '.', ''),
+            'operating_expenses_amount' => number_format($operating_expenses_amount, 2, '.', ''),
+        ];
+
+        send($return);
+    }
+
     private function _get_loan_schedules()
     {
         $loan_id = $this->input->post("loan_id");

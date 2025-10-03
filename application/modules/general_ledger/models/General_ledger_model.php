@@ -87,7 +87,6 @@ class General_ledger_model extends CI_Model {
                     $transaction->explanation = $trans_row->transaction_description;
                     $transaction->account_name = $trans_row->account_name;
                     $transaction->account_number = $trans_row->account_number;
-                    $transaction->account_type = $trans_row->account_type;
                     $transaction->amount = $trans_row->amount;
                     
                     // Determinar debe/haber según movement_type
