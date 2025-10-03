@@ -77,6 +77,18 @@ class Accounting extends Secure_area implements iData_controller {
         }
     }
     
+    function getIndentLevel(string $code): int {
+        $len = strlen(trim($code));
+        $digits = preg_replace('/[^0-9]/', '', $code); // Solo contar dígitos
+        
+        if (strlen($digits) <= 2) {
+            return 0; // grupo grande (activo, pasivo, etc.)
+        }
+
+        // cada 2 dígitos extra después de los primeros 2 aumenta el nivel
+        return intdiv((strlen($digits) - 2), 2);
+    }
+    
     private function _load_account()
     {
         $id = $this->input->post("id");
@@ -293,12 +305,16 @@ class Accounting extends Secure_area implements iData_controller {
                 $actions .= "<a href='javascript:void(0)' class='btn btn-xs btn-danger btn-delete' data-id='" . $row->id . "' title='Delete'><span class='fa fa-trash'></span></a>";
             }
             
+            // Calcular nivel de sangría basado en code_number
+            $indent_level = $this->getIndentLevel($row->code_number);
+            
             $data_row = [];
             $data_row["DT_RowId"] = $row->id;
             $data_row["actions"] = $actions;
             $data_row["code_number"] = ucwords($row->code_number);
             $data_row["account_name"] = ucwords($row->account_name);
             $data_row["description"] = truncate_html($row->description, 250);
+            $data_row["indent_level"] = $indent_level; // Nuevo campo para el nivel de sangría
             
             $tmp[] = $data_row;
         }

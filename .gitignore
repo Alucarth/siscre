@@ -6,8 +6,9 @@
 /storage/
 /tmp/
 /cache/
-/logs/
+
 /error_log
+/application/logs/
 
 # --- ARCHIVOS TEMPORALES ---
 *.log

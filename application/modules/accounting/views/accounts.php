@@ -99,12 +99,23 @@
     .content-area {
         transition: margin-left 0.3s ease;
     }
+    
+    /* Estilos para sangrías de cuentas */
+    .indent-0 { padding-left: 8px !important; }
+    .indent-1 { padding-left: 30px !important; }
+    .indent-2 { padding-left: 60px !important; }
+    .indent-3 { padding-left: 70px !important; }
+    .indent-4 { padding-left: 90px !important; }
+    
+    /* Iconos para niveles jerárquicos */
+    .account-name-cell {
+        position: relative;
+    }
+
 </style>
 
 <script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
 <script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.3/js/dataTables.fixedHeader.min.js"></script>
-
-
 
 <div class="title-block">
     <h3 class="title"> 
@@ -192,6 +203,34 @@
 <?php echo form_close();?>
 
 <script>
+    // Función para aplicar sangrías a las filas de la tabla
+    function applyIndentation(tableId) {
+        $('#' + tableId + ' tbody tr').each(function() {
+            var row = $(this);
+            var indentLevel = row.data('indent-level') || 0;
+            var accountNameCell = row.find('td:eq(2)'); // Columna del nombre de cuenta
+            
+            // Aplicar clase de sangría
+            accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4');
+            accountNameCell.addClass('indent-' + indentLevel);
+            
+            // Determinar si es cuenta padre (tiene subcuentas)
+            var codeNumber = row.find('td:eq(1)').text().trim();
+            var codeLength = codeNumber.replace(/[^0-9]/g, '').length;
+            
+            // Considerar como padre si tiene menos de 6 dígitos (podría tener hijos)
+            var isParent = codeLength <= 4;
+            
+            // Aplicar icono según el tipo
+            accountNameCell.removeClass('has-children no-children');
+            if (isParent && codeLength <= 4) {
+                accountNameCell.addClass('has-children');
+            } else {
+                accountNameCell.addClass('no-children');
+            }
+        });
+    }
+    
     $(document).ready(function(){
         var url = '<?=site_url('accounting/ajax');?>';
         var params = {
@@ -200,6 +239,10 @@
         };
         $.post(url, params, function(data){
             $("#div-asset").html(data);
+            // Aplicar sangrías después de cargar
+            setTimeout(function() {
+                applyIndentation('tbl_asset');
+            }, 100);
         });
                 
         // CAMBIO: data-toggle="pill" en lugar de "tab"
@@ -212,6 +255,9 @@
             };
             $.post(url, params, function(data){
                 $("#div-asset").html(data);
+                setTimeout(function() {
+                    applyIndentation('tbl_asset');
+                }, 100);
             });
         });
         
@@ -224,6 +270,9 @@
             };
             $.post(url, params, function(data){
                 $("#div-liability").html(data);
+                setTimeout(function() {
+                    applyIndentation('tbl_liability');
+                }, 100);
             });
         });
         
@@ -236,6 +285,9 @@
             };
             $.post(url, params, function(data){
                 $("#div-equity").html(data);
+                setTimeout(function() {
+                    applyIndentation('tbl_equity');
+                }, 100);
             });
         });
         
@@ -248,6 +300,9 @@
             };
             $.post(url, params, function(data){
                 $("#div-income").html(data);
+                setTimeout(function() {
+                    applyIndentation('tbl_income');
+                }, 100);
             });
         });
         
@@ -260,6 +315,9 @@
             };
             $.post(url, params, function(data){
                 $("#div-expenses").html(data);
+                setTimeout(function() {
+                    applyIndentation('tbl_expenses');
+                }, 100);
             });
         });
     });

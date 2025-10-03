@@ -12,6 +12,13 @@
     .dataTables_info {
         float:left;
     }
+    
+    /* ESTILOS NUEVOS PARA SANGRÍAS */
+    .indent-0 { padding-left: 8px !important; }
+    .indent-1 { padding-left: 30px !important; }
+    .indent-2 { padding-left: 60px !important; }
+    .indent-3 { padding-left: 70px !important; }
+    .indent-4 { padding-left: 90px !important; }
 </style>
 
 <script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
@@ -92,10 +99,50 @@
 <?php echo form_close(); ?>
 
 <script>
+    // Función para aplicar sangrías basada en el código
+    function applyAssetIndentation() {
+        $('#tbl_asset tbody tr').each(function() {
+            var row = $(this);
+            var codeCell = row.find('td:eq(1)'); // Segunda columna (Código)
+            var accountNameCell = row.find('td:eq(2)'); // Tercera columna (Nombre de cuenta)
+            
+            var codeNumber = codeCell.text().trim();
+            var digitCount = codeNumber.replace(/[^0-9]/g, '').length;
+            
+            // Calcular nivel de sangría basado en dígitos
+            var indentLevel = 0;
+            if (digitCount <= 2) {
+                indentLevel = 0; // 1-2 dígitos
+            } else if (digitCount <= 4) {
+                indentLevel = 1; // 4 dígitos
+            } else if (digitCount <= 6) {
+                indentLevel = 2; // 6 dígitos
+            } else {
+                indentLevel = 3; // más de 6 dígitos
+            }
+            
+            // Aplicar clase de sangría
+            accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4');
+            accountNameCell.addClass('indent-' + indentLevel);
+        });
+    }
+
     $(document).ready(function () {
         $("#tbl_asset_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-asset'>Nueva cuenta de activo</a>");
         $("#tbl_asset_filter input[type='search']").attr("placeholder", "Escriba su busqueda");
         $("#tbl_asset_filter input[type='search']").removeClass("input-sm");
+        
+        // Aplicar sangrías cuando se cargue o recargue la tabla
+        $('#tbl_asset').on('draw.dt', function () {
+            setTimeout(function() {
+                applyAssetIndentation();
+            }, 100);
+        });
+        
+        // Aplicar sangrías inicialmente
+        setTimeout(function() {
+            applyAssetIndentation();
+        }, 1000);
         
         $("#btn-save-asset").click(function(){
             var url = '<?=site_url('accounting/ajax');?>';
