@@ -158,7 +158,7 @@
                         <hr>
                         <div class="form-group">
                             <button type="submit" class="btn btn-primary" id="save-voucher">
-                                <i class="fa fa-save"></i> Guardar Comprobante
+                                <i class="fa fa-save"></i> <span class="button-text">Guardar Comprobante</span>
                             </button>
                             <a href="<?php echo site_url('accounting/transactions'); ?>" class="btn btn-default">
                                 <i class="fa fa-times"></i> Cancelar
