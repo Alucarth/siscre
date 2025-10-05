@@ -490,16 +490,25 @@ class Accounting extends Secure_area implements iData_controller {
     function voucher_save()
     {
         $voucher_date_input = $this->input->post('voucher_date');
-        $voucher_timestamp = strtotime($voucher_date_input);
-        if ($voucher_timestamp === false || $voucher_timestamp < 0) {
-            $voucher_timestamp = time();
+        
+        // Convertir la fecha al formato YYYY-MM-DD correctamente
+        if ($this->config->item('date_format') == 'd/m/Y') {
+            // Si el formato es DD/MM/YYYY, convertir a YYYY-MM-DD
+            $voucher_date = date('Y-m-d', strtotime(uk_to_isodate($voucher_date_input)));
+        } else {
+            // Si el formato es MM/DD/YYYY o otro, usar strtotime normal
+            $voucher_timestamp = strtotime($voucher_date_input);
+            if ($voucher_timestamp === false || $voucher_timestamp < 0) {
+                $voucher_timestamp = time();
+            }
+            $voucher_date = date('Y-m-d', $voucher_timestamp);
         }
 
         // Obtener el método de pago de la cabecera (único para todas las transacciones)
         $payment_methods = $this->input->post('payment_methods');
 
         $voucher_data = array(
-            'voucher_date' => date('Y-m-d H:i:s', $voucher_timestamp),
+            'voucher_date' => $voucher_date, // Ya en formato YYYY-MM-DD
             'description'  => $this->input->post('description'),
             'total_debit'  => $this->input->post('total_debit'),
             'total_credit' => $this->input->post('total_credit'),
@@ -541,9 +550,14 @@ class Accounting extends Secure_area implements iData_controller {
 
                 $purchased_date = $transaction_date;
                 if (!empty($purchased_dates[$i])) {
-                    $purchased_timestamp = strtotime($purchased_dates[$i]);
-                    if ($purchased_timestamp !== false && $purchased_timestamp > 0) {
-                        $purchased_date = date('Y-m-d H:i:s', $purchased_timestamp);
+                    // Aplicar la misma lógica de conversión para purchased_dates
+                    if ($this->config->item('date_format') == 'd/m/Y') {
+                        $purchased_date = date('Y-m-d H:i:s', strtotime(uk_to_isodate($purchased_dates[$i])));
+                    } else {
+                        $purchased_timestamp = strtotime($purchased_dates[$i]);
+                        if ($purchased_timestamp !== false && $purchased_timestamp > 0) {
+                            $purchased_date = date('Y-m-d H:i:s', $purchased_timestamp);
+                        }
                     }
                 }
 
