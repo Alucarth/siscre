@@ -412,26 +412,26 @@ class Payments extends Secure_area implements iData_controller {
             $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
             $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
 
-            $capital   = $sched_entry['found'] ? round($sched_entry['capital'], 2) : 0.00;
-            $intereses = $sched_entry['found'] ? round($sched_entry['interest'], 2) : 0.00;
+            // Obtener la tasa de interés del préstamo
+            $interest_rate = floatval($loan_info->interest_rate);
+            
+            // Cálculos según la nueva estructura
+            $intereses_amortizables = $interest_rate * 0.87;
+            $iva = $interest_rate * 0.13;
+            $it = ($iva + $intereses_amortizables) * 0.03;
+            $caja_moneda_nacional = $amount + $iva + $intereses_amortizables;
 
             $customer = $this->Customer->get_info($payment_data['customer_id']);
             $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name}";
 
             $payment_methods = $this->input->post('payment_methods');
 
-            // Cálculos contables
-            $it_amount     = round($amount * 0.03, 2);
-            $iva_liability = round($intereses * 0.13, 2);
-            $it_liability  = $it_amount;
-            $caja          = round($amount - $it_amount, 2);
-
             // Voucher
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
                 'description'  => $descripcion,
-                'total_debit'  => $amount,
-                'total_credit' => $amount,
+                'total_debit'  => $caja_moneda_nacional,
+                'total_credit' => $caja_moneda_nacional,
                 'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
                 'added_date'   => date('Y-m-d H:i:s')
             ];
@@ -445,23 +445,27 @@ class Payments extends Secure_area implements iData_controller {
 
             $transaction_date = date('Y-m-d H:i:s');
 
+            // Asignación de cuentas contables según la nueva estructura
             $transaction_entries = [
-                ['account_id' => 165, 'debit' => $it_amount,      'credit' => 0,              'description' => $descripcion . ' - IT',       'transaction_type' => 'expense'],
-                ['account_id' => 5,   'debit' => $caja,           'credit' => 0,              'description' => $descripcion . ' - Caja',     'transaction_type' => 'asset'],
-                ['account_id' => 58,  'debit' => 0,               'credit' => $capital,       'description' => $descripcion . ' - Capital',  'transaction_type' => 'asset'],
-                ['account_id' => 128, 'debit' => 0,               'credit' => $intereses,     'description' => $descripcion . ' - Interés',  'transaction_type' => 'income'],
-                ['account_id' => 84,  'debit' => 0,               'credit' => $iva_liability, 'description' => $descripcion . ' - IVA',      'transaction_type' => 'liability'],
-                ['account_id' => 13,  'debit' => 0,               'credit' => $it_liability,  'description' => $descripcion . ' - IT',       'transaction_type' => 'liability']
+                // Débitos
+                ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expense'],
+                ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset'],
+                
+                // Créditos
+                ['account_id' => 58,  'debit' => 0, 'credit' => $amount,                 'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
+                ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income'],
+                ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability'],
+                ['account_id' => 165,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
             ];
 
             foreach ($transaction_entries as $entry) {
                 if ($entry['debit'] > 0 || $entry['credit'] > 0) {
-                    $amount = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
+                    $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
                     $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
 
                     $transaction_data = [
                         'account_id'       => $entry['account_id'],
-                        'amount'           => $amount,
+                        'amount'           => $amount_entry,
                         'description'      => $entry['description'],
                         'added_date'       => $transaction_date,
                         'added_by'         => $this->Employee->get_logged_in_employee_info()->person_id,
