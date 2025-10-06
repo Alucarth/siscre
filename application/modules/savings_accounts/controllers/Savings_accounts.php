@@ -103,4 +103,67 @@ class Savings_accounts extends MX_Controller
         $data['show_inactive'] = true;
         $this->load->view('savings_accounts/savings_accounts/index', $data);
     }
+
+    public function reactivate($account_id)
+    {
+        $user = $this->Employee->get_logged_in_employee_info();
+        if (!is_object($user)) return redirect('login');
+
+        $account_id = (int)$account_id;
+
+        // POST => procesa reactivación
+        if ($this->input->method() === 'post') {
+            $reason = trim((string)$this->input->post('reason'));
+            if ($reason === '') {
+                $this->session->set_flashdata('error','Debes indicar un motivo para reactivar.');
+                return redirect('savings_accounts/savings_accounts/reactivate/'.$account_id);
+            }
+
+            // Verifica existencia y estado actual (usa 'status', no 'is_active')
+            $row = $this->db->select('savings_account_id, status')
+                            ->from($this->db->dbprefix('savings_accounts'))
+                            ->where('savings_account_id', $account_id)
+                            ->limit(1)->get()->row();
+
+            if (!$row) {
+                $this->session->set_flashdata('error','Cuenta no encontrada.');
+                return redirect('savings_accounts/savings_accounts');
+            }
+
+            if ((int)$row->status === 1) {
+                $this->session->set_flashdata('success','La cuenta ya estaba activa.');
+                return redirect('savings_accounts/savings_accounts');
+            }
+
+            // Cambia estado con auditoría (modelo)
+            $ok = $this->Savings_accounts_model->reactivate(
+                $account_id,
+                $reason,
+                (int)$user->person_id
+            );
+
+            // (Opcional) Bitácora separada si la tabla existe
+            if ($ok && $this->db->table_exists('c19_savings_account_status_log')) {
+                $this->db->insert('c19_savings_account_status_log', [
+                    'savings_account_id' => $account_id,
+                    'old_status'         => 0,
+                    'new_status'         => 1,
+                    'reason'             => $reason,
+                    'changed_by'         => (int)$user->person_id,
+                ]);
+            }
+
+            if ($ok) {
+                $this->session->set_flashdata('success','Cuenta reactivada correctamente.');
+            } else {
+                $this->session->set_flashdata('error','No se pudo reactivar la cuenta.');
+            }
+            return redirect('savings_accounts/savings_accounts');
+        }
+
+        // GET => muestra formulario simple de motivo
+        $data = ['account_id' => $account_id];
+        $this->load->view('savings_accounts/savings_accounts/reactivate_form', $data);
+    }
+
 }

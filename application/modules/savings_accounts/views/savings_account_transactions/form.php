@@ -11,7 +11,7 @@
       <?php
         $action = 'savings_accounts/savings_account_transactions/form'
                 . (isset($tx) ? "/{$tx->transaction_id}" : '');
-        echo form_open($action, ['class'=>'form-horizontal']);
+        echo form_open($action, ['class'=>'form-horizontal', 'id'=>'tx_form']);
       ?>
       
       <!-- Cuenta + Tipo en la misma fila (2 columnas iguales) -->
@@ -191,16 +191,61 @@
         }
       })();
       </script>
-
       <script>
-        (function() {
-          function toggleExtras() {
-            var v = $('#trans_type').val();
-            $('#dst-account-group').toggle(v === 'transfer');
+        (function(){
+          var $type   = $('#trans_type');
+          var $dstGrp = $('#dst-account-group');
+          var $dst    = $('#dst_account_id');
+          var $form   = $('#tx_form');
+          var $btn    = $('#btn-save');
+          var $src    = $('[name="savings_account_id"]');
+
+          function toggleExtrasRequired(){
+            var v = $type.val();
+
+            // Mostrar / ocultar secciones
+            $dstGrp.toggle(v === 'transfer');
             $('#deposit-fields').toggle(v === 'deposit');
+
+            // Required dinámico
+            if (v === 'transfer') {
+              $dst.prop('required', true);
+            } else {
+              $dst.prop('required', false);
+              // opcional: limpia valor destino si no es transferencia
+              // $dst.val('');
+            }
           }
-          $('#trans_type').on('change select2:select', toggleExtras);
-          toggleExtras(); // estado inicial
+
+          // Evita que la cuenta origen sea igual a la destino
+          function validateSrcDst(){
+            if ($type.val() === 'transfer') {
+              var src = String($src.val() || '');
+              var dst = String($dst.val() || '');
+              if (src && dst && src === dst) {
+                alert('La cuenta de origen y destino no pueden ser la misma.');
+                return false;
+              }
+            }
+            return true;
+          }
+
+          // Anti doble submit (sin cambiar controlador)
+          $form.on('submit', function(e){
+            // Validación rápida de transferencia
+            if (!validateSrcDst()) {
+              e.preventDefault();
+              return;
+            }
+            // Deshabilita botón para evitar doble envío
+            $btn.prop('disabled', true);
+            // Si tu controlador redirige correctamente, no hace falta re-habilitar.
+            // Si vuelve a la misma vista por un error, el botón se habilitará por recarga.
+          });
+
+          // Reaccionar a cambios
+          $type.on('change select2:select', toggleExtrasRequired);
+          toggleExtrasRequired(); // estado inicial
         })();
       </script>
 
@@ -247,7 +292,7 @@
       <!-- Botones -->
       <div class="form-group">
         <div class="col-sm-offset-2 col-sm-10">
-          <button type="submit" class="btn btn-success">
+          <button type="submit" id="btn-save" class="btn btn-success">
             <span class="glyphicon glyphicon-save"></span> Guardar
           </button>
           <a href="<?= site_url('savings_accounts/savings_account_transactions') ?>"

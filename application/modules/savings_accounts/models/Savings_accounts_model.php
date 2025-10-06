@@ -138,4 +138,47 @@ class Savings_accounts_model extends CI_Model
             ->update($this->table, $data);
     }
 
+    /**
+     * Cambia el estado de la cuenta (1=activa, 0=inactiva) con auditoría opcional.
+     */
+    public function set_status($account_id, $status, $reason = '', $actor_id = 0)
+    {
+        $account_id = (int)$account_id;
+        $status     = (int)$status ? 1 : 0;
+        if ($account_id <= 0) return false;
+
+        $stamp  = date('Y-m-d H:i:s');
+        $actor  = (int)$actor_id;
+        $action = $status ? 'REACTIVAR' : 'DESHABILITAR';
+        $reason = trim((string)$reason);
+        if ($reason === '') $reason = 'Sin motivo especificado';
+
+        $this->db->set('status', $status);
+        $this->db->set('date_modified', time());
+        $this->db->set('modified_by', $actor);
+
+        // Si existe la columna comments, anexamos una línea de auditoría.
+        if ($this->db->field_exists('comments', $this->db->dbprefix($this->table))) {
+            $this->db->set(
+                'comments',
+                "CONCAT(COALESCE(comments,''), '\n[$stamp] $action por $actor: $reason')",
+                false
+            );
+        }
+
+        return $this->db
+            ->where('savings_account_id', $account_id)
+            ->update($this->db->dbprefix($this->table));
+    }
+
+    /** Helpers opcionales por si quieres llamarlos directo */
+    public function reactivate($account_id, $reason = '', $actor_id = 0)
+    {
+        return $this->set_status($account_id, 1, $reason, $actor_id);
+    }
+    public function disable_account($account_id, $reason = '', $actor_id = 0)
+    {
+        return $this->set_status($account_id, 0, $reason, $actor_id);
+    }
+
 }

@@ -133,21 +133,57 @@ class Savings_account_transactions_model extends CI_Model
      * OJO: si quieres reversas automáticas, lo hacemos en el controlador
      * para decidir la lógica según trans_type.
      */
+   
+    /**
+     * Deshabilita (soft delete) una transacción y ajusta el saldo de la cuenta.
+     * No elimina físicamente, solo marca status=0 y revierte el monto.
+     */
     public function delete($id)
     {
-        // Si la tabla tiene 'status'
-        if ($this->db->field_exists('status', $this->db->dbprefix($this->table))) {
-            return $this->db
-                ->where('transaction_id',(int)$id)
-                ->update($this->table, [
-                    'status'        => 0,
-                    'date_modified' => time(),
-                    'modified_by'   => (int)($this->session->userdata('person_id') ?: 0),
-                ]);
+        $tbl = $this->db->dbprefix($this->table); // c19_savings_account_transactions
+        $id  = (int)$id;
+
+        // 1) Obtener transacción
+        $tx = $this->db->where('transaction_id', $id)->get($tbl)->row();
+        if (!$tx) return false;
+
+        // 2) Marcar como deshabilitada (si tiene columna status)
+        if ($this->db->field_exists('status', $tbl)) {
+            $this->db->where('transaction_id', $id)->update($tbl, [
+                'status'        => 0,
+                'date_modified' => time(),
+                'modified_by'   => (int)($this->session->userdata('person_id') ?: 0),
+            ]);
+        } else {
+            // Si no existe columna 'status', se borra físicamente
+            $this->db->where('transaction_id', $id)->delete($tbl);
         }
 
-        // Fallback: eliminar físico (no recomendado, pero evita error)
-        return $this->db->where('transaction_id',(int)$id)->delete($this->table);
+        // 3) Revertir el saldo de la cuenta
+        //    - Depósito => restar
+        //    - Retiro   => sumar
+        $sign  = (strtolower($tx->trans_type) === 'withdraw') ? +1 : -1;
+        $delta = $sign * (float)$tx->amount;
+
+        $this->db->set('current_balance', 'current_balance + ('. $this->db->escape($delta) .')', false)
+                ->where('savings_account_id', (int)$tx->savings_account_id)
+                ->update($this->db->dbprefix('savings_accounts'));
+
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function reactivate_tx($id, $reason = '')
+    {
+        $tbl = $this->db->dbprefix($this->table);
+        if (! $this->db->field_exists('status', $tbl)) return false;
+
+        return $this->db->where('transaction_id', (int)$id)
+                        ->update($tbl, [
+                            'status'        => 1,
+                            'date_modified' => time(),
+                            'modified_by'   => (int)($this->session->userdata('person_id') ?: 0),
+                            // podrías guardar $reason en otra tabla de bitácora si quieres
+                        ]);
     }
 
     /* ============================
@@ -236,7 +272,7 @@ class Savings_account_transactions_model extends CI_Model
 
         $this->db->set('current_balance', 'current_balance + '.$delta, FALSE)
                  ->where('savings_account_id', $acc_id)
-                 ->update('savings_accounts');
+                 ->update($this->db->dbprefix('savings_accounts'));
 
         $this->db->trans_complete();
         return $this->db->trans_status() ? $tx_id : false;
@@ -333,7 +369,7 @@ class Savings_account_transactions_model extends CI_Model
         // Saldo origen
         $this->db->set('current_balance', 'current_balance - '.$amount, FALSE)
                  ->where('savings_account_id', $src_account_id)
-                 ->update('savings_accounts');
+                 ->update($this->db->dbprefix('savings_accounts'));
 
         // Asiento 2: depósito en destino
         $row_deposit = [
@@ -380,9 +416,54 @@ class Savings_account_transactions_model extends CI_Model
         // Saldo destino
         $this->db->set('current_balance', 'current_balance + '.$amount, FALSE)
                  ->where('savings_account_id', $dst_account_id)
-                 ->update('savings_accounts');
+                 ->update($this->db->dbprefix('savings_accounts'));
 
         $this->db->trans_complete();
-        return $this->db->trans_status() ? ['withdraw_id' => $w_id, 'deposit_id' => $d_id] : false;
+        return $this->db->trans_status() ? ['withdraw_id' => $withdraw_id, 'deposit_id' => $deposit_id] : false;
     }
+
+    public function get_accounts_state($src_id, $dst_id)
+    {
+        // NOTA: ajusta los nombres de columna aquí ↓↓↓
+        // - sa.status           → 1=activa (cámbialo si es is_active)
+        // - sa.time_deposit     → 1=plazo fijo
+        // - sa.maturity_date    → fecha de vencimiento (si aplica)
+        // - sa.available_balance→ si NO existe, calculamos por movimientos
+        // - sat.min_transfer_amount → mínimo requerido por tipo de cuenta (si no existe, lo manejamos en el controlador)
+
+        $sql = "
+        SELECT 
+            sa.savings_account_id,
+            sa.account_number,
+            sa.currency,
+            COALESCE(sa.status, 1) AS is_active,             -- <== cambia a sa.is_active si así se llama
+            COALESCE(sa.time_deposit, 0) AS is_time_deposit, -- <== 1 si es plazo fijo
+            sa.maturity_date,                                -- <== si usas otro nombre, cámbialo
+            COALESCE(sa.available_balance, 
+                ROUND(SUM(CASE 
+                    WHEN tx.trans_type='deposit'  THEN tx.amount
+                    WHEN tx.trans_type='withdraw' THEN -tx.amount
+                    ELSE 0 END),2)
+            ) AS available_balance,
+            COALESCE(sat.min_transfer_amount, 0) AS min_transfer_amount
+        FROM {$this->db->dbprefix('savings_accounts')} sa
+        LEFT JOIN {$this->db->dbprefix('savings_account_transactions')} tx
+            ON tx.savings_account_id = sa.savings_account_id
+        LEFT JOIN {$this->db->dbprefix('savings_account_types')} sat
+            ON sat.savings_account_type_id = sa.savings_account_type_id
+        WHERE sa.savings_account_id IN (?,?)
+        GROUP BY 
+            sa.savings_account_id, sa.account_number, sa.currency, 
+            is_active, is_time_deposit, sa.maturity_date, sa.available_balance, sat.min_transfer_amount
+        ";
+        $rows = $this->db->query($sql, [(int)$src_id, (int)$dst_id])->result();
+        $out = ['src'=>null,'dst'=>null];
+
+        foreach ($rows as $r) {
+            if ((int)$r->savings_account_id === (int)$src_id) $out['src'] = $r;
+            if ((int)$r->savings_account_id === (int)$dst_id) $out['dst'] = $r;
+        }
+        return $out;
+    }
+
 }

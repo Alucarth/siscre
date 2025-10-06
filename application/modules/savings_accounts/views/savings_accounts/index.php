@@ -65,14 +65,24 @@
                 <tr>
                   <td class="text-center">
                     <a href="<?= site_url("savings_accounts/savings_accounts/form/{$a->savings_account_id}") ?>"
-                       class="btn btn-xs btn-warning" title="Editar">
+                      class="btn btn-xs btn-warning" title="Editar">
                       <span class="fa fa-pencil"></span>
                     </a>
-                    <a href="<?= site_url("savings_accounts/savings_accounts/delete/{$a->savings_account_id}") ?>"
-                       class="btn btn-xs btn-danger" title="Deshabilitar"
-                       onclick="return confirm('¿Eliminar esta cuenta?');">
-                      <span class="fa fa-trash"></span>
-                    </a>
+
+                    <?php if (empty($show_inactive)): ?>
+                      <!-- Listado de ACTIVAS: deshabilitar -->
+                      <a href="<?= site_url("savings_accounts/savings_accounts/delete/{$a->savings_account_id}") ?>"
+                        class="btn btn-xs btn-danger" title="Deshabilitar"
+                        onclick="return confirm('¿Deshabilitar esta cuenta?');">
+                        <span class="fa fa-trash"></span>
+                      </a>
+                    <?php else: ?>
+                      <!-- Listado de INACTIVAS: reactivar -->
+                      <a href="<?= site_url("savings_accounts/savings_accounts/reactivate/{$a->savings_account_id}") ?>"
+                        class="btn btn-xs btn-success" title="Reactivar">
+                        <span class="fa fa-undo"></span>
+                      </a>
+                    <?php endif; ?>
                   </td>
                   <td><?= htmlspecialchars($a->account_number) ?></td>
                   <td><?= htmlspecialchars($a->first_name . ' ' . $a->last_name) ?></td>
@@ -86,8 +96,8 @@
                   </td>
                   <td class="text-center">
                     <?= $a->status
-                         ? '<span class="label label-success">Activo</span>'
-                         : '<span class="label label-default">Cerrada</span>' ?>
+                         ? '<span class="label label-success">Activa</span>'
+                         : '<span class="label label-default">Inactiva</span>' ?>
                   </td>
                 </tr>
               <?php endforeach; ?>
