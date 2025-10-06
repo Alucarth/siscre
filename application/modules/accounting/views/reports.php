@@ -63,9 +63,9 @@
                                             <div class="form-group">
                                                 <label>Elija su reporte</label>
                                                 <select class="form-control" name="report_type">
-                                                    <option value="trial_balance">Balance de Comprobacion</option>
-                                                    <option value="financial_income">Ingresos Financieros</option>
-                                                    <option value="balance_sheet">Hoja de Balance</option>
+                                                    <option value="trial_balance">Sumas y Saldos</option>
+                                                    <option value="income_statement">Estado de Resultados</option>
+                                                    <option value="balance_sheet">Balance General</option>
                                                 </select>
                                             </div>
                                         </div>

@@ -491,12 +491,9 @@ class Accounting extends Secure_area implements iData_controller {
     {
         $voucher_date_input = $this->input->post('voucher_date');
         
-        // Convertir la fecha al formato YYYY-MM-DD correctamente
         if ($this->config->item('date_format') == 'd/m/Y') {
-            // Si el formato es DD/MM/YYYY, convertir a YYYY-MM-DD
             $voucher_date = date('Y-m-d', strtotime(uk_to_isodate($voucher_date_input)));
         } else {
-            // Si el formato es MM/DD/YYYY o otro, usar strtotime normal
             $voucher_timestamp = strtotime($voucher_date_input);
             if ($voucher_timestamp === false || $voucher_timestamp < 0) {
                 $voucher_timestamp = time();
@@ -504,11 +501,10 @@ class Accounting extends Secure_area implements iData_controller {
             $voucher_date = date('Y-m-d', $voucher_timestamp);
         }
 
-        // Obtener el método de pago de la cabecera (único para todas las transacciones)
         $payment_methods = $this->input->post('payment_methods');
 
         $voucher_data = array(
-            'voucher_date' => $voucher_date, // Ya en formato YYYY-MM-DD
+            'voucher_date' => $voucher_date, // Formato YYYY-MM-DD
             'description'  => $this->input->post('description'),
             'total_debit'  => $this->input->post('total_debit'),
             'total_credit' => $this->input->post('total_credit'),
@@ -523,7 +519,6 @@ class Accounting extends Secure_area implements iData_controller {
         $this->db->insert('c19_accounting_vouchers', $voucher_data);
         $voucher_id = $this->db->insert_id();
 
-        // Fecha de transacción
         $transaction_date = date('Y-m-d H:i:s');
 
         // Guardar transacciones
@@ -550,7 +545,6 @@ class Accounting extends Secure_area implements iData_controller {
 
                 $purchased_date = $transaction_date;
                 if (!empty($purchased_dates[$i])) {
-                    // Aplicar la misma lógica de conversión para purchased_dates
                     if ($this->config->item('date_format') == 'd/m/Y') {
                         $purchased_date = date('Y-m-d H:i:s', strtotime(uk_to_isodate($purchased_dates[$i])));
                     } else {
@@ -586,7 +580,7 @@ class Accounting extends Secure_area implements iData_controller {
         }
 
         $return["status"]     = "OK";
-        $return["voucher_id"] = $voucher_id; // este será el número del comprobante
+        $return["voucher_id"] = $voucher_id;
         send($return);
     }
 
@@ -835,31 +829,34 @@ class Accounting extends Secure_area implements iData_controller {
         echo $out;
     }
     
+   // En la función _load_report_data, agregar:
     private function _load_report_data( $report_type )
     {
         $filters = [];
-        $filters["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
-        $filters["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        $filters["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? 
+            strtotime(uk_to_isodate($this->input->post('date_from'))) : 
+            strtotime($this->input->post('date_from'));
+        $filters["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? 
+            strtotime(uk_to_isodate($this->input->post('date_to'))) : 
+            strtotime($this->input->post('date_to'));
         
         $data = [];
         switch( $report_type )
         {
             case 'trial_balance':
-                $data = $this->accounting_model->get_balance_sheet_data($filters);
                 $data["accounts"] = $this->accounting_model->get_trial_balance_data($filters);
-                $data["loan_fund_capital"] = $this->accounting_model->get_current_loan_amount($filters);
-                $data["interest_on_current"] = $this->accounting_model->get_interest_on_current($filters);
-                $data["interest_on_current_and_past_due"] = $this->accounting_model->get_interest_on_current($filters, 0);
                 break;
-            case 'financial_income':
-                $data["accounts"] = $this->accounting_model->get_financial_income_data($filters);
-                $data["interest_on_current"] = $this->accounting_model->get_interest_on_current($filters, 0);
+            case 'income_statement':
+                $data["accounts"] = $this->accounting_model->get_income_statement_data($filters);
                 break;
             case 'balance_sheet':
                 $data = $this->accounting_model->get_balance_sheet_data($filters);
                 $data["interest_on_current"] = $this->accounting_model->get_interest_on_current($filters);
                 break;
         }
+        
+        $data["date_from"] = $filters["date_from"];
+        $data["date_to"] = $filters["date_to"];
         
         return $data;
     }

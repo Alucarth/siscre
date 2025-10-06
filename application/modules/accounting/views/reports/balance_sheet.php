@@ -1,163 +1,185 @@
 <style>
-    .center-text {
-        text-align:center;
-    }
+    .center-text { text-align:center; }
+    .right-text { text-align:right; }
+    .left-text { text-align:left; }
+    .bold { font-weight:bold; }
+    .border-bottom { border-bottom:1px solid #000; }
+    .table-simple { border-collapse:collapse; width:100%; }
+    .table-simple td { padding:4px; vertical-align:top; }
+    .empresa-info { font-size:12px; line-height:1.2; }
 </style>
 
-<div style="text-align:center">
-    <h3>Hoja de saldos</h3>
-   Fechado: <?=date($this->config->item('date_format'), $date_from) . " - " . date($this->config->item('date_format'), $date_to)?>
-    <br/>
+<!-- INFORMACIÓN DE LA EMPRESA - SUPERIOR IZQUIERDA -->
+<div style="position:absolute; top:20px; left:40px;" class="empresa-info">
+    <div class="bold">CREDISURGIR</div>
+    <div>NIT: 485672023</div>
+</div>
+
+<div style="text-align:center; margin-top:40px;">
+    <h2>BALANCE GENERAL</h2>
+    <h4>Del: <?=date($this->config->item('date_format'), $date_from)?> Al: <?=date($this->config->item('date_format'), $date_to)?></h4>
+    <p>(Expresado en bolivianos)</p>
     <br/>
 </div>
 
-<table width="100%" cellpadding="1" cellspacing="0" border="0" id="tbl-balance-sheet">
+<table class="table-simple" border="1" cellpadding="4" cellspacing="0">
+    <!-- Cabecera de columnas -->
     <tr>
-        <td style="width:50%" valign="top">
-            <div><b>ACTIVO</b></div>    
-            <table width="100%" cellpadding="1" cellspacing="0" border="1">
-                <tr>
-                    <td colspan="2">Activos Corrientes</td>
-                </tr>
-                <tr>
-                    <td style="width:70%">Efectivo</td>
-                    <td class="center-text"><?=to_currency($cash_amount);?></td>
-                </tr>
-                <tr>
-                    <td>Efectivo en bancos</td>
-                    <td class="center-text"><?=to_currency($cash_amount_bank)?></td>
-                </tr>
-                <tr>
-                    <td colspan="2">Prestamos pendientes</td>
-                </tr>
-                <tr>
-                    <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Prestamo actual</td>
-                    <td class="center-text"><?=to_currency($current_loan_amount);?></td>
-                </tr>
-                <tr>
-                    <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Interes por cobrar</td>
-                    <td class="center-text"><?=to_currency($interest_on_current);?></td>
-                </tr>
-                <tr>
-                    <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MENOS: Reservas por Prestamos Incobrables</td>
-                    <td class="center-text"><?=to_currency($loan_loss_reserve)?></td>
-                </tr>
-                <tr>
-                    <td>Prestamos Netos Pendientes</td>
-                    <td class="center-text"><?=to_currency($net_loan_outstanding);?></td>
-                </tr>
-                <tr>
-                    <td><b>TOTAL ACTIVOS ACTUALES</b></td>
-                    <td class="center-text"><b><?=to_currency($total_current_assets);?></b></td>
-                </tr>
-                <tr>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                </tr>
-                <tr>
-                    <td colspan="2">ACTIVOS No Corrientes</td>
-                </tr>
-                
-                <?php $total_non_current_assets = 0; ?>
-                
-                <?php foreach( $non_current_assets as $asset ): ?>
-                    <tr>
-                        <td><?=$asset->account_name;?></td>
-                        <td class="center-text"><?=to_currency($asset->amount);?></td>
-                    </tr>
-                    <?php $total_non_current_assets += $asset->amount;?>
-                    
-                    <?php if ( $asset->depreciation_amount > 0 ): ?>
-                    <tr>
-                        <td>&nbsp;&nbsp;&nbsp;&nbsp;Menos: Depreciacion Acumulada</td>
-                        <td class="center-text">(<?=to_currency($asset->depreciation_amount);?>)</td>
-                    </tr>
-                    <?php $total_non_current_assets -= $asset->depreciation_amount;?>
-                    <?php endif; ?>
-                
-                
-                <?php endforeach; ?>
-                <tr>
-                    <td><b>TOTAL ACTIVOS NO CORRIENTES</b></td>
-                    <td class="center-text"><b><?=to_currency($total_non_current_assets);?></b></td>
-                </tr>
-                <tr>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                </tr>
-                <tr>
-                    <td><b>TOTAL ACTIVOS</b></td>
-                    
-                    <?php
-                    
-                    $total_assets = $total_current_assets + $total_non_current_assets;
-                    
-                    ?>
-                    
-                    <td class="center-text"><b><?=to_currency($total_assets);?></b></td>
-                </tr>
-            </table>
+        <th width="15%">Código</th>
+        <th width="55%">Cuenta</th>
+        <th width="30%">Importe</th>
+    </tr>
+    
+    <!-- ACTIVOS -->
+    <tr>
+        <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">ACTIVOS</td>
+    </tr>
+    
+    <!-- ACTIVOS CORRIENTES -->
+    <tr>
+        <td class="bold">11</td>
+        <td class="bold">ACTIVOS CORRIENTES</td>
+        <td class="right-text"></td>
+    </tr>
+    
+    <?php foreach($activos_corrientes as $activo): ?>
+    <?php if($activo->amount != 0): ?>
+    <tr>
+        <td><?=$activo->account_map?></td>
+        <td class="left-text"><?=$activo->account_name?></td>
+        <td class="right-text"><?=to_currency($activo->amount)?></td>
+    </tr>
+    <?php endif; ?>
+    <?php endforeach; ?>
+    
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL ACTIVOS CORRIENTES</td>
+        <td class="right-text bold border-bottom"><?=to_currency($total_activos_corrientes)?></td>
+    </tr>
+    
+    <!-- ACTIVOS NO CORRIENTES -->
+    <tr>
+        <td class="bold">12</td>
+        <td class="bold">ACTIVOS NO CORRIENTES</td>
+        <td class="right-text"></td>
+    </tr>
+    
+    <?php foreach($activos_no_corrientes as $activo): ?>
+    <?php if($activo->amount != 0): ?>
+    <tr>
+        <td><?=$activo->account_map?></td>
+        <td class="left-text"><?=$activo->account_name?></td>
+        <td class="right-text"><?=to_currency($activo->amount)?></td>
+    </tr>
+    <?php if($activo->depreciation_amount > 0): ?>
+    <tr>
+        <td></td>
+        <td class="left-text" style="padding-left:20px;">(-) Depreciación Acumulada</td>
+        <td class="right-text">(<?=to_currency($activo->depreciation_amount)?>)</td>
+    </tr>
+    <?php endif; ?>
+    <?php endif; ?>
+    <?php endforeach; ?>
+    
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL ACTIVOS NO CORRIENTES</td>
+        <td class="right-text bold border-bottom"><?=to_currency($total_activos_no_corrientes)?></td>
+    </tr>
+    
+    <!-- TOTAL ACTIVOS -->
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL ACTIVOS</td>
+        <td class="right-text bold" style="background-color:#e8f4f8;"><?=to_currency($total_activos)?></td>
+    </tr>
+    
+    <!-- ESPACIO -->
+    <tr><td colspan="3" style="height:20px;"></td></tr>
+    
+    <!-- PASIVOS -->
+    <tr>
+        <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">PASIVOS</td>
+    </tr>
+    
+    <?php foreach($pasivos as $pasivo): ?>
+    <?php if($pasivo->amount != 0): ?>
+    <tr>
+        <td><?=$pasivo->account_map?></td>
+        <td class="left-text"><?=$pasivo->account_name?></td>
+        <td class="right-text"><?=to_currency($pasivo->amount)?></td>
+    </tr>
+    <?php endif; ?>
+    <?php endforeach; ?>
+    
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL PASIVOS</td>
+        <td class="right-text bold border-bottom"><?=to_currency($total_pasivos)?></td>
+    </tr>
+    
+    <!-- ESPACIO -->
+    <tr><td colspan="3" style="height:20px;"></td></tr>
+    
+    <!-- PATRIMONIO -->
+    <tr>
+        <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">PATRIMONIO</td>
+    </tr>
+    
+    <?php foreach($patrimonio as $pat): ?>
+    <?php if($pat->amount != 0): ?>
+    <tr>
+        <td><?=$pat->account_map?></td>
+        <td class="left-text"><?=$pat->account_name?></td>
+        <td class="right-text"><?=to_currency($pat->amount)?></td>
+    </tr>
+    <?php endif; ?>
+    <?php endforeach; ?>
+    
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL PATRIMONIO</td>
+        <td class="right-text bold border-bottom"><?=to_currency($total_patrimonio)?></td>
+    </tr>
+    
+    <!-- TOTAL PASIVOS + PATRIMONIO -->
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL PASIVOS Y PATRIMONIO</td>
+        <td class="right-text bold" style="background-color:#f8e8e8;"><?=to_currency($total_pasivos_patrimonio)?></td>
+    </tr>
+</table>
+
+<br/><br/>
+
+<!-- VERIFICACIÓN DEL BALANCE -->
+<div style="text-align:center; <?=$balance_cuadra ? 'color:green;' : 'color:red;'?>">
+    <?php if($balance_cuadra): ?>
+        <h4>✓ BALANCE CUADRADO - ACTIVOS = PASIVOS + PATRIMONIO</h4>
+    <?php else: ?>
+        <h4>✗ DESCUADRE DETECTADO: <?=to_currency(abs($total_activos - $total_pasivos_patrimonio))?></h4>
+    <?php endif; ?>
+</div>
+
+<br/><br/><br/>
+
+<!-- FIRMAS -->
+<table width="100%" style="margin-top:50px;">
+    <tr>
+        <td width="50%" class="center-text">
+            <div class="border-bottom" style="width:200px; margin:0 auto; padding-bottom:5px;">
+                CONTADOR
+            </div>
+            <br/>
+            <div>Nombre y Firma</div>
         </td>
-        <td style="width:50%" valign="top">
-            <div><b>PASIVOS</b></div>
-            
-            <?php $loan_fund_capital = $total_assets;?>
-            <?php $total_liability = 0;?>
-            
-            <table width="100%" cellpadding="1" cellspacing="0" border="1">
-                <?php foreach( $liability_accounts as $account ): ?>
-                <tr>
-                    <td style="width:70%"><?=$account->account_name;?></td>
-                    <td class="center-text"><?=to_currency($account->amount);?></td>
-                </tr>
-                <?php $total_liability += $account->amount;?>
-                <?php endforeach; ?>
-                <tr>
-                    <td style="width:70%"><b>TOTAL PASIVOS</b></td>
-                    <td class="center-text"><b><?=to_currency($total_liability)?></b></td>
-                </tr>
-            </table>
+        <td width="50%" class="center-text">
+            <div class="border-bottom" style="width:200px; margin:0 auto; padding-bottom:5px;">
+                GERENTE GENERAL
+            </div>
             <br/>
-            
-            <?php
-            
-            $loan_fund_capital -= $total_liability;
-            foreach ( $equity_accounts as $account )
-            {
-                $loan_fund_capital -= $account->amount;
-            }
-            
-            ?>
-            
-            <div><b>PATRIMONIO</b></div>
-            <table width="100%" cellpadding="1" cellspacing="0" border="1">
-                <tr>
-                    <td style="width:70%">Fondo de Capital</td>
-                    <td class="center-text"><?=to_currency($loan_fund_capital);?></td>
-                </tr>
-                <?php $total_capital = 0;?>
-                <?php foreach ( $equity_accounts as $account ):?>
-                <tr>
-                    <td style="width:70%"><?=$account->account_name;?></td>
-                    <td class="center-text"><?=to_currency($account->amount);?></td>
-                </tr>
-                
-                <?php $total_capital += $account->amount;?>
-                
-                <?php endforeach; ?>
-                <tr>
-                    <td style="width:70%"><b>TOTAL PATRIMONIO</b></td>
-                    <td class="center-text"><b><?=to_currency($total_capital + $loan_fund_capital);?></b></td>
-                </tr>
-            </table>
-            
-            <br/>
-            <table width="100%" cellpadding="1" cellspacing="0" border="1">
-                <tr>
-                    <td style="width:70%"><b>TOTAL PASIVO Y CAPITAL</b></td>
-                    <td class="center-text"><b><?=to_currency($total_liability + $total_capital + $loan_fund_capital)?></b></td>
-                </tr>
-            </table>
-        </td>        
+            <div>Nombre y Firma</div>
+        </td>
     </tr>
 </table>

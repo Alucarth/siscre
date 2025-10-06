@@ -171,16 +171,18 @@ class Accounting_model extends CI_Model
             $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
         }
         
+        // Consulta mejorada que incluye el movimiento_type
         $sql = "
             SELECT  b.account_type, 
                     b.account_name, 
-                    SUM(a.amount) amount,
+                    SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE 0 END) as debit_amount,
+                    SUM(CASE WHEN a.movement_type = 'credit' THEN a.amount ELSE 0 END) as credit_amount,
                     SUM(a.depreciate_amount) depreciation_amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
             WHERE 1 $where
-            GROUP BY b.account_name
-            ORDER BY FIELD(account_type, 'asset', 'liability', 'equity', 'income', 'expenses')
+            GROUP BY b.account_name, b.account_type
+            ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses'), b.account_name
             ";
         
         $query = $this->db->query( $sql );
@@ -216,13 +218,14 @@ class Accounting_model extends CI_Model
             $sql = "
                 SELECT  b.account_type, 
                         b.account_name, 
-                        SUM(a.amount) amount,
+                        SUM(a.amount) as debit_amount,
+                        0 as credit_amount,
                         0 depreciation_amount
                 FROM c19_account_transactions a 
                 LEFT JOIN c19_accounts b ON b.id = a.account_id
                 WHERE 1 $where
-                GROUP BY b.account_name
-                ORDER BY FIELD(account_type, 'asset', 'liability', 'equity', 'income', 'expenses')
+                GROUP BY b.account_name, b.account_type
+                ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses')
                 ";
 
             $query = $this->db->query( $sql );
@@ -233,6 +236,7 @@ class Accounting_model extends CI_Model
                 {
                     if ( $row->account_type != '' )
                     {
+                        // Para el plugin de accounts, asumimos que todo es débito
                         $tmp[] = $row;
                     }
                 }
@@ -242,283 +246,225 @@ class Accounting_model extends CI_Model
         
         return $tmp;
     }
-    
-    public function get_financial_income_data( $filters = [] )
+
+    // Función auxiliar para calcular saldos correctos en el balance de comprobación
+    public function get_trial_balance_with_balances( $filters = [] )
     {
-        $where = '';
-        if ( isset($filters["date_from"]) && trim($filters["date_from"]) != '' )
-        {
-            $where .= " AND a.added_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
+        $accounts = $this->get_trial_balance_data($filters);
+        $result = [];
+        
+        foreach($accounts as $account) {
+            $balance = 0;
+            
+            // Determinar si la cuenta es de naturaleza débito o crédito
+            switch($account->account_type) {
+                case 'asset':
+                case 'expenses':
+                    // Cuentas de naturaleza débito
+                    $balance = $account->debit_amount - $account->credit_amount;
+                    break;
+                case 'liability':
+                case 'equity':
+                case 'income':
+                    // Cuentas de naturaleza crédito
+                    $balance = $account->credit_amount - $account->debit_amount;
+                    break;
+            }
+            
+            $account->balance = $balance;
+            $result[] = $account;
         }
         
-        if ( isset($filters["date_to"]) && trim($filters["date_to"]) != '' )
-        {
-            $where .= " AND a.added_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
+        return $result;
+    }
+    
+    public function get_income_statement_data($filters = [])
+    {
+        $this->db->select("b.account_type, b.account_name, b.account_map");
+        $this->db->select("SUM(CASE 
+            WHEN b.account_type = 'income' AND a.movement_type = 'credit' THEN a.amount
+            WHEN b.account_type = 'income' AND a.movement_type = 'debit' THEN -a.amount
+            WHEN b.account_type = 'expenses' AND a.movement_type = 'debit' THEN a.amount
+            WHEN b.account_type = 'expenses' AND a.movement_type = 'credit' THEN -a.amount
+            ELSE 0 
+        END) as amount");
+        
+        $this->db->from('c19_accounting_transactions a');
+        $this->db->join('c19_accounting_accounts b', 'b.id = a.account_id');
+        $this->db->where_in('b.account_type', ['income', 'expenses']);
+        
+        // Aplicar filtros de fecha
+        if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
+            $date_from = date("Y-m-d", $filters["date_from"]) . " 00:00:00";
+            $this->db->where('a.added_date >=', $date_from);
         }
         
-        if(is_plugin_active("branches"))
-        {
-            $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
+        if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
+            $date_to = date("Y-m-d", $filters["date_to"]) . " 23:59:59";
+            $this->db->where('a.added_date <=', $date_to);
         }
         
-        $sql = "
-            SELECT  b.account_type, 
-                    b.account_name, 
-                    SUM(a.amount) amount
-            FROM c19_accounting_transactions a 
-            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE account_type IN ('income', 'expenses') $where
-            GROUP BY b.account_name
-            ORDER BY FIELD(account_type, 'income', 'expenses')
-            ";
-        
-        $query = $this->db->query( $sql );
-        
-        $financial_data = [];
-        if ( $query && $query->num_rows() > 0 )
-        {
-            foreach ( $query->result() as $row )
-            {
-                $financial_data[] = $row;
-            }
+        if (is_plugin_active("branches")) {
+            $this->db->where('a.branch_id', $this->session->userdata("branch_id"));
         }
         
-        // Account Plugin - START
-        if(is_plugin_active("accounts"))
-        {
-            $where = '';
-            if ( isset($filters["date_from"]) && trim($filters["date_from"]) != '' )
-            {
-                $where .= " AND a.trans_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
-            }
-
-            if ( isset($filters["date_to"]) && trim($filters["date_to"]) != '' )
-            {
-                $where .= " AND a.trans_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
-            }
-
-            if(is_plugin_active("branches"))
-            {
-                $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
-            }
-
-            $sql = "
-                SELECT  b.account_type, 
-                        b.account_name, 
-                        SUM(a.amount) amount
-                FROM c19_account_transactions a 
-                LEFT JOIN c19_accounts b ON b.id = a.account_id
-                WHERE b.account_type IN ('asset', 'expenses') $where
-                GROUP BY b.account_name
-                ";
-
-            $query = $this->db->query( $sql );
-
-            if ( $query && $query->num_rows() > 0 )
-            {
-                foreach( $query->result() as $row )
-                {
-                    if ( $row->account_type != '' )
-                    {
-                        $financial_data[] = $row;
-                    }
-                }
-            }
-        }
-        // Account Plugin - END
+        $this->db->group_by('b.account_name, b.account_type, b.account_map');
+        $this->db->order_by('FIELD(b.account_type, "income", "expenses"), b.account_map');
         
-        return $financial_data;
+        $query = $this->db->get();
+        
+        return $query->result();
     }
     
     private function _get_map_account_ids()
     {
-        $sql = "SELECT id, account_map FROM c19_accounting_accounts a WHERE a.account_map <> ''";
+        $sql = "SELECT id, code_number FROM c19_accounting_accounts a WHERE a.code_number <> ''";
         $query = $this->db->query( $sql );
         
-        $map_ids["cash"] = 0;
-        $map_ids["bank"] = 0;
-        $map_ids["loan"] = 0;
-        $map_ids["loan_loss_reserve"] = 0;
+        $map_ids = array();
         
         if ( $query && $query->num_rows() > 0 )
         {
             foreach ( $query->result() as $row )
             {
-                switch( $row->account_map )
-                {
-                    case "cash":
-                        $map_ids["cash"] = $row->id;
-                        break;
-                    case "bank":
-                        $map_ids["bank"] = $row->id;
-                        break;
-                    case "loan":
-                        $map_ids["loan"] = $row->id;
-                        break;
-                    case "loan_loss_reserve":
-                        $map_ids["loan_loss_reserve"] = $row->id;
-                        break;
-                }
+                // Mapear por code_number como clave y id como valor
+                $map_ids[$row->code_number] = $row->id;
             }
         }
         
         return $map_ids;
     }
     
-    public function get_balance_sheet_data( $filters = [] )
+    public function get_balance_sheet_data($filters = [])
     {
-        $map_ids = $this->_get_map_account_ids();
-        $cash_account_id = $map_ids["cash"];
-        $bank_account_id = $map_ids["bank"];
-        $loan_account_id = $map_ids["loan"];
-        $loan_loss_reserve_account_id = $map_ids["loan_loss_reserve"];
+        $data = [];
         
+        // Configurar filtros de fecha
         $where = '';
-        if ( isset($filters["date_from"]) && trim($filters["date_from"]) != '' )
-        {
+        if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
             $where .= " AND a.added_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
         }
-        
-        if ( isset($filters["date_to"]) && trim($filters["date_to"]) != '' )
-        {
+        if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
             $where .= " AND a.added_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
         }
-        
-        if(is_plugin_active("branches"))
-        {
+        if(is_plugin_active("branches")) {
             $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
         }
-        
-        $sql = "
-            SELECT  b.id, 
-                    SUM(a.amount) amount, 
-                    SUM(a.depreciate_amount) depreciation_amount,
-                    b.account_name 
+
+        // 1. OBTENER ACTIVOS CORRIENTES (account_map que empiezan con 11)
+        $sql_activos_corrientes = "
+            SELECT b.id, b.account_name, b.account_map, 
+                SUM(a.amount) as amount,
+                SUM(a.depreciate_amount) as depreciation_amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE a.account_id IN ($cash_account_id, $bank_account_id, $loan_account_id, $loan_loss_reserve_account_id) $where
-            GROUP BY a.account_id;
-            ";
+            WHERE b.account_type = 'asset' 
+            AND b.account_map IN ('110101', '110102', '110103', '110104', '110105') $where
+            GROUP BY b.id, b.account_name, b.account_map
+            ORDER BY b.account_map
+        ";
         
-        $query = $this->db->query( $sql );
+        $query = $this->db->query($sql_activos_corrientes);
+        $activos_corrientes = [];
+        $total_activos_corrientes = 0;
         
-        $cash_amount = 0;
-        $cash_amount_bank = 0;
-        $loan_loss_reserve = 0;
-        if ( $query && $query->num_rows() > 0 )
-        {
-            foreach( $query->result() as $row )
-            {
-                switch( $row->id )
-                {
-                    case $cash_account_id:
-                        $cash_amount = $row->amount;
-                        break;
-                    case $bank_account_id:
-                        $cash_amount_bank = $row->amount;
-                        break;
-                    case $loan_loss_reserve_account_id:
-                        $loan_loss_reserve = $row->amount;
-                        break;
-                }
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $activos_corrientes[] = $row;
+                $total_activos_corrientes += $row->amount;
             }
         }
-        
-        $current_loan_amount = $this->get_current_loan_amount($filters);
-        
-        $tmp["cash_amount"] = $cash_amount;
-        $tmp["cash_amount_bank"] = $cash_amount_bank;
-        $tmp["current_loan_amount"] = $current_loan_amount;
-        $tmp["loan_loss_reserve"] = $loan_loss_reserve;
-        
-        $interest_receivable = $this->get_interest_on_current($filters);
-        $net_loan_outstanding = $current_loan_amount + $interest_receivable - $loan_loss_reserve;
-        
-        $tmp["net_loan_outstanding"] = $net_loan_outstanding;
-        $tmp["total_current_assets"] = $cash_amount + $cash_amount_bank + $net_loan_outstanding;
-        
-        // Non-current Assets
-        $non_current_assets = [];
-        
-        if (is_plugin_active("accounts"))
-        {
-            $str_where = '';
-            if(is_plugin_active("branches"))
-            {
-                $str_where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
-            }
 
-            $sql = "
-                SELECT  b.id, 
-                        SUM(a.amount) amount, 
-                        SUM(a.depreciate_amount) depreciation_amount, 
-                        b.account_name 
-                FROM c19_accounting_transactions a 
-                LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-                WHERE a.account_id NOT IN ($cash_account_id, $bank_account_id, $loan_account_id, $loan_loss_reserve_account_id) $where
-                AND b.account_type = 'asset' $str_where
-                GROUP BY a.account_id;
-                ";
-
-            $query = $this->db->query( $sql );
-            
-            if ( $query && $query->num_rows() > 0 )
-            {
-                foreach ( $query->result() as $row )
-                {
-                    $non_current_assets[] = $row;
-                }
-            }        
+        // 2. OBTENER ACTIVOS NO CORRIENTES (account_map que empiezan con 12)
+        $sql_activos_no_corrientes = "
+            SELECT b.id, b.account_name, b.account_map, 
+                SUM(a.amount) as amount,
+                SUM(a.depreciate_amount) as depreciation_amount
+            FROM c19_accounting_transactions a 
+            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
+            WHERE b.account_type = 'asset' 
+            AND b.account_map LIKE '12%' $where
+            GROUP BY b.id, b.account_name, b.account_map
+            ORDER BY b.account_map
+        ";
         
-            // Account Plugin - START
+        $query = $this->db->query($sql_activos_no_corrientes);
+        $activos_no_corrientes = [];
+        $total_activos_no_corrientes = 0;
         
-            $where = '';
-            if ( isset($filters["date_from"]) && trim($filters["date_from"]) != '' )
-            {
-                $where .= " AND a.trans_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
-            }
-
-            if ( isset($filters["date_to"]) && trim($filters["date_to"]) != '' )
-            {
-                $where .= " AND a.trans_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
-            }
-
-            if(is_plugin_active("branches"))
-            {
-                $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
-            }
-
-            $sql = "
-                SELECT  b.account_type, 
-                        b.account_name, 
-                        SUM(a.amount) amount,
-                        0 depreciation_amount
-                FROM c19_account_transactions a 
-                LEFT JOIN c19_accounts b ON b.id = a.account_id
-                WHERE b.account_type = 'asset' $where
-                GROUP BY b.account_name
-                ";
-
-            $query = $this->db->query( $sql );
-
-            if ( $query && $query->num_rows() > 0 )
-            {
-                foreach( $query->result() as $row )
-                {
-                    if ( $row->account_type != '' )
-                    {
-                        $non_current_assets[] = $row;
-                    }
-                }
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $activos_no_corrientes[] = $row;
+                $total_activos_no_corrientes += ($row->amount - $row->depreciation_amount);
             }
         }
-        // Account Plugin - END
+
+        // 3. OBTENER PASIVOS (account_map que empiezan con 2)
+        $sql_pasivos = "
+            SELECT b.id, b.account_name, b.account_map, 
+                SUM(a.amount) as amount
+            FROM c19_accounting_transactions a 
+            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
+            WHERE b.account_type = 'liability' $where
+            GROUP BY b.id, b.account_name, b.account_map
+            ORDER BY b.account_map
+        ";
         
-        $tmp["non_current_assets"] = $non_current_assets;
-        $tmp['liability_accounts'] = $this->get_account_data('liability', $filters);
-        $tmp['equity_accounts'] = $this->get_account_data('equity', $filters);
+        $query = $this->db->query($sql_pasivos);
+        $pasivos = [];
+        $total_pasivos = 0;
         
-        return $tmp;
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $pasivos[] = $row;
+                $total_pasivos += $row->amount;
+            }
+        }
+
+        // 4. OBTENER PATRIMONIO (account_map que empiezan con 3)
+        $sql_patrimonio = "
+            SELECT b.id, b.account_name, b.account_map, 
+                SUM(a.amount) as amount
+            FROM c19_accounting_transactions a 
+            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
+            WHERE b.account_type = 'equity' $where
+            GROUP BY b.id, b.account_name, b.account_map
+            ORDER BY b.account_map
+        ";
+        
+        $query = $this->db->query($sql_patrimonio);
+        $patrimonio = [];
+        $total_patrimonio = 0;
+        
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $patrimonio[] = $row;
+                $total_patrimonio += $row->amount;
+            }
+        }
+
+        // 5. CALCULAR TOTALES
+        $total_activos = $total_activos_corrientes + $total_activos_no_corrientes;
+        $total_pasivos_patrimonio = $total_pasivos + $total_patrimonio;
+
+        // 6. PREPARAR DATOS PARA LA VISTA
+        $data['activos_corrientes'] = $activos_corrientes;
+        $data['total_activos_corrientes'] = $total_activos_corrientes;
+        
+        $data['activos_no_corrientes'] = $activos_no_corrientes;
+        $data['total_activos_no_corrientes'] = $total_activos_no_corrientes;
+        
+        $data['pasivos'] = $pasivos;
+        $data['total_pasivos'] = $total_pasivos;
+        
+        $data['patrimonio'] = $patrimonio;
+        $data['total_patrimonio'] = $total_patrimonio;
+        
+        $data['total_activos'] = $total_activos;
+        $data['total_pasivos_patrimonio'] = $total_pasivos_patrimonio;
+        $data['balance_cuadra'] = ($total_activos == $total_pasivos_patrimonio);
+
+        return $data;
     }
     
     public function get_account_data($account_type = '', $filters = [])

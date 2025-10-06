@@ -1,111 +1,77 @@
 <style>
-    #tbl-trial-balance td:nth-child(2),
-    #tbl-trial-balance td:nth-child(3) 
-    {
-        text-align: center;
-    }
+    .center-text { text-align:center; }
+    .right-text { text-align:right; }
+    .left-text { text-align:left; }
 </style>
 
-<?php
-
-$total_non_current_assets = 0;
-foreach( $non_current_assets as $asset )
-{
-    $total_non_current_assets += $asset->amount;
-}
-$total_assets = $total_current_assets + $interest_on_current + $total_non_current_assets;
-
-$loan_fund_capital = $total_assets;
-
-$total_liability = 0;
-foreach( $liability_accounts as $account )
-{
-    $total_liability += $account->amount;
-}
-$loan_fund_capital -= $total_liability;
-foreach ( $equity_accounts as $account )
-{
-    $loan_fund_capital -= $account->amount;
-}
-
-?>
-
+<div style="position:absolute; top:20px; left:40px;" class="empresa-info">
+    <div class="bold">CREDISURGIR</div>
+    <div>NIT: 485672023</div>
+</div>  
 <div style="text-align:center">
-    <h3>Balance de comprobacion</h3>
-    Fechado: <?=date($this->config->item('date_format'), $date_from) . " - " . date($this->config->item('date_format'), $date_to)?>
-    <br/>
-    <br/>
+    <h3>BALANCE DE COMPROBACIÓN</h3>
+    Del: <?=date($this->config->item('date_format'), $date_from)?> 
+    Al: <?=date($this->config->item('date_format'), $date_to)?>
+    <br/><h4>(Expresado en Bolivianos)</h4><br/>
 </div>
 
-<table width="100%" cellpadding="1" cellspacing="0" border="1" id="tbl-trial-balance">
+<table width="100%" cellpadding="4" cellspacing="0" border="1">
     <tr>
-        <td style="text-align:center"><b>Nombre de la cuenta</b></td>
-        <td><b>Debito</b></td>
-        <td><b>Credito</b></td>
+        <th width="40%">Cuenta</th>
+        <th width="20%">Tipo</th>
+        <th width="20%">Débito</th>
+        <th width="20%">Crédito</th>
     </tr>
-    <?php $debit_total = $credit_total = 0;?>
-    <?php foreach ( $accounts as $account ): ?>
+    
+    <?php 
+    $total_debito = 0;
+    $total_credito = 0;
+    ?>
+    
+    <?php foreach($accounts as $account): ?>
     <tr>
-        <td><?=$account->account_name;?></td>
-        <td>
-            <?php
-            if (in_array($account->account_type, ['asset', 'expenses']))
-            {
-                echo to_currency($account->amount);
-                $debit_total += $account->amount;
+        <td class="left-text"><?=$account->account_name?></td>
+        <td class="center-text">
+            <?=ucfirst($account->account_type)?>
+        </td>
+        <td class="right-text">
+            <?php 
+            if(isset($account->debit_amount) && $account->debit_amount > 0) {
+                echo to_currency($account->debit_amount);
+                $total_debito += $account->debit_amount;
+            } else {
+                echo to_currency(0);
             }
             ?>
         </td>
-        <td>
-            <?php
-            if (in_array($account->account_type, ['liability', 'equity', 'income']))
-            {
-                echo to_currency($account->amount);
-                $credit_total += $account->amount;
+        <td class="right-text">
+            <?php 
+            if(isset($account->credit_amount) && $account->credit_amount > 0) {
+                echo to_currency($account->credit_amount);
+                $total_credito += $account->credit_amount;
+            } else {
+                echo to_currency(0);
             }
             ?>
         </td>
     </tr>
-    <?php if (in_array($account->account_type, ['asset', 'expenses']) && $account->depreciation_amount > 0): ?>
-        <tr>
-            <td>Depreciacion acumulada: <?=$account->account_name;?></td>
-            <td>
-                &nbsp;
-            </td>
-            <td>
-                <?php
-                    echo to_currency($account->depreciation_amount);
-                    $credit_total += $account->depreciation_amount;
-                ?>
-            </td>
-        </tr>
-    <?php endif; ?>
     <?php endforeach; ?>
-    <tr>
-        <td>Fondo de Prestamo de Patrimonio</td>
-        <td></td>
-        <td><?=to_currency($loan_fund_capital);?></td>
-    </tr>
-    <tr>
-        <td>Interes por Cobrar</td>
-        <td><?=to_currency($interest_on_current);?></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>Prestamo Neto Pendiente</td>
-        <td><?=to_currency($net_loan_outstanding);?></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>Intereses sobre Prestamos Vigentes y Vencidos</td>
-        <td></td>
-        <td><?=to_currency($interest_on_current_and_past_due);?></td>
+    
+    <!-- TOTALES -->
+    <tr style="background-color:#f0f0f0;">
+        <td colspan="2" class="right-text"><b>TOTALES</b></td>
+        <td class="right-text"><b><?=to_currency($total_debito)?></b></td>
+        <td class="right-text"><b><?=to_currency($total_credito)?></b></td>
     </tr>
     
+    <!-- VERIFICACIÓN -->
     <tr>
-        <td><b>Total</b></td>
-        <td><?=to_currency($debit_total+$net_loan_outstanding);?></td>
-        <td><?=to_currency($credit_total+$loan_fund_capital+$interest_on_current_and_past_due);?></td>
+        <td colspan="4" class="center-text" style="<?=($total_debito == $total_credito) ? 'color:green;' : 'color:red;'?>">
+            <?php if($total_debito == $total_credito): ?>
+                <b>✓ CUADRADO - Débitos (<?=to_currency($total_debito)?>) = Créditos (<?=to_currency($total_credito)?>)</b>
+            <?php else: ?>
+                <b>✗ NO CUADRADO - Diferencia: <?=to_currency(abs($total_debito - $total_credito))?></b>
+            <?php endif; ?>
+        </td>
     </tr>
-    
 </table>
