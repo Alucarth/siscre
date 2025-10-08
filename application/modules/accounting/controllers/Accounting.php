@@ -829,16 +829,35 @@ class Accounting extends Secure_area implements iData_controller {
         echo $out;
     }
     
-   // En la función _load_report_data, agregar:
     private function _load_report_data( $report_type )
     {
         $filters = [];
-        $filters["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? 
-            strtotime(uk_to_isodate($this->input->post('date_from'))) : 
-            strtotime($this->input->post('date_from'));
-        $filters["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? 
-            strtotime(uk_to_isodate($this->input->post('date_to'))) : 
-            strtotime($this->input->post('date_to'));
+        
+        // DEPURACIÓN: Ver qué fechas llegan del POST
+        error_log("POST date_from: " . $this->input->post('date_from'));
+        error_log("POST date_to: " . $this->input->post('date_to'));
+        error_log("Date format: " . $this->config->item('date_format'));
+        
+        if ($this->config->item('date_format') == 'd/m/Y') {
+            $filters["date_from"] = strtotime(uk_to_isodate($this->input->post('date_from')));
+            $filters["date_to"] = strtotime(uk_to_isodate($this->input->post('date_to')));
+        } else {
+            $filters["date_from"] = strtotime($this->input->post('date_from'));
+            $filters["date_to"] = strtotime($this->input->post('date_to'));
+        }
+        
+        // Asegurarnos de que las fechas sean válidas
+        if ($filters["date_from"] === false) {
+            $filters["date_from"] = strtotime('-1 month');
+            error_log("Invalid date_from, using default: -1 month");
+        }
+        if ($filters["date_to"] === false) {
+            $filters["date_to"] = time();
+            error_log("Invalid date_to, using default: now");
+        }
+        
+        error_log("Processed date_from: " . date('Y-m-d', $filters["date_from"]));
+        error_log("Processed date_to: " . date('Y-m-d', $filters["date_to"]));
         
         $data = [];
         switch( $report_type )
@@ -847,7 +866,11 @@ class Accounting extends Secure_area implements iData_controller {
                 $data["accounts"] = $this->accounting_model->get_trial_balance_data($filters);
                 break;
             case 'income_statement':
-                $data["accounts"] = $this->accounting_model->get_income_statement_data($filters);
+                $income_data = $this->accounting_model->get_consolidated_income_statement($filters);
+                $data["accounts"] = $income_data['accounts'];
+                $data["total_income"] = $income_data['total_income'];
+                $data["total_expenses"] = $income_data['total_expenses'];
+                $data["net_income"] = $income_data['net_income'];
                 break;
             case 'balance_sheet':
                 $data = $this->accounting_model->get_balance_sheet_data($filters);
