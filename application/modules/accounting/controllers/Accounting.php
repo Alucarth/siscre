@@ -871,7 +871,7 @@ class Accounting extends Secure_area implements iData_controller {
                 $data["total_income"] = $income_data['total_income'];
                 $data["total_expenses"] = $income_data['total_expenses'];
                 $data["net_income"] = $income_data['net_income'];
-                break;
+                break; 
             case 'balance_sheet':
                 $data = $this->accounting_model->get_balance_sheet_data($filters);
                 $data["interest_on_current"] = $this->accounting_model->get_interest_on_current($filters);
