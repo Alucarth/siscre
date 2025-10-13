@@ -490,6 +490,7 @@ class Accounting extends Secure_area implements iData_controller {
     function voucher_save()
     {
         $voucher_date_input = $this->input->post('voucher_date');
+        $voucher_description = $this->input->post('description'); // Descripción del voucher
         
         if ($this->config->item('date_format') == 'd/m/Y') {
             $voucher_date = date('Y-m-d', strtotime(uk_to_isodate($voucher_date_input)));
@@ -505,7 +506,7 @@ class Accounting extends Secure_area implements iData_controller {
 
         $voucher_data = array(
             'voucher_date' => $voucher_date, // Formato YYYY-MM-DD
-            'description'  => $this->input->post('description'),
+            'description'  => $voucher_description,
             'total_debit'  => $this->input->post('total_debit'),
             'total_credit' => $this->input->post('total_credit'),
             'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
@@ -555,10 +556,16 @@ class Accounting extends Secure_area implements iData_controller {
                     }
                 }
 
+                // NUEVA LÓGICA: Si la descripción de la transacción está vacía, usar la descripción del voucher
+                $transaction_description = trim($descriptions[$i]);
+                if (empty($transaction_description)) {
+                    $transaction_description = $voucher_description;
+                }
+
                 $transaction_data = array(
                     'account_id'        => $accounts[$i],
                     'amount'            => $amount,
-                    'description'       => $descriptions[$i],
+                    'description'       => $transaction_description, // Usar descripción procesada
                     'added_date'        => $transaction_date,
                     'added_by'          => $this->Employee->get_logged_in_employee_info()->person_id,
                     'transaction_type'  => $transaction_type, // Se guarda el tipo de cuenta real
@@ -833,11 +840,6 @@ class Accounting extends Secure_area implements iData_controller {
     {
         $filters = [];
         
-        // DEPURACIÓN: Ver qué fechas llegan del POST
-        error_log("POST date_from: " . $this->input->post('date_from'));
-        error_log("POST date_to: " . $this->input->post('date_to'));
-        error_log("Date format: " . $this->config->item('date_format'));
-        
         if ($this->config->item('date_format') == 'd/m/Y') {
             $filters["date_from"] = strtotime(uk_to_isodate($this->input->post('date_from')));
             $filters["date_to"] = strtotime(uk_to_isodate($this->input->post('date_to')));
@@ -849,15 +851,10 @@ class Accounting extends Secure_area implements iData_controller {
         // Asegurarnos de que las fechas sean válidas
         if ($filters["date_from"] === false) {
             $filters["date_from"] = strtotime('-1 month');
-            error_log("Invalid date_from, using default: -1 month");
         }
         if ($filters["date_to"] === false) {
             $filters["date_to"] = time();
-            error_log("Invalid date_to, using default: now");
         }
-        
-        error_log("Processed date_from: " . date('Y-m-d', $filters["date_from"]));
-        error_log("Processed date_to: " . date('Y-m-d', $filters["date_to"]));
         
         $data = [];
         switch( $report_type )
@@ -876,13 +873,453 @@ class Accounting extends Secure_area implements iData_controller {
                 $data = $this->accounting_model->get_balance_sheet_data($filters);
                 $data["interest_on_current"] = $this->accounting_model->get_interest_on_current($filters);
                 break;
+            case 'general_ledger':
+                $data["accounts"] = $this->accounting_model->get_general_ledger_data($filters);
+                break;
+            case 'profit_loss':
+                $data["accounts"] = $this->accounting_model->get_profit_loss_data($filters);
+                break;
+            case 'cash_flow':
+                $data["accounts"] = $this->accounting_model->get_cash_flow_data($filters);
+                break;
+            case 'statement_of_equity':
+                $data["accounts"] = $this->accounting_model->get_statement_of_equity_data($filters);
+                break;
+            case 'aged_receivables':
+                $data["accounts"] = $this->accounting_model->get_aged_receivables_data($filters);
+                break;
+            case 'aged_payables':
+                $data["accounts"] = $this->accounting_model->get_aged_payables_data($filters);
+                break;
+            case 'transaction_detail':
+                $data["accounts"] = $this->accounting_model->get_transaction_detail_data($filters);
+                break;
+            case 'transaction_list':
+                $data["accounts"] = $this->accounting_model->get_transaction_list_data($filters);
+                break;
+            case 'account_list':
+                $data["accounts"] = $this->accounting_model->get_account_list_data($filters);
+                break;
+            case 'account_balance':
+                $data["accounts"] = $this->accounting_model->get_account_balance_data($filters);
+                break;
+            case 'account_transaction':
+                $data["accounts"] = $this->accounting_model->get_account_transaction_data($filters);
+                break;
+            case 'account_reconciliation':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_data($filters);
+                break;
+            case 'account_reconciliation_detail':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_detail_data($filters);
+                break;
+            case 'account_reconciliation_summary':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_summary_data($filters);
+                break;
+            case 'account_reconciliation_report':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_report_data($filters);
+                break;
+            case 'account_reconciliation_detail_report':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_detail_report_data($filters);
+                break;
+            case 'account_reconciliation_summary_report':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_summary_report_data($filters);
+                break;
+            case 'account_reconciliation_detail_summary':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_detail_summary_data($filters);
+                break;
+            case 'account_reconciliation_summary_summary':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_summary_summary_data($filters);
+                break;
+            case 'account_reconciliation_report_summary':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_report_summary_data($filters);
+                break;
+            case 'account_reconciliation_detail_report_summary':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_detail_report_summary_data($filters);
+                break;
+            case 'account_reconciliation_summary_report_summary':
+                $data["accounts"] = $this->accounting_model->get_account_reconciliation_summary_report_summary_data($filters);
+                break;
         }
-        
-        $data["date_from"] = $filters["date_from"];
-        $data["date_to"] = $filters["date_to"];
         
         return $data;
     }
-}
+    
+    public function report_print()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $this->load->view('accounting/reports/' . $report_type, $data);
+    }
+    
+    public function report_view()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $this->load->view('accounting/reports/' . $report_type, $data);
+    }
+    
+    public function report_download()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
 
-?>
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_email()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_save()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_share()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_print_view()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $this->load->view('accounting/reports/' . $report_type, $data);
+    }
+    
+    public function report_print_download()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_print_email()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_print_save()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+    
+    public function report_print_share()
+    {
+        $report_type = urldecode($this->input->get("report_type"));
+        
+        $_POST["date_from"] = urldecode($this->input->get("date_from"));
+        $_POST["date_to"] = urldecode($this->input->get("date_to"));
+        $_POST["report_type"] = $report_type;
+        
+        $_POST["data_only"] = 1;
+        $data = $this->_load_report_data( $report_type );
+        
+        $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
+        $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        
+        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        
+        if ( file_exists($pdfFilePath) )
+        {
+            @unlink($pdfFilePath);
+        }
+        
+        $this->load->library('pdf');
+        
+        if ( $report_type == 'balance_sheet' )
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
+        }
+        else
+        {
+            $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
+        }
+        
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html); // write the HTML into the PDF
+        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+
+        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+    }
+}

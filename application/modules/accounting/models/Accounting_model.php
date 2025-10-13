@@ -283,16 +283,13 @@ class Accounting_model extends CI_Model
         $date_from = isset($filters["date_from"]) ? date("Y-m-d", $filters["date_from"]) : '1900-01-01';
         $date_to = isset($filters["date_to"]) ? date("Y-m-d", $filters["date_to"]) : '2100-01-01';
         
-        log_message('debug', "=== INICIANDO get_income_statement_data ===");
-        log_message('debug', "Fechas - Desde: $date_from, Hasta: $date_to");
-        
         $branch_condition = "";
         if (is_plugin_active("branches")) {
             $branch_id = $this->session->userdata("branch_id");
             $branch_condition = " AND a.branch_id = $branch_id";
         }
         
-        // CONSULTA MEJORADA - Con más depuración
+        // CONSULTA MEJORADA
         $sql = "
             SELECT 
                 b.account_type, 
@@ -310,90 +307,48 @@ class Accounting_model extends CI_Model
             GROUP BY b.id, b.account_name, b.account_type, b.code_number, b.account_map
             ORDER BY b.account_type, b.code_number
         ";
-        
-        log_message('debug', "SQL Consulta: " . $sql);
-        
+                
         $query = $this->db->query($sql);
         
         // Log de error de SQL si existe
         if (!$query) {
             $error = $this->db->error();
-            log_message('error', "Error en consulta: " . $error['message']);
             return [];
         }
         
         $financial_data = [];
-        $row_count = $query->num_rows();
-        log_message('debug', "Consulta retornó $row_count registros");
         
-        if ($row_count > 0) {
+        if ($query->num_rows() > 0) {
             foreach ($query->result() as $row) {
-                log_message('debug', "Registro: " . $row->account_name . " - " . $row->amount);
                 $financial_data[] = $row;
             }
-        } else {
-            log_message('debug', "NO se encontraron registros");
-            
-            // DEBUG: Consulta para verificar datos existentes
-            $debug_sql = "
-                SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN b.account_type IN ('income', 'expenses') THEN 1 ELSE 0 END) as income_expenses_count
-                FROM c19_accounting_transactions a 
-                LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-                WHERE DATE(a.added_date) BETWEEN '$date_from' AND '$date_to'
-                $branch_condition
-            ";
-            $debug_query = $this->db->query($debug_sql);
-            $debug_data = $debug_query->row();
-            log_message('debug', "Total transacciones en rango: " . $debug_data->total);
-            log_message('debug', "Transacciones income/expenses: " . $debug_data->income_expenses_count);
         }
-        
-        log_message('debug', "Total registros finales: " . count($financial_data));
-        log_message('debug', "=== FINALIZANDO get_income_statement_data ===");
         
         return $financial_data;
     }
 
     public function get_consolidated_income_statement($filters = [])
     {
-        log_message('debug', "=== INICIANDO get_consolidated_income_statement ===");
-        
         $accounts = $this->get_income_statement_data($filters);
-        
-        log_message('debug', "Número de cuentas obtenidas: " . count($accounts));
-        
+               
         $income_total = 0;
         $expenses_total = 0;
         $consolidated_data = [];
         
-        foreach ($accounts as $index => $account) {
-            // DEPURACIÓN: Verificar estructura real del objeto
-            log_message('debug', "Procesando cuenta $index: " . print_r($account, true));
-            
+        foreach ($accounts as $index => $account) {           
             $account_type = isset($account->account_type) ? strtolower(trim($account->account_type)) : '';
             $amount = isset($account->amount) ? floatval($account->amount) : 0;
             
-            log_message('debug', "Cuenta $index: " . $account->account_name . " - Tipo: '$account_type' - Monto: $amount");
-            
             if ($account_type == 'income') {
                 $income_total += $amount;
-                log_message('debug', "Sumando a INCOME: $amount, Total acumulado: $income_total");
             } elseif ($account_type == 'expenses') {
                 $expenses_total += $amount;
-                log_message('debug', "Sumando a EXPENSES: $amount, Total acumulado: $expenses_total");
-            } else {
-                log_message('debug', "TIPO DESCONOCIDO: '$account_type' para cuenta: " . $account->account_name);
             }
             
             $consolidated_data[] = $account;
         }
         
         $net_income = $income_total - $expenses_total;
-        
-        log_message('debug', "Totales finales - Income: $income_total, Expenses: $expenses_total, Net: $net_income");
-        log_message('debug', "=== FINALIZANDO get_consolidated_income_statement ===");
         
         return [
             'accounts' => $consolidated_data,
