@@ -571,7 +571,7 @@ class Accounting extends Secure_area implements iData_controller {
                     'transaction_type'  => $transaction_type, // Se guarda el tipo de cuenta real
                     'movement_type'     => $movement_type,    // Debe/Haber
                     'voucher_id'        => $voucher_id,
-                    'payment_methods'    => $payment_methods,   // Usar el mismo método de pago para todas
+                    'payment_methods'   => $payment_methods,   // Usar el mismo método de pago para todas
                     'invoice_number'    => $invoice_numbers[$i] ?? '',
                     'purchased_date'    => $purchased_date,
                     'purchased_amount'  => $purchased_amounts[$i] ?? 0,

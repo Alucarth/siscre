@@ -455,7 +455,7 @@ class Payments extends Secure_area implements iData_controller {
                 ['account_id' => 58,  'debit' => 0, 'credit' => $amount,                 'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
                 ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income'],
                 ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability'],
-                ['account_id' => 165,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
+                ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
             ];
 
             foreach ($transaction_entries as $entry) {

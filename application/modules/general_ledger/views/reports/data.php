@@ -107,7 +107,7 @@
             <!-- ENCABEZADO DEL VOUCHER -->
             <div class="voucher-header">
                 <h4 style="margin: 0; color: white;">
-                    Voucher ID: <?= $voucher_id ?>
+                    Voucher: <?= $voucher_id ?>
                 </h4>
                 <div style="display: flex; gap: 10px;">
                     <a href="<?= site_url('general_ledger/print_voucher/' . $voucher_id) ?>" 
