@@ -448,7 +448,7 @@ class Payments extends Secure_area implements iData_controller {
             // Asignación de cuentas contables según la nueva estructura
             $transaction_entries = [
                 // Débitos
-                ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expense'],
+                ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expenses'],
                 ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset'],
                 
                 // Créditos

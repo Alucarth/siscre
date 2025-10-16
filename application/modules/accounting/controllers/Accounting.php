@@ -700,7 +700,7 @@ class Accounting extends Secure_area implements iData_controller {
         
         
         $datatable->add_table_definition(["orderable" => false, "targets" => 0]);
-        $datatable->order = [[1, 'desc']];
+        $datatable->order = [[2, 'desc']];
 
         $datatable->allow_search = true;
         $datatable->dt_height = '350px';

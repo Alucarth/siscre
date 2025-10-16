@@ -65,7 +65,7 @@ class Accounting_model extends CI_Model
         if (is_plugin_active('activity_log'))
         {
             $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
-            track_action($user_id, "Assets", "Viewed assets list");
+            track_action($user_id, "assets", "Viewed assets list");
         }
         
         return $query;
@@ -93,9 +93,14 @@ class Accounting_model extends CI_Model
     function get_transactions($limit = 10000, $offset = 0, $search = "", $order = [], $filters = [], &$count_all = 0)
     {
         $sorter = array(
-            "",
-            "account_name",
-            "description",
+            "", // 0 - actions
+            "aa.account_name", // 1 - account_name
+            "at.added_date", // 2 - added_date (NUEVO)
+            "at.amount", // 3 - amount (NUEVO)
+            "at.purchased_date", // 4 - purchased_date (NUEVO)
+            "at.purchased_amount", // 5 - purchased_amount (NUEVO)
+            "at.depreciate_amount", // 6 - depreciate_amount (NUEVO)
+            "at.description", // 7 - description
         );
         
         $str_where = "WHERE transaction_type = '{$filters["transaction_type"]}' ";
@@ -147,7 +152,7 @@ class Accounting_model extends CI_Model
         if (is_plugin_active('activity_log'))
         {
             $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
-            track_action($user_id, "Assets", "Viewed assets transaction list");
+            track_action($user_id, "assets", "Viewed assets transaction list");
         }
         
         return $query;
