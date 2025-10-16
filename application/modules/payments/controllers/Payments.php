@@ -408,30 +408,31 @@ class Payments extends Secure_area implements iData_controller {
             $loan_info = $this->Loan->get_info($payment_data['loan_id']);
             $amount = floatval($payment_data['paid_amount']);
             
-            // Buscar en el cronograma
             $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
             $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
-
-            // Obtener la tasa de interés del préstamo
-            $interest_rate = floatval($loan_info->interest_rate);
             
-            // Cálculos según la nueva estructura
-            $intereses_amortizables = $interest_rate * 0.87;
-            $iva = $interest_rate * 0.13;
+            $interest = $sched_entry['found'] ? $sched_entry['interest'] : 0;
+
+            $intereses_amortizables = $interest * 0.87;
+            $iva = $interest * 0.13;
             $it = ($iva + $intereses_amortizables) * 0.03;
-            $caja_moneda_nacional = $amount + $iva + $intereses_amortizables;
+            $capital = $amount - $iva - $intereses_amortizables;
+            $caja_moneda_nacional = $capital + $iva + $intereses_amortizables;
 
             $customer = $this->Customer->get_info($payment_data['customer_id']);
             $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name}";
 
             $payment_methods = $this->input->post('payment_methods');
 
-            // Voucher
+            // Voucher - Sumar IT al total del débito
+            $total_debit = $caja_moneda_nacional + $it;
+            $total_credit = $caja_moneda_nacional + $it;
+
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
                 'description'  => $descripcion,
-                'total_debit'  => $caja_moneda_nacional,
-                'total_credit' => $caja_moneda_nacional,
+                'total_debit'  => $total_debit,
+                'total_credit' => $total_credit,
                 'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
                 'added_date'   => date('Y-m-d H:i:s')
             ];
@@ -452,7 +453,7 @@ class Payments extends Secure_area implements iData_controller {
                 ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset'],
                 
                 // Créditos
-                ['account_id' => 58,  'debit' => 0, 'credit' => $amount,                 'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
+                ['account_id' => 58,  'debit' => 0, 'credit' => $capital,               'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
                 ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income'],
                 ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability'],
                 ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
@@ -495,7 +496,7 @@ class Payments extends Secure_area implements iData_controller {
             return null;
         }
     }
-
+    
     /**
      * Busca una entrada en el cronograma de pagos del préstamo
      */
