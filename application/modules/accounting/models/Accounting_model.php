@@ -176,9 +176,9 @@ class Accounting_model extends CI_Model
             $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
         }
         
-        // Consulta mejorada que incluye el movimiento_type
         $sql = "
-            SELECT  b.account_type, 
+            SELECT  b.account_type,
+                    b.code_number, 
                     b.account_name, 
                     SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE 0 END) as debit_amount,
                     SUM(CASE WHEN a.movement_type = 'credit' THEN a.amount ELSE 0 END) as credit_amount,
@@ -186,7 +186,7 @@ class Accounting_model extends CI_Model
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
             WHERE 1 $where
-            GROUP BY b.account_name, b.account_type
+            GROUP BY b.account_name, b.account_type, b.code_number
             ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses'), b.account_name
             ";
         
@@ -221,7 +221,8 @@ class Accounting_model extends CI_Model
             }
 
             $sql = "
-                SELECT  b.account_type, 
+                SELECT  b.account_type,
+                        b.code_number 
                         b.account_name, 
                         SUM(a.amount) as debit_amount,
                         0 as credit_amount,
@@ -229,7 +230,7 @@ class Accounting_model extends CI_Model
                 FROM c19_account_transactions a 
                 LEFT JOIN c19_accounts b ON b.id = a.account_id
                 WHERE 1 $where
-                GROUP BY b.account_name, b.account_type
+                GROUP BY b.account_name, b.account_type, b.code_number
                 ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses')
                 ";
 
