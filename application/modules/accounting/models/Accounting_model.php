@@ -371,25 +371,36 @@ class Accounting_model extends CI_Model
         // Configurar filtros de fecha
         $where = '';
         if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
-            $where .= " AND a.added_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
+            $date_from = date("Y-m-d", $filters["date_from"]);
+            $where .= " AND DATE(a.added_date) >= '$date_from'";
         }
         if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
-            $where .= " AND a.added_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
+            $date_to = date("Y-m-d", $filters["date_to"]);
+            $where .= " AND DATE(a.added_date) <= '$date_to'";
         }
+        
         if(is_plugin_active("branches")) {
             $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
         }
 
-        // 1. OBTENER ACTIVOS CORRIENTES (account_map que empiezan con 11)
+        // 1. ACTIVOS CORRIENTES (cuentas que empiezan con 11)
         $sql_activos_corrientes = "
-            SELECT b.id, b.account_name, b.account_map, 
-                SUM(a.amount) as amount,
-                SUM(a.depreciate_amount) as depreciation_amount
+            SELECT 
+                b.id, 
+                b.account_name, 
+                b.account_map,
+                SUM(CASE 
+                    WHEN a.movement_type = 'debit' THEN a.amount 
+                    ELSE -a.amount 
+                END) as amount,
+                0 as depreciation_amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
             WHERE b.account_type = 'asset' 
-            AND b.account_map IN ('110101', '110102', '110103', '110104', '110105') $where
+            AND b.account_map LIKE '11%' 
+            $where
             GROUP BY b.id, b.account_name, b.account_map
+            HAVING ABS(amount) > 0.01
             ORDER BY b.account_map
         ";
         
@@ -404,16 +415,30 @@ class Accounting_model extends CI_Model
             }
         }
 
-        // 2. OBTENER ACTIVOS NO CORRIENTES (account_map que empiezan con 12)
+        // 2. ACTIVOS NO CORRIENTES (cuentas que empiezan con 12)
         $sql_activos_no_corrientes = "
-            SELECT b.id, b.account_name, b.account_map, 
-                SUM(a.amount) as amount,
-                SUM(a.depreciate_amount) as depreciation_amount
+            SELECT 
+                b.id, 
+                b.account_name, 
+                b.account_map,
+                SUM(CASE 
+                    WHEN a.movement_type = 'debit' THEN a.amount 
+                    ELSE -a.amount 
+                END) as amount,
+                COALESCE((
+                    SELECT SUM(at2.depreciate_amount) 
+                    FROM c19_accounting_transactions at2 
+                    WHERE at2.account_id = b.id 
+                    AND at2.depreciate_amount != 0
+                    $where
+                ), 0) as depreciation_amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
             WHERE b.account_type = 'asset' 
-            AND b.account_map LIKE '12%' $where
+            AND b.account_map LIKE '12%' 
+            $where
             GROUP BY b.id, b.account_name, b.account_map
+            HAVING ABS(amount) > 0.01
             ORDER BY b.account_map
         ";
         
@@ -424,18 +449,27 @@ class Accounting_model extends CI_Model
         if ($query && $query->num_rows() > 0) {
             foreach ($query->result() as $row) {
                 $activos_no_corrientes[] = $row;
-                $total_activos_no_corrientes += ($row->amount - $row->depreciation_amount);
+                $net_amount = $row->amount - $row->depreciation_amount;
+                $total_activos_no_corrientes += $net_amount;
             }
         }
 
-        // 3. OBTENER PASIVOS (account_map que empiezan con 2)
+        // 3. PASIVOS (todas las cuentas de liability)
         $sql_pasivos = "
-            SELECT b.id, b.account_name, b.account_map, 
-                SUM(a.amount) as amount
+            SELECT 
+                b.id, 
+                b.account_name, 
+                b.account_map,
+                SUM(CASE 
+                    WHEN a.movement_type = 'credit' THEN a.amount 
+                    ELSE -a.amount 
+                END) as amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type = 'liability' $where
+            WHERE b.account_type = 'liability' 
+            $where
             GROUP BY b.id, b.account_name, b.account_map
+            HAVING ABS(amount) > 0.01
             ORDER BY b.account_map
         ";
         
@@ -450,14 +484,22 @@ class Accounting_model extends CI_Model
             }
         }
 
-        // 4. OBTENER PATRIMONIO (account_map que empiezan con 3)
+        // 4. PATRIMONIO (todas las cuentas de equity - SOLO LAS QUE EXISTEN EN LA BD)
         $sql_patrimonio = "
-            SELECT b.id, b.account_name, b.account_map, 
-                SUM(a.amount) as amount
+            SELECT 
+                b.id, 
+                b.account_name, 
+                b.account_map,
+                SUM(CASE 
+                    WHEN a.movement_type = 'credit' THEN a.amount 
+                    ELSE -a.amount 
+                END) as amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type = 'equity' $where
+            WHERE b.account_type = 'equity' 
+            $where
             GROUP BY b.id, b.account_name, b.account_map
+            HAVING ABS(amount) > 0.01
             ORDER BY b.account_map
         ";
         
@@ -472,9 +514,13 @@ class Accounting_model extends CI_Model
             }
         }
 
-        // 5. CALCULAR TOTALES
+        // 5. CALCULAR TOTALES FINALES (SOLO CON DATOS REALES DE LA BD)
         $total_activos = $total_activos_corrientes + $total_activos_no_corrientes;
         $total_pasivos_patrimonio = $total_pasivos + $total_patrimonio;
+        
+        // Verificar si el balance cuadra (con tolerancia para decimales)
+        $diferencia = abs($total_activos - $total_pasivos_patrimonio);
+        $balance_cuadra = ($diferencia < 0.01);
 
         // 6. PREPARAR DATOS PARA LA VISTA
         $data['activos_corrientes'] = $activos_corrientes;
@@ -491,9 +537,57 @@ class Accounting_model extends CI_Model
         
         $data['total_activos'] = $total_activos;
         $data['total_pasivos_patrimonio'] = $total_pasivos_patrimonio;
-        $data['balance_cuadra'] = ($total_activos == $total_pasivos_patrimonio);
+        $data['balance_cuadra'] = $balance_cuadra;
+        $data['diferencia'] = $total_activos - $total_pasivos_patrimonio;
 
         return $data;
+    }
+
+    public function get_income_expenses_for_balance_sheet($filters = [])
+    {
+        $where = '';
+        if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
+            $date_from = date("Y-m-d", $filters["date_from"]);
+            $where .= " AND DATE(a.added_date) >= '$date_from'";
+        }
+        if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
+            $date_to = date("Y-m-d", $filters["date_to"]);
+            $where .= " AND DATE(a.added_date) <= '$date_to'";
+        }
+        
+        if(is_plugin_active("branches")) {
+            $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
+        }
+
+        $sql_income = "
+            SELECT SUM(CASE WHEN a.movement_type = 'credit' THEN a.amount ELSE -a.amount END) as total_income
+            FROM c19_accounting_transactions a 
+            INNER JOIN c19_accounting_accounts b ON b.id = a.account_id
+            WHERE b.account_type = 'income'
+            $where
+        ";
+        
+        $query_income = $this->db->query($sql_income);
+        $total_income = $query_income->row() ? floatval($query_income->row()->total_income) : 0;
+        
+        $sql_expenses = "
+            SELECT SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE -a.amount END) as total_expenses
+            FROM c19_accounting_transactions a 
+            INNER JOIN c19_accounting_accounts b ON b.id = a.account_id
+            WHERE b.account_type = 'expenses'
+            $where
+        ";
+        
+        $query_expenses = $this->db->query($sql_expenses);
+        $total_expenses = $query_expenses->row() ? floatval($query_expenses->row()->total_expenses) : 0;
+        
+        $net_income = $total_income - $total_expenses;
+        
+        return [
+            'total_income' => $total_income,
+            'total_expenses' => $total_expenses,
+            'net_income' => $net_income
+        ];
     }
     
     public function get_account_data($account_type = '', $filters = [])

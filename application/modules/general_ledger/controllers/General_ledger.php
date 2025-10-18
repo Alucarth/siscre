@@ -211,7 +211,7 @@ class General_ledger extends Secure_area implements iData_controller {
         $this->db->from('c19_accounting_transactions t');
         $this->db->join('c19_accounting_accounts a', 'a.id = t.account_id');
         $this->db->where('t.voucher_id', $voucher_id);
-        $this->db->order_by('t.movement_type DESC, t.amount DESC');
+        $this->db->order_by('t.movement_type DESC, t.amount DESC, t.id DESC');
         $transactions_query = $this->db->get();
 
         $data['transactions'] = $transactions_query->result();

@@ -13,7 +13,7 @@
 
 <!-- INFORMACIÓN DE LA EMPRESA - SUPERIOR IZQUIERDA -->
 <div style="position:absolute; top:20px; left:40px;" class="empresa-info">
-    <div class="bold">CREDISURGIR</div>
+    <div class="bold">CREDISURGIR S.R.L.</div>
     <div>NIT: 485672023</div>
 </div>
 
@@ -105,29 +105,15 @@
         <td class="right-text bold border-top"><?=to_currency($total_expenses)?></td>
     </tr>
     
-    <!-- ESPACIO -->
-    <tr><td colspan="3" style="height:20px;"></td></tr>
-    
     <!-- RESULTADO FINAL -->
     <?php 
     $color_fondo = $net_income >= 0 ? '#e8f8e8' : '#f8e8e8';
-    $color_texto = $net_income >= 0 ? 'green' : 'red';
     ?>
-    
-    <tr style="background-color:<?=$color_fondo?>;">
-        <td></td>
-        <td class="bold right-text">UTILIDAD (PÉRDIDA) NETA</td>
-        <td class="right-text bold border-top" style="color:<?=$color_texto?>; font-size:14px;">
-            <?=to_currency($net_income)?>
-        </td>
-    </tr>
 </table>
 
 <br/><br/><br/>
 
-<!-- RESUMEN EJECUTIVO -->
 <div style="margin-top:30px; padding:15px; border:1px solid #ccc; background-color:#f9f9f9;">
-    <h4 class="center-text">RESUMEN EJECUTIVO</h4>
     <table width="100%" style="border-collapse:collapse;">
         <tr>
             <td width="70%" class="bold">Total Ingresos:</td>
@@ -138,7 +124,7 @@
             <td class="right-text bold"><?=to_currency($total_expenses)?></td>
         </tr>
         <tr style="background-color:<?=$color_fondo?>;">
-            <td class="bold">Utilidad (Pérdida) Neta:</td>
+            <td class="bold">Resultado:</td>
             <td class="right-text bold" style="color:<?=$color_texto?>;"><?=to_currency($net_income)?></td>
         </tr>
     </table>
@@ -147,24 +133,19 @@
 <br/><br/>
 
 <!-- FIRMAS -->
-<table width="100%" style="margin-top:50px;">
-    <tr>
-        <td width="50%" class="center-text">
-            <div class="border-bottom" style="width:200px; margin:0 auto; padding-bottom:5px;">
-                CONTADOR
-            </div>
-            <br/>
-            <div>Nombre y Firma</div>
-        </td>
-        <td width="50%" class="center-text">
-            <div class="border-bottom" style="width:200px; margin:0 auto; padding-bottom:5px;">
-                GERENTE GENERAL
-            </div>
-            <br/>
-            <div>Nombre y Firma</div>
-        </td>
-    </tr>
-</table>
+<br><br>
+    <table style="width: 100%; margin-top: 60px; border: none;">
+        <tr>
+            <td style="width: 50%; text-align: center; border: none;">
+                <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
+                <div style="font-size: 11px; font-weight: bold;">CONTADOR</div>
+            </td>
+            <td style="width: 50%; text-align: center; border: none;">
+                <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
+                <div style="font-size: 11px; font-weight: bold;">GERENTE GENERAL</div>
+            </td>
+        </tr>
+    </table>
 
 <!-- ESTADÍSTICAS ADICIONALES -->
 <div style="margin-top:40px; font-size:11px; color:#666;">

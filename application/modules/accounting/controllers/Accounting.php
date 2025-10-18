@@ -785,31 +785,45 @@ class Accounting extends Secure_area implements iData_controller {
         $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
         $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
         
-        $html = $this->load->view('accounting/reports/' . $report_type, $data, true); // render the view into HTML
+        if ($report_type == 'balance_sheet') {
+            $income_data = $this->accounting_model->get_consolidated_income_statement([
+                "date_from" => $data["date_from"],
+                "date_to" => $data["date_to"]
+            ]);
+            
+            $data["total_income"] = $income_data['total_income'];
+            $data["total_expenses"] = $income_data['total_expenses'];
+            $data["net_income"] = $income_data['net_income'];
+        }
         
-        $pdfFilePath = FCPATH . "/downloads/reports/$report_type.pdf";
+        $html = $this->load->view('accounting/reports/' . $report_type, $data, true);
         
-        if ( file_exists($pdfFilePath) )
-        {
+        $timestamp = date('dmyHis');
+        $filename = "balance_sheet_{$timestamp}";
+        $pdfFilePath = FCPATH . "downloads/reports/{$filename}.pdf";
+        
+        $downloads_dir = FCPATH . "downloads/reports/";
+        if (!is_dir($downloads_dir)) {
+            mkdir($downloads_dir, 0755, true);
+        }
+        
+        if (file_exists($pdfFilePath)) {
             @unlink($pdfFilePath);
         }
         
         $this->load->library('pdf');
         
-        if ( $report_type == 'balance_sheet' )
-        {
+        if ($report_type == 'balance_sheet') {
             $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
-        }
-        else
-        {
+        } else {
             $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
         }
         
         $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
-        $pdf->WriteHTML($html); // write the HTML into the PDF
-        $pdf->Output($pdfFilePath, 'F'); // save to file because we can
+        $pdf->WriteHTML($html);
+        $pdf->Output($pdfFilePath, 'F');
 
-        redirect(base_url("downloads/reports/" . $report_type . ".pdf"));
+        redirect(base_url("downloads/reports/{$filename}.pdf"));
     }
     
     public function report_csv()

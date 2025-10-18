@@ -11,7 +11,7 @@
 
 <!-- INFORMACIÓN DE LA EMPRESA - SUPERIOR IZQUIERDA -->
 <div style="position:absolute; top:20px; left:40px;" class="empresa-info">
-    <div class="bold">CREDISURGIR</div>
+    <div class="bold">CREDISURGIR S.R.L.</div>
     <div>NIT: 485672023</div>
 </div>
 
@@ -95,9 +95,6 @@
         <td class="right-text bold" style="background-color:#e8f4f8;"><?=to_currency($total_activos)?></td>
     </tr>
     
-    <!-- ESPACIO -->
-    <tr><td colspan="3" style="height:20px;"></td></tr>
-    
     <!-- PASIVOS -->
     <tr>
         <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">PASIVOS</td>
@@ -118,10 +115,6 @@
         <td class="bold right-text">TOTAL PASIVOS</td>
         <td class="right-text bold border-bottom"><?=to_currency($total_pasivos)?></td>
     </tr>
-    
-    <!-- ESPACIO -->
-    <tr><td colspan="3" style="height:20px;"></td></tr>
-    
     <!-- PATRIMONIO -->
     <tr>
         <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">PATRIMONIO</td>
@@ -153,33 +146,38 @@
 
 <br/><br/>
 
-<!-- VERIFICACIÓN DEL BALANCE -->
-<div style="text-align:center; <?=$balance_cuadra ? 'color:green;' : 'color:red;'?>">
-    <?php if($balance_cuadra): ?>
-        <h4>✓ BALANCE CUADRADO - ACTIVOS = PASIVOS + PATRIMONIO</h4>
-    <?php else: ?>
-        <h4>✗ DESCUADRE DETECTADO: <?=to_currency(abs($total_activos - $total_pasivos_patrimonio))?></h4>
-    <?php endif; ?>
+<div style="margin-top:30px; padding:15px; border:1px solid #ccc; background-color:#f9f9f9;">
+    <table width="100%" style="border-collapse:collapse;">
+        <tr>
+            <td width="70%" class="bold">TOTAL ACTIVOS:</td>
+            <td width="30%" class="right-text bold"><?=to_currency($total_activos)?></td>
+        </tr>
+        <tr>
+            <td class="bold">TOTAL PASIVOS:</td>
+            <td class="right-text bold"><?=to_currency($total_pasivos)?></td>
+        </tr>
+        <tr>
+            <td class="bold">TOTAL PATRIMONIO:</td>
+            <td class="right-text bold"><?=to_currency($total_patrimonio)?></td>
+        </tr>
+        <tr>
+            <td class="bold">TOTAL PASIVOS + PATRIMONIO:</td>
+            <td class="right-text bold"><?=to_currency($total_pasivos_patrimonio)?></td>
+        </tr>
+    </table>
 </div>
 
-<br/><br/><br/>
-
 <!-- FIRMAS -->
-<table width="100%" style="margin-top:50px;">
-    <tr>
-        <td width="50%" class="center-text">
-            <div class="border-bottom" style="width:200px; margin:0 auto; padding-bottom:5px;">
-                CONTADOR
-            </div>
-            <br/>
-            <div>Nombre y Firma</div>
-        </td>
-        <td width="50%" class="center-text">
-            <div class="border-bottom" style="width:200px; margin:0 auto; padding-bottom:5px;">
-                GERENTE GENERAL
-            </div>
-            <br/>
-            <div>Nombre y Firma</div>
-        </td>
-    </tr>
-</table>
+<br><br>
+    <table style="width: 100%; margin-top: 60px; border: none;">
+        <tr>
+            <td style="width: 50%; text-align: center; border: none;">
+                <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
+                <div style="font-size: 11px; font-weight: bold;">CONTADOR</div>
+            </td>
+            <td style="width: 50%; text-align: center; border: none;">
+                <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
+                <div style="font-size: 11px; font-weight: bold;">GERENTE GENERAL</div>
+            </td>
+        </tr>
+    </table>

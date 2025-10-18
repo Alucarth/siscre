@@ -38,7 +38,7 @@ class General_ledger_model extends CI_Model {
                 v.total_credit
             FROM c19_accounting_vouchers v
             $where_vouchers
-            ORDER BY v.voucher_date DESC, v.voucher_number DESC
+            ORDER BY v.voucher_number DESC, v.voucher_date DESC
         ";
         
         $query_vouchers = $this->db->query($sql_vouchers);
