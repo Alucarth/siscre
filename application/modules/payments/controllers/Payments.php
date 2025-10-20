@@ -409,6 +409,7 @@ class Payments extends Secure_area implements iData_controller {
             $amount = floatval($payment_data['paid_amount']);
             
             $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
+            $installment_number = $this->_get_installment_number($loan_info, $lookup_date);
             $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
             
             $interest = $sched_entry['found'] ? $sched_entry['interest'] : 0;
@@ -420,7 +421,7 @@ class Payments extends Secure_area implements iData_controller {
             $caja_moneda_nacional = $capital + $iva + $intereses_amortizables;
 
             $customer = $this->Customer->get_info($payment_data['customer_id']);
-            $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name} Cuota N° {}";
+            $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name} - Cuota N° {$installment_number}";
 
             $payment_methods = $this->input->post('payment_methods');
 
@@ -495,6 +496,49 @@ class Payments extends Secure_area implements iData_controller {
             log_message('error', 'Error creating payment voucher: ' . $e->getMessage());
             return null;
         }
+    }
+    
+    private function _get_installment_number($loan_info, $lookup_date)
+    {
+        $installment_number = 0;
+        
+        if (!$loan_info || empty($loan_info->periodic_loan_table)) {
+            return $installment_number;
+        }
+        
+        try {
+            $schedules = json_decode($loan_info->periodic_loan_table);
+            
+            if (!is_array($schedules)) {
+                return $installment_number;
+            }
+            
+            // Convertir la fecha de búsqueda al formato correcto
+            if ($this->config->item('date_format') == 'd/m/Y') {
+                $lookup_date_formatted = date('d/m/Y', strtotime($lookup_date));
+            } else {
+                $lookup_date_formatted = date('Y-m-d', strtotime($lookup_date));
+            }
+            
+            $counter = 0;
+            foreach ($schedules as $schedule) {
+                $counter++;
+                $schedule_date = $schedule->payment_date;
+                
+                // Comparar fechas (manejar diferentes formatos)
+                if ($schedule_date == $lookup_date_formatted || 
+                    strtotime($schedule_date) == strtotime($lookup_date)) {
+                    
+                    $installment_number = $counter;
+                    break;
+                }
+            }
+            
+        } catch (Exception $e) {
+            log_message('error', 'Error in _get_installment_number: ' . $e->getMessage());
+        }
+        
+        return $installment_number;
     }
     
     /**

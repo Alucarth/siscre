@@ -104,7 +104,6 @@
             ?>
         
         <div class="voucher-section">
-            <!-- ENCABEZADO DEL VOUCHER -->
             <div class="voucher-header">
                 <h4 style="margin: 0; color: white;">
                     Voucher: <?= $voucher_id ?>

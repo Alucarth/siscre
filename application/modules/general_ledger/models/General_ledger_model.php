@@ -10,7 +10,6 @@ class General_ledger_model extends CI_Model {
 
     function get_accounting_transactions($filters = [])
     {
-        // Primero: Obtener todos los vouchers en el rango de fechas
         $where_vouchers = ' WHERE 1=1';
         
         if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
@@ -28,6 +27,7 @@ class General_ledger_model extends CI_Model {
             $where_vouchers .= " AND v.branch_id = $branch_id";
         }
         
+        // CAMBIO PRINCIPAL: Orden descendente por voucher_number
         $sql_vouchers = "
             SELECT 
                 v.id as voucher_id,
@@ -38,76 +38,79 @@ class General_ledger_model extends CI_Model {
                 v.total_credit
             FROM c19_accounting_vouchers v
             $where_vouchers
-            ORDER BY v.voucher_number DESC, v.voucher_date DESC
+            ORDER BY v.voucher_number ASC, v.voucher_date ASC
         ";
         
         $query_vouchers = $this->db->query($sql_vouchers);
-    
-    $vouchers = [];
-    
-    if ($query_vouchers && $query_vouchers->num_rows() > 0) {
-        foreach ($query_vouchers->result() as $voucher_row) {
-            $voucher_id = $voucher_row->voucher_id;
-            
-            // Inicializar el voucher
-            $vouchers[$voucher_id] = new stdClass();
-            $vouchers[$voucher_id]->voucher_info = new stdClass();
-            $vouchers[$voucher_id]->voucher_info->voucher_number = $voucher_row->voucher_number;
-            $vouchers[$voucher_id]->voucher_info->voucher_date = $voucher_row->voucher_date;
-            $vouchers[$voucher_id]->voucher_info->voucher_description = $voucher_row->voucher_description;
-            $vouchers[$voucher_id]->voucher_info->total_debit = $voucher_row->total_debit;
-            $vouchers[$voucher_id]->voucher_info->total_credit = $voucher_row->total_credit;
-            $vouchers[$voucher_id]->transactions = [];
-            
-            // Segundo: Obtener las transacciones de ESTE voucher específico
-            $sql_transactions = "
-                SELECT 
-                    t.id as transaction_id,
-                    t.amount,
-                    t.description as transaction_description,
-                    t.added_date,
-                    t.movement_type,
-                    a.account_name,
-                    a.code_number as account_number,
-                    a.account_type
-                FROM c19_accounting_transactions t
-                LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
-                WHERE t.voucher_id = $voucher_id
-                ORDER BY t.added_date
-            ";
-            
-            $query_transactions = $this->db->query($sql_transactions);
-            
-            if ($query_transactions && $query_transactions->num_rows() > 0) {
-                foreach ($query_transactions->result() as $trans_row) {
-                    $transaction = new stdClass();
-                    $transaction->date = date($this->config->item("date_format"), strtotime($trans_row->added_date));
-                    $transaction->voucher_date = date($this->config->item("date_format"), strtotime($voucher_row->voucher_date));
-                    $transaction->voucher_number = $voucher_row->voucher_number;
-                    $transaction->explanation = $trans_row->transaction_description;
-                    $transaction->account_name = $trans_row->account_name;
-                    $transaction->account_number = $trans_row->account_number;
-                    $transaction->amount = $trans_row->amount;
-                    
-                    // Determinar debe/haber según movement_type
-                    if ($trans_row->movement_type == 'debit') {
-                        $transaction->debit = $trans_row->amount;
-                        $transaction->credit = 0;
-                    } else {
-                        $transaction->debit = 0;
-                        $transaction->credit = $trans_row->amount;
+
+        $vouchers = [];
+        
+        if ($query_vouchers && $query_vouchers->num_rows() > 0) {
+            foreach ($query_vouchers->result() as $voucher_row) {
+                $voucher_id = $voucher_row->voucher_id;
+                
+                // Inicializar el voucher
+                $vouchers[$voucher_id] = new stdClass();
+                $vouchers[$voucher_id]->voucher_info = new stdClass();
+                $vouchers[$voucher_id]->voucher_info->voucher_number = $voucher_row->voucher_number;
+                $vouchers[$voucher_id]->voucher_info->voucher_date = $voucher_row->voucher_date;
+                $vouchers[$voucher_id]->voucher_info->voucher_description = $voucher_row->voucher_description;
+                $vouchers[$voucher_id]->voucher_info->total_debit = $voucher_row->total_debit;
+                $vouchers[$voucher_id]->voucher_info->total_credit = $voucher_row->total_credit;
+                $vouchers[$voucher_id]->transactions = [];
+                
+                $sql_transactions = "
+                    SELECT 
+                        t.id as transaction_id,
+                        t.amount,
+                        t.description as transaction_description,
+                        t.added_date,
+                        t.movement_type,
+                        a.account_name,
+                        a.code_number as account_number,
+                        a.account_type
+                    FROM c19_accounting_transactions t
+                    LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
+                    WHERE t.voucher_id = $voucher_id
+                    ORDER BY t.added_date DESC, t.id DESC
+                ";
+                
+                $query_transactions = $this->db->query($sql_transactions);
+                
+                if ($query_transactions && $query_transactions->num_rows() > 0) {
+                    foreach ($query_transactions->result() as $trans_row) {
+                        $transaction = new stdClass();
+                        $transaction->date = date($this->config->item("date_format"), strtotime($trans_row->added_date));
+                        $transaction->voucher_date = date($this->config->item("date_format"), strtotime($voucher_row->voucher_date));
+                        $transaction->voucher_number = $voucher_row->voucher_number;
+                        $transaction->explanation = $trans_row->transaction_description;
+                        $transaction->account_name = $trans_row->account_name;
+                        $transaction->account_number = $trans_row->account_number;
+                        $transaction->amount = $trans_row->amount;
+                        
+                        // Determinar debe/haber según movement_type
+                        if ($trans_row->movement_type == 'debit') {
+                            $transaction->debit = $trans_row->amount;
+                            $transaction->credit = 0;
+                        } else {
+                            $transaction->debit = 0;
+                            $transaction->credit = $trans_row->amount;
+                        }
+                        
+                        $transaction->balance = $trans_row->amount;
+                        
+                        $vouchers[$voucher_id]->transactions[] = $transaction;
                     }
-                    
-                    $transaction->balance = $trans_row->amount;
-                    
-                    $vouchers[$voucher_id]->transactions[] = $transaction;
                 }
             }
         }
+        
+        uasort($vouchers, function($a, $b) {
+            return $b->voucher_info->voucher_number - $a->voucher_info->voucher_number;
+        });
+        
+        return $vouchers;
     }
-    
-    return $vouchers;
-}
 
     function get_account_transactions($filters = [])
     {
