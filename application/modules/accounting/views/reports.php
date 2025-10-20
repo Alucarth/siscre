@@ -75,7 +75,7 @@
                                                 <label>&nbsp;</label>
                                                 <div>
                                                     <button type="button" class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> Imprimir Reporte (PDF)</button>
-                                                    <button type="button" class="btn btn-primary" id="btn-export-csv"><span class="fa fa-print"></span> Imprimir Reporte (CSV)</button>
+                                                    <!-- <button type="button" class="btn btn-primary" id="btn-export-csv"><span class="fa fa-print"></span> Imprimir Reporte (CSV)</button> -->
                                                 </div>
                                             </div>
                                         </div>
