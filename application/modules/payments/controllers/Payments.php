@@ -399,7 +399,6 @@ class Payments extends Secure_area implements iData_controller {
     private function _create_payment_voucher($payment_data)
     {
         // Verificar si el módulo contable está activo o si debemos crear el voucher
-        // Puedes agregar aquí una condición para activar/desactivar esta funcionalidad
         if (!/* condición para activar contabilidad */ true) {
             return null;
         }
@@ -408,17 +407,33 @@ class Payments extends Secure_area implements iData_controller {
             $loan_info = $this->Loan->get_info($payment_data['loan_id']);
             $amount = floatval($payment_data['paid_amount']);
             
-            $lookup_date = $this->input->post('payment_due') ?: $this->input->post('date_paid');
-            $installment_number = $this->_get_installment_number($loan_info, $lookup_date);
-            $sched_entry = $this->_find_schedule_entry($loan_info, $lookup_date, $amount);
+            $lookup_date = $this->input->post('payment_due');
             
-            $interest = $sched_entry['found'] ? $sched_entry['interest'] : 0;
+            $installment_number = 0;
+            $interest = 0;
+            $capital = 0;
+            
+            if ($loan_info && !empty($loan_info->periodic_loan_table)) {
+                $json_objects = json_decode($loan_info->periodic_loan_table);
+                $number = 0;
+                
+                foreach($json_objects as $object) {
+                    $number++;
+                    
+                    if($object->payment_date == $lookup_date) {
+                        $installment_number = $number;
+                        $interest = floatval($object->interest);
+                        $capital = floatval($object->payment_amount_capital);
+                        break;
+                    }
+                }
+            }
 
             $intereses_amortizables = $interest * 0.87;
             $iva = $interest * 0.13;
             $it = ($iva + $intereses_amortizables) * 0.03;
-            $capital = $amount - $iva - $intereses_amortizables;
-            $caja_moneda_nacional = $capital + $iva + $intereses_amortizables;
+            $capital_final = $amount - $iva - $intereses_amortizables;
+            $caja_moneda_nacional = $capital_final + $iva + $intereses_amortizables;
 
             $customer = $this->Customer->get_info($payment_data['customer_id']);
             $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name} - Cuota N° {$installment_number}";
@@ -449,12 +464,12 @@ class Payments extends Secure_area implements iData_controller {
 
             // Asignación de cuentas contables
             $transaction_entries = [
-                // Débitos
+                // Debe
                 ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expenses'],
                 ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset'],
                 
-                // Créditos
-                ['account_id' => 58,  'debit' => 0, 'credit' => $capital,               'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
+                // Haber
+                ['account_id' => 58,  'debit' => 0, 'credit' => $capital_final,         'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
                 ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income'],
                 ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability'],
                 ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
@@ -496,139 +511,6 @@ class Payments extends Secure_area implements iData_controller {
             log_message('error', 'Error creating payment voucher: ' . $e->getMessage());
             return null;
         }
-    }
-    
-    private function _get_installment_number($loan_info, $lookup_date)
-    {
-        $installment_number = 0;
-        
-        if (!$loan_info || empty($loan_info->periodic_loan_table)) {
-            return $installment_number;
-        }
-        
-        try {
-            $schedules = json_decode($loan_info->periodic_loan_table);
-            
-            if (!is_array($schedules)) {
-                return $installment_number;
-            }
-            
-            // Convertir la fecha de búsqueda al formato correcto
-            if ($this->config->item('date_format') == 'd/m/Y') {
-                $lookup_date_formatted = date('d/m/Y', strtotime($lookup_date));
-            } else {
-                $lookup_date_formatted = date('Y-m-d', strtotime($lookup_date));
-            }
-            
-            $counter = 0;
-            foreach ($schedules as $schedule) {
-                $counter++;
-                $schedule_date = $schedule->payment_date;
-                
-                // Comparar fechas (manejar diferentes formatos)
-                if ($schedule_date == $lookup_date_formatted || 
-                    strtotime($schedule_date) == strtotime($lookup_date)) {
-                    
-                    $installment_number = $counter;
-                    break;
-                }
-            }
-            
-        } catch (Exception $e) {
-            log_message('error', 'Error in _get_installment_number: ' . $e->getMessage());
-        }
-        
-        return $installment_number;
-    }
-    
-    /**
-     * Busca una entrada en el cronograma de pagos del préstamo
-     */
-    private function _find_schedule_entry($loan_info, $lookup_date, $amount)
-    {
-        $result = ['found' => false, 'capital' => 0, 'interest' => 0];
-        
-        if (!$loan_info || empty($loan_info->periodic_loan_table)) {
-            return $result;
-        }
-        
-        try {
-            $schedules = json_decode($loan_info->periodic_loan_table, true);
-            
-            if (!is_array($schedules)) {
-                return $result;
-            }
-            
-            // Convertir la fecha de búsqueda al formato correcto
-            if ($this->config->item('date_format') == 'd/m/Y') {
-                $lookup_date_formatted = date('d/m/Y', strtotime($lookup_date));
-            } else {
-                $lookup_date_formatted = date('Y-m-d', strtotime($lookup_date));
-            }
-            
-            foreach ($schedules as $schedule) {
-                $schedule_date = $schedule['payment_date'];
-                
-                // Comparar fechas (manejar diferentes formatos)
-                if ($schedule_date == $lookup_date_formatted || 
-                    strtotime($schedule_date) == strtotime($lookup_date)) {
-                    
-                    $result['found'] = true;
-                    $result['capital'] = isset($schedule['payment_amount_capital']) ? 
-                        floatval($schedule['payment_amount_capital']) : 0;
-                    $result['interest'] = isset($schedule['interest']) ? 
-                        floatval($schedule['interest']) : 0;
-                    break;
-                }
-            }
-            
-            // Si no se encuentra la fecha exacta, hacer una distribución proporcional
-            if (!$result['found'] && $amount > 0) {
-                $result = $this->_distribute_payment_amount($schedules, $amount);
-            }
-            
-        } catch (Exception $e) {
-            log_message('error', 'Error in _find_schedule_entry: ' . $e->getMessage());
-        }
-        
-        return $result;
-    }
-
-    /**
-     * Distribuye el monto del pago proporcionalmente entre capital e intereses
-     * basado en el cronograma existente
-     */
-    private function _distribute_payment_amount($schedules, $amount)
-    {
-        $result = ['found' => true, 'capital' => 0, 'interest' => 0];
-        
-        // Calcular totales del cronograma pendiente
-        $total_capital = 0;
-        $total_interest = 0;
-        
-        foreach ($schedules as $schedule) {
-            $total_capital += isset($schedule['payment_amount_capital']) ? 
-                floatval($schedule['payment_amount_capital']) : 0;
-            $total_interest += isset($schedule['interest']) ? 
-                floatval($schedule['interest']) : 0;
-        }
-        
-        $total_payment = $total_capital + $total_interest;
-        
-        if ($total_payment > 0) {
-            // Distribuir proporcionalmente
-            $capital_ratio = $total_capital / $total_payment;
-            $interest_ratio = $total_interest / $total_payment;
-            
-            $result['capital'] = round($amount * $capital_ratio, 2);
-            $result['interest'] = round($amount * $interest_ratio, 2);
-        } else {
-            // Si no hay cronograma, distribución 50/50 como fallback
-            $result['capital'] = round($amount * 0.5, 2);
-            $result['interest'] = round($amount * 0.5, 2);
-        }
-        
-        return $result;
     }
 
     function delete()

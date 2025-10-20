@@ -145,6 +145,18 @@
 
             <!-- TABLA DE TRANSACCIONES DEL VOUCHER -->
             <?php if (!empty($transactions)): ?>
+                <?php 
+                $debitos = [];
+                $creditos = [];
+                
+                foreach ($transactions as $transaction) {
+                    if ($transaction->debit > 0) {
+                        $debitos[] = $transaction;
+                    } else {
+                        $creditos[] = $transaction;
+                    }
+                }
+                ?>
                 <table class="table table-bordered tbl-ledger">
                     <thead>
                         <tr>
@@ -156,7 +168,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($transactions as $transaction): ?>
+                        <?php foreach ($debitos as $transaction): ?>
                             <tr class="transaction-row">
                                 <td>
                                     <strong><?= $transaction->account_number ?></strong><br>
@@ -165,15 +177,33 @@
                                 </td>
                                 <td><?= !empty($transaction->explanation) ? $transaction->explanation : '---' ?></td>
                                 <td>
-                                    <span class="badge badge-<?= $transaction->debit > 0 ? 'danger' : 'success' ?>">
-                                        <?= $transaction->debit > 0 ? 'DEBE' : 'HABER' ?>
-                                    </span>
+                                    <span class="badge badge-danger">DEBE</span>
                                 </td>
-                                <td style="text-align: right; font-weight: <?= $transaction->debit > 0 ? 'bold' : 'normal' ?>;">
-                                    <?= $transaction->debit > 0 ? to_currency($transaction->debit) : '---' ?>
+                                <td style="text-align: right; font-weight: bold;">
+                                    <?= to_currency($transaction->debit) ?>
                                 </td>
-                                <td style="text-align: right; font-weight: <?= $transaction->credit > 0 ? 'bold' : 'normal' ?>;">
-                                    <?= $transaction->credit > 0 ? to_currency($transaction->credit) : '---' ?>
+                                <td style="text-align: right;">
+                                    ---
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        
+                        <?php foreach ($creditos as $transaction): ?>
+                            <tr class="transaction-row">
+                                <td>
+                                    <strong><?= $transaction->account_number ?></strong><br>
+                                    <small><?= $transaction->account_name ?></small><br>
+                                    <small style="color: #6c757d;"><?= $transaction->account_type ?></small>
+                                </td>
+                                <td><?= !empty($transaction->explanation) ? $transaction->explanation : '---' ?></td>
+                                <td>
+                                    <span class="badge badge-success">HABER</span>
+                                </td>
+                                <td style="text-align: right;">
+                                    ---
+                                </td>
+                                <td style="text-align: right; font-weight: bold;">
+                                    <?= to_currency($transaction->credit) ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

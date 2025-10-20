@@ -31,14 +31,13 @@ class General_ledger_model extends CI_Model {
         $sql_vouchers = "
             SELECT 
                 v.id as voucher_id,
-                v.voucher_number,
                 v.voucher_date,
                 v.description as voucher_description,
                 v.total_debit,
                 v.total_credit
             FROM c19_accounting_vouchers v
             $where_vouchers
-            ORDER BY v.voucher_number ASC, v.voucher_date ASC
+            ORDER BY v.id DESC
         ";
         
         $query_vouchers = $this->db->query($sql_vouchers);
