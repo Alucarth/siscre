@@ -824,6 +824,7 @@ class Loans extends Secure_area implements iData_controller
             // Crear Voucher
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
+                'voucher_type' => 'egreso',
                 'description'  => $descripcion,
                 'total_debit'  => $amount,
                 'total_credit' => $amount,
@@ -840,7 +841,6 @@ class Loans extends Secure_area implements iData_controller
 
             $transaction_date = date('Y-m-d H:i:s');
 
-            // Definir las transacciones contables
             $transaction_entries = [
                 [
                     'account_id' => 58,  // Cuenta: Préstamos por cobrar

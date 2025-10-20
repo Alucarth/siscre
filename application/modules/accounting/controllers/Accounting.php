@@ -490,7 +490,8 @@ class Accounting extends Secure_area implements iData_controller {
     function voucher_save()
     {
         $voucher_date_input = $this->input->post('voucher_date');
-        $voucher_description = $this->input->post('description'); // Descripción del voucher
+        $voucher_description = $this->input->post('description');
+        $voucher_type = $this->input->post('voucher_type');
         
         if ($this->config->item('date_format') == 'd/m/Y') {
             $voucher_date = date('Y-m-d', strtotime(uk_to_isodate($voucher_date_input)));
@@ -505,7 +506,8 @@ class Accounting extends Secure_area implements iData_controller {
         $payment_methods = $this->input->post('payment_methods');
 
         $voucher_data = array(
-            'voucher_date' => $voucher_date, // Formato YYYY-MM-DD
+            'voucher_date' => $voucher_date,
+            'voucher_type' => $voucher_type,
             'description'  => $voucher_description,
             'total_debit'  => $this->input->post('total_debit'),
             'total_credit' => $this->input->post('total_credit'),
@@ -556,7 +558,6 @@ class Accounting extends Secure_area implements iData_controller {
                     }
                 }
 
-                // NUEVA LÓGICA: Si la descripción de la transacción está vacía, usar la descripción del voucher
                 $transaction_description = trim($descriptions[$i]);
                 if (empty($transaction_description)) {
                     $transaction_description = $voucher_description;
@@ -565,13 +566,13 @@ class Accounting extends Secure_area implements iData_controller {
                 $transaction_data = array(
                     'account_id'        => $accounts[$i],
                     'amount'            => $amount,
-                    'description'       => $transaction_description, // Usar descripción procesada
+                    'description'       => $transaction_description,
                     'added_date'        => $transaction_date,
                     'added_by'          => $this->Employee->get_logged_in_employee_info()->person_id,
-                    'transaction_type'  => $transaction_type, // Se guarda el tipo de cuenta real
-                    'movement_type'     => $movement_type,    // Debe/Haber
+                    'transaction_type'  => $transaction_type,
+                    'movement_type'     => $movement_type,
                     'voucher_id'        => $voucher_id,
-                    'payment_methods'   => $payment_methods,   // Usar el mismo método de pago para todas
+                    'payment_methods'   => $payment_methods,
                     'invoice_number'    => $invoice_numbers[$i] ?? '',
                     'purchased_date'    => $purchased_date,
                     'purchased_amount'  => $purchased_amounts[$i] ?? 0,

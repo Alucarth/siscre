@@ -420,16 +420,16 @@ class Payments extends Secure_area implements iData_controller {
             $caja_moneda_nacional = $capital + $iva + $intereses_amortizables;
 
             $customer = $this->Customer->get_info($payment_data['customer_id']);
-            $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name}";
+            $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name} Cuota N° {}";
 
             $payment_methods = $this->input->post('payment_methods');
 
-            // Voucher - Sumar IT al total del débito
             $total_debit = $caja_moneda_nacional + $it;
             $total_credit = $caja_moneda_nacional + $it;
 
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
+                'voucher_type' => 'ingreso',
                 'description'  => $descripcion,
                 'total_debit'  => $total_debit,
                 'total_credit' => $total_credit,
@@ -446,7 +446,7 @@ class Payments extends Secure_area implements iData_controller {
 
             $transaction_date = date('Y-m-d H:i:s');
 
-            // Asignación de cuentas contables según la nueva estructura
+            // Asignación de cuentas contables
             $transaction_entries = [
                 // Débitos
                 ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expenses'],

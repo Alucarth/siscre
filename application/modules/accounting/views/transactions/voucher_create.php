@@ -55,19 +55,31 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label>Método de Pago</label>
-                                <select class="form-control" name="payment_methods" required>
-                                    <option value="">Seleccionar</option>
-                                    <option value="efectivo">Efectivo</option>
-                                    <option value="QR">QR</option>
-                                    <option value="transferencia">Transferencia</option>
-                                    <option value="deposito">Deposito</option>
-                                </select>
+                        <div class="row">
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label>Método de Pago</label>
+                                    <select class="form-control" name="payment_methods" required>
+                                        <option value="">Seleccionar</option>
+                                        <option value="efectivo">Efectivo</option>
+                                        <option value="QR">QR</option>
+                                        <option value="transferencia">Transferencia</option>
+                                        <option value="deposito">Deposito</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label>Tipo de comprobante</label>
+                                    <select class="form-control" name="voucher_type" required>
+                                        <option value="">Seleccionar</option>
+                                        <option value="ingreso">Ingreso</option>
+                                        <option value="egreso">Egreso</option>
+                                        <option value="traspaso">Traspaso</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-
                         <hr>
                         <h4>Detalles del Comprobante</h4>
                         

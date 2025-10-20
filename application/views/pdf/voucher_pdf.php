@@ -99,14 +99,27 @@
     </style>
 </head>
 <body>
-    <!-- ENCABEZADO ARRIBA IZQUIERDA -->
     <div class="header-top-left">
         <div class="company-name">CREDISURGIR S.R.L.</div>
         <div class="company-nit">NIT: 485672023</div>
     </div>
     
     <div class="content">
-        <div class="document-title">COMPROBANTE CONTABLE</div>
+        <!-- TÍTULO DINÁMICO SEGÚN TIPO DE COMPROBANTE -->
+        <div class="document-title">
+            <?php
+            $titles = [
+                'ingreso' => 'COMPROBANTE DE INGRESO',
+                'egreso' => 'COMPROBANTE DE EGRESO',
+                'traspaso' => 'COMPROBANTE DE TRASPASO'
+            ];
+            
+            $voucher_type = !empty($voucher_info->voucher_type) ? $voucher_info->voucher_type : 'contable';
+            $document_title = isset($titles[$voucher_type]) ? $titles[$voucher_type] : 'COMPROBANTE CONTABLE';
+            
+            echo $document_title;
+            ?>
+        </div>
         
         <div class="voucher-info">
             <div class="info-row">
