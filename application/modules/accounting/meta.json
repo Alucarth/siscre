@@ -1,0 +1,14 @@
+{
+    "plugin": {	
+        "name":"accounting",
+		"description":"Accounting plugin - integrate accounting on your Loan Management System",
+		"settings":{
+			"addToPermissions" : false,
+			"addToGrants" : false,
+			"addToModules" : true,
+			"icon":"<i class='fa fa-balance-scale'></i>",
+			"sub_menus":{"Accounts":"accounts","Transactions":"transactions", "Reports":"reports"},
+			"label":"Accounting"
+		}  
+    }
+}
