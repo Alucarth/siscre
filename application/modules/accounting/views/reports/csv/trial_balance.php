@@ -19,71 +19,56 @@ foreach ($equity_accounts as $account)
 {
     $loan_fund_capital -= $account->amount;
 }
-?>
 
-<?php
+$out = '"CREDISURGIR S.R.L."' . "\n";
+$out .= '"NIT: 485672023"' . "\n";
+$out .= '"BALANCE DE COMPROBACIÓN"' . "\n";
+$out .= '"Del: ' . date($this->config->item('date_format'), $date_from) . ' Al: ' . date($this->config->item('date_format'), $date_to) . '"' . "\n";
+$out .= '"(Expresado en bolivianos)"' . "\n\n";
 
-$out = '"Balance de comprobacion(' . date($this->config->item('date_format'), $date_from) . " - " . date($this->config->item('date_format'), $date_to) . ')",';
-$out .= "\n\n";
-
-$out .= '"Nombre de la cuenta",';
-$out .= '"Debito",';
-$out .= '"Credito"';
-$out .= "\n";
+// Encabezados de columnas
+$out .= '"Código";"Nombre de la cuenta";"Débito";"Crédito"' . "\n";
 
 $debit_total = $credit_total = 0;
 foreach ($accounts as $account)
 {
-
-    $out .= '"' . $account->account_name . '",';
+    $codigo = isset($account->code_number) ? $account->code_number : (isset($account->account_map) ? $account->account_map : '');
+    
+    $out .= '"' . $codigo . '";"' . $account->account_name . '";';
 
     if (in_array($account->account_type, ['asset', 'expenses']))
     {
-        $out .= '"' . to_currency($account->amount) . '",';
-        $out .= '"",';
+        $out .= '"' . to_currency($account->amount) . '";""';
         $debit_total += $account->amount;
     }
-
-    if (in_array($account->account_type, ['liability', 'equity', 'income']))
+    else if (in_array($account->account_type, ['liability', 'equity', 'income']))
     {
-        $out .= '"",';
-        $out .= '"' . to_currency($account->amount) . '",';
+        $out .= '"";"' . to_currency($account->amount) . '"';
         $credit_total += $account->amount;
+    }
+    else
+    {
+        $out .= '"";""';
     }
 
     $out .= "\n";
     
     if (in_array($account->account_type, ['asset', 'expenses']) && $account->depreciation_amount > 0)
     {
-        $out .= '"Depreciacion acumulada: ' . $account->account_name . '",';
-        $out .= '"",';
-        $out .= '"' . to_currency($account->depreciation_amount) . '",';
+        $out .= '"";"Depreciación acumulada: ' . $account->account_name . '";"";"' . to_currency($account->depreciation_amount) . '"';
         $credit_total += $account->depreciation_amount;
         $out .= "\n";
     }
 }
 
-$out .= '"Fondo de Prestamo de Patrimonio",';
-$out .= '"",';
-$out .= '"' . to_currency($loan_fund_capital) . '",';
-$out .= "\n";
+// CUENTAS ESPECIALES
+$out .= '"";"Fondo de Préstamo de Patrimonio";"";"' . to_currency($loan_fund_capital) . '"' . "\n";
+$out .= '"";"Interés por Cobrar";"' . to_currency($interest_on_current) . '";""' . "\n";
+$out .= '"";"Préstamo Neto Pendiente";"' . to_currency($net_loan_outstanding-$interest_on_current) . '";""' . "\n";
+$out .= '"";"Intereses sobre Préstamos Vigentes y Vencidos";"";"' . to_currency($interest_on_current_and_past_due) . '"' . "\n\n";
 
-$out .= '"Interes por Cobrar",';
-$out .= '"' . to_currency($interest_on_current) . '",';
-$out .= "\n";
-$out .= '"Prestamo Neto Pendiente",';
-$out .= '"' . to_currency($net_loan_outstanding-$interest_on_current) . '",';
-$out .= "\n";
-$out .= '"Intereses sobre Prestamos Vigentes y Vencidos",';
-$out .= '"",';
-$out .= '"' . to_currency($interest_on_current_and_past_due) . '",';
-$out .= "\n";
-
-$out .= '"Total",';
-$out .= '"' . to_currency($debit_total + $net_loan_outstanding) . '",';
-$out .= '"' . to_currency($credit_total + $loan_fund_capital + $interest_on_current_and_past_due) . '"';
-
-$out .= "\n";
+// TOTALES
+$out .= '"";"TOTAL";"' . to_currency($debit_total + $net_loan_outstanding) . '";"' . to_currency($credit_total + $loan_fund_capital + $interest_on_current_and_past_due) . '"' . "\n";
 
 echo $out;
 ?>

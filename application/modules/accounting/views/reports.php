@@ -54,11 +54,10 @@
                                                 <label>Hasta fecha:</label>
                                                 <div class="input-group date">
                                                     <span class="input-group-addon input-group-prepend"><span class="input-group-text"><i class="fa fa-calendar"></i></span></span>
-                                                    <input type="text" class="form-control" id="filter_to_date" name="date_to" value="<?= date($this->config->item("date_format")); ?>" />
+                                                    <input type="text" class="form-control" id="filter_to_date" name="date_to" value="<?= date($this->config->item("date_format"), strtotime('+1 day')); ?>" />
                                                 </div>
                                             </div>
                                         </div>
-                                        
                                         <div class="col-lg-3">
                                             <div class="form-group">
                                                 <label>Elija su reporte</label>
@@ -75,7 +74,7 @@
                                                 <label>&nbsp;</label>
                                                 <div>
                                                     <button type="button" class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> Imprimir Reporte (PDF)</button>
-                                                    <!-- <button type="button" class="btn btn-primary" id="btn-export-csv"><span class="fa fa-print"></span> Imprimir Reporte (CSV)</button> -->
+                                                    <button type="button" class="btn btn-primary" id="btn-export-csv"><span class="fa fa-print"></span> Imprimir Reporte (CSV)</button>
                                                 </div>
                                             </div>
                                         </div>

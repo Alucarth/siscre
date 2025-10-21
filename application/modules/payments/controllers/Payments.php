@@ -403,6 +403,23 @@ class Payments extends Secure_area implements iData_controller {
             return null;
         }
         
+        // Función auxiliar para redondeo personalizado
+        $custom_round = function($number) {
+            $number = floatval($number);
+            $partes = explode('.', strval($number));
+            
+            if (count($partes) === 2) {
+                $decimales = $partes[1];
+                if (strlen($decimales) > 2) {
+                    $tercer_decimal = substr($decimales, 2, 1);
+                    if (intval($tercer_decimal) >= 5) {
+                        return round($number + 0.001, 2);
+                    }
+                }
+            }
+            return round($number, 2);
+        };
+        
         try {
             $loan_info = $this->Loan->get_info($payment_data['loan_id']);
             $amount = floatval($payment_data['paid_amount']);
@@ -429,19 +446,20 @@ class Payments extends Secure_area implements iData_controller {
                 }
             }
 
-            $intereses_amortizables = $interest * 0.87;
-            $iva = $interest * 0.13;
-            $it = ($iva + $intereses_amortizables) * 0.03;
-            $capital_final = $amount - $iva - $intereses_amortizables;
-            $caja_moneda_nacional = $capital_final + $iva + $intereses_amortizables;
+            // Cálculos monetarios
+            $intereses_amortizables = $custom_round($interest * 0.87);
+            $iva = $custom_round($interest * 0.13);
+            $it = $custom_round(($iva + $intereses_amortizables) * 0.03);
+            $capital_final = $custom_round($amount - $iva - $intereses_amortizables);
+            $caja_moneda_nacional = $custom_round($capital_final + $iva + $intereses_amortizables);
 
             $customer = $this->Customer->get_info($payment_data['customer_id']);
             $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name} - Cuota N° {$installment_number}";
 
             $payment_methods = $this->input->post('payment_methods');
 
-            $total_debit = $caja_moneda_nacional + $it;
-            $total_credit = $caja_moneda_nacional + $it;
+            $total_debit = $custom_round($caja_moneda_nacional + $it);
+            $total_credit = $custom_round($caja_moneda_nacional + $it);
 
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),

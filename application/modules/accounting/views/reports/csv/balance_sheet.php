@@ -1,108 +1,75 @@
 <?php
 
-$out = '"Hoja de saldos (' . date($this->config->item('date_format'), $date_from) . " - " . date($this->config->item('date_format'), $date_to) . ')"';
-$out .= "\n\n";
+$out = '"CREDISURGIR S.R.L."' . "\n";
+$out .= '"NIT: 485672023"' . "\n";
+$out .= '"BALANCE GENERAL"' . "\n";
+$out .= '"Del: ' . date($this->config->item('date_format'), $date_from) . ' Al: ' . date($this->config->item('date_format'), $date_to) . '"' . "\n";
+$out .= '"(Expresado en bolivianos)"' . "\n\n";
 
-$out .= '"ACTIVO"';
-$out .= "\n";
+// Encabezados de columnas - usando punto y coma como separador
+$out .= '"Código";"Cuenta' . str_repeat(' ', 50) . '";"Importe"' . "\n";
 
-$out .= '"Activos Corrientes"';
-$out .= "\n";
-$out .= '"Efectivo",' . '"' . to_currency($cash_amount) . '"';
-$out .= "\n";
-$out .= '"Efectivo en bancos",' . '"' . to_currency($cash_amount_bank) . '"';
-$out .= "\n";
-$out .= '"Prestamos pendientes"';
-$out .= "\n";
-$out .= '"Prestamo actual",' . '"' . to_currency($current_loan_amount) . '"';
-$out .= "\n";
-$out .= '"Interes por cobrar",' . '"' . to_currency($interest_on_current) . '"';
-$out .= "\n";
-$out .= '"MENOS: Reservas por Prestamos Incobrables",' . '"' . to_currency($loan_loss_reserve) . '"';
-$out .= "\n";
-$out .= '"Prestamos Netos Pendientes",' . '"' . to_currency($net_loan_outstanding) . '"';
-$out .= "\n";
-$out .= '"TOTAL ACTIVOS ACTUALES",' . '"' . to_currency($total_current_assets) . '"';
-$out .= "\n\n";
+// ACTIVOS
+$out .= '"";"ACTIVOS' . str_repeat(' ', 50) . '";""' . "\n";
 
-$out .= '"ACTIVOS No Corrientes"';
-$out .= "\n";
+// ACTIVOS CORRIENTES
+$out .= '"11";"ACTIVOS CORRIENTES' . str_repeat(' ', 50) . '";""' . "\n";
 
+foreach($activos_corrientes as $activo):
+    if($activo->amount != 0):
+        $out .= '"' . $activo->account_map . '";"' . $activo->account_name . str_repeat(' ', 50) . '";"' . to_currency($activo->amount) . '"' . "\n";
+    endif;
+endforeach;
 
-$total_non_current_assets = 0;
+$out .= '"";"TOTAL ACTIVOS CORRIENTES' . str_repeat(' ', 50) . '";"' . to_currency($total_activos_corrientes) . '"' . "\n";
 
-foreach ($non_current_assets as $asset)
-{
-    $out .= '"' . $asset->account_name . '",' . '"' . to_currency($asset->amount) . '"';
+// ACTIVOS NO CORRIENTES
+$out .= '"12";"ACTIVOS NO CORRIENTES' . str_repeat(' ', 50) . '";""' . "\n";
 
-    $total_non_current_assets += $asset->amount;
-    $out .= "\n";
-    
-    if ( $asset->depreciation_amount > 0 )
-    {
-        $out .= '"Menos: Depreciacion Acumulada",' . '"(' . to_currency($asset->depreciation_amount) . ')"';
-        $total_non_current_assets -= $asset->depreciation_amount;
-        $out .= "\n";
-    }
-}
+foreach($activos_no_corrientes as $activo):
+    if($activo->amount != 0):
+        $out .= '"' . $activo->account_map . '";"' . $activo->account_name . str_repeat(' ', 50) . '";"' . to_currency($activo->amount) . '"' . "\n";
+        
+        if($activo->depreciation_amount > 0):
+            $out .= '"";"(-) Depreciación Acumulada' . str_repeat(' ', 50) . '";"(' . to_currency($activo->depreciation_amount) . ')"' . "\n";
+        endif;
+    endif;
+endforeach;
 
-$out .= '"TOTAL ACTIVOS NO CORRIENTES",' . '"' . to_currency($total_non_current_assets) . '"';
+$out .= '"";"TOTAL ACTIVOS NO CORRIENTES' . str_repeat(' ', 50) . '";"' . to_currency($total_activos_no_corrientes) . '"' . "\n";
 
-$out .= "\n";
-$out .= '"TOTAL ACTIVOS",';
+$out .= '"";"TOTAL ACTIVOS' . str_repeat(' ', 50) . '";"' . to_currency($total_activos) . '"' . "\n\n";
 
-$total_assets = $total_current_assets + $total_non_current_assets;
+// PASIVOS
+$out .= '"";"PASIVOS' . str_repeat(' ', 50) . '";""' . "\n";
 
+foreach($pasivos as $pasivo):
+    if($pasivo->amount != 0):
+        $out .= '"' . $pasivo->account_map . '";"' . $pasivo->account_name . str_repeat(' ', 50) . '";"' . to_currency($pasivo->amount) . '"' . "\n";
+    endif;
+endforeach;
 
+$out .= '"";"TOTAL PASIVOS' . str_repeat(' ', 50) . '";"' . to_currency($total_pasivos) . '"' . "\n\n";
 
-$out .= '"' . to_currency($total_assets) . '"';
-$out .= "\n\n";
+// PATRIMONIO
+$out .= '"";"PATRIMONIO' . str_repeat(' ', 50) . '";""' . "\n";
 
+foreach($patrimonio as $pat):
+    if($pat->amount != 0):
+        $out .= '"' . $pat->account_map . '";"' . $pat->account_name . str_repeat(' ', 50) . '";"' . to_currency($pat->amount) . '"' . "\n";
+    endif;
+endforeach;
 
+$out .= '"";"TOTAL PATRIMONIO' . str_repeat(' ', 50) . '";"' . to_currency($total_patrimonio) . '"' . "\n";
 
-$out .= '"PASIVOS"';
-$out .= "\n\n";
+$out .= '"";"TOTAL PASIVOS Y PATRIMONIO' . str_repeat(' ', 50) . '";"' . to_currency($total_pasivos_patrimonio) . '"' . "\n\n";
 
-$loan_fund_capital = $total_assets;
-$total_liability = 0;
-
-foreach ($liability_accounts as $account)
-{
-
-    $out .= '"' . $account->account_name . '",' . '"' . to_currency($account->amount) . '"';
-
-    $total_liability += $account->amount;
-    $out .= "\n";
-}
-
-$out .= '"TOTAL PASIVOS",' . '"' . to_currency($total_liability) . '"';
-$out .= "\n\n";
-
-$loan_fund_capital -= $total_liability;
-foreach ($equity_accounts as $account)
-{
-    $loan_fund_capital -= $account->amount;
-}
-
-
-$out .= '"PATRIMONIO"';
-$out .= "\n";
-
-$out .= '"Fondo de Capital",' . '"' . to_currency($loan_fund_capital) . '"';
-$out .= "\n";
-
-$total_capital = 0;
-foreach ($equity_accounts as $account)
-{
-    $out .= '"' . $account->account_name . '",' . '"' . to_currency($account->amount) . '"';
-    $out .= "\n";
-    $total_capital += $account->amount;
-}
-
-$out .= '"TOTAL PATRIMONIO",' . '"' . to_currency($total_capital + $loan_fund_capital) . '"';
-$out .= "\n";
-
-$out .= '"TOTAL PASIVO Y CAPITAL",' . '"' . to_currency($total_liability + $total_capital + $loan_fund_capital) . '"';
+// RESUMEN FINAL
+$out .= '"RESUMEN:";"";""' . "\n";
+$out .= '"";"TOTAL ACTIVOS' . str_repeat(' ', 50) . '";"' . to_currency($total_activos) . '"' . "\n";
+$out .= '"";"TOTAL PASIVOS' . str_repeat(' ', 50) . '";"' . to_currency($total_pasivos) . '"' . "\n";
+$out .= '"";"TOTAL PATRIMONIO' . str_repeat(' ', 50) . '";"' . to_currency($total_patrimonio) . '"' . "\n";
+$out .= '"";"TOTAL PASIVOS + PATRIMONIO' . str_repeat(' ', 50) . '";"' . to_currency($total_pasivos_patrimonio) . '"' . "\n";
 
 echo $out;
 ?>
