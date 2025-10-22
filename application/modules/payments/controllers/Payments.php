@@ -352,6 +352,9 @@ class Payments extends Secure_area implements iData_controller {
             $this->My_wallet->save($wallet_data);
             
             $this->Loan->update_balance($payment_data['loan_id']);
+
+            // Nueva funcionalidad: Crear voucher y transacciones si está habilitado
+            $voucher_id = $this->_create_payment_voucher($payment_data);
             
             //New Payment            
             if ($payment_id == -1)
@@ -386,6 +389,141 @@ class Payments extends Secure_area implements iData_controller {
         $this->db->trans_complete();
         
         send($return);
+    }
+
+    private function _create_payment_voucher($payment_data)
+    {
+        // Verificar si el módulo contable está activo o si debemos crear el voucher
+        if (!/* condición para activar contabilidad */ true) {
+            return null;
+        }
+        
+        // Función auxiliar para redondeo personalizado
+        $custom_round = function($number) {
+            $number = floatval($number);
+            $partes = explode('.', strval($number));
+            
+            if (count($partes) === 2) {
+                $decimales = $partes[1];
+                if (strlen($decimales) > 2) {
+                    $tercer_decimal = substr($decimales, 2, 1);
+                    if (intval($tercer_decimal) >= 5) {
+                        return round($number + 0.001, 2);
+                    }
+                }
+            }
+            return round($number, 2);
+        };
+        
+        try {
+            $loan_info = $this->Loan->get_info($payment_data['loan_id']);
+            $amount = floatval($payment_data['paid_amount']);
+            
+            $lookup_date = $this->input->post('payment_due');
+            
+            $installment_number = 0;
+            $interest = 0;
+            $capital = 0;
+            
+            if ($loan_info && !empty($loan_info->periodic_loan_table)) {
+                $json_objects = json_decode($loan_info->periodic_loan_table);
+                $number = 0;
+                
+                foreach($json_objects as $object) {
+                    $number++;
+                    
+                    if($object->payment_date == $lookup_date) {
+                        $installment_number = $number;
+                        $interest = floatval($object->interest);
+                        $capital = floatval($object->payment_amount_capital);
+                        break;
+                    }
+                }
+            }
+
+            // Cálculos monetarios
+            $intereses_amortizables = $custom_round($interest * 0.87);
+            $iva = $custom_round($interest * 0.13);
+            $it = $custom_round(($iva + $intereses_amortizables) * 0.03);
+            $capital_final = $custom_round($amount - $iva - $intereses_amortizables);
+            $caja_moneda_nacional = $custom_round($capital_final + $iva + $intereses_amortizables);
+
+            $customer = $this->Customer->get_info($payment_data['customer_id']);
+            $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer->first_name} {$customer->last_name} - Cuota N° {$installment_number}";
+
+            $payment_methods = $this->input->post('payment_methods');
+
+            $total_debit = $custom_round($caja_moneda_nacional + $it);
+            $total_credit = $custom_round($caja_moneda_nacional + $it);
+
+            $voucher_data = [
+                'voucher_date' => date('Y-m-d H:i:s'),
+                'voucher_type' => 'ingreso',
+                'description'  => $descripcion,
+                'total_debit'  => $total_debit,
+                'total_credit' => $total_credit,
+                'added_by'     => $this->Employee->get_logged_in_employee_info()->person_id,
+                'added_date'   => date('Y-m-d H:i:s')
+            ];
+            
+            if (is_plugin_active("branches")) {
+                $voucher_data["branch_id"] = $this->session->userdata("branch_id");
+            }
+            
+            $this->db->insert('c19_accounting_vouchers', $voucher_data);
+            $voucher_id = $this->db->insert_id();
+
+            $transaction_date = date('Y-m-d H:i:s');
+
+            // Asignación de cuentas contables
+            $transaction_entries = [
+                // Debe
+                ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expenses'],
+                ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset'],
+                
+                // Haber
+                ['account_id' => 58,  'debit' => 0, 'credit' => $capital_final,         'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
+                ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income'],
+                ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability'],
+                ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
+            ];
+
+            foreach ($transaction_entries as $entry) {
+                if ($entry['debit'] > 0 || $entry['credit'] > 0) {
+                    $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
+                    $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
+
+                    $transaction_data = [
+                        'account_id'       => $entry['account_id'],
+                        'amount'           => $amount_entry,
+                        'description'      => $entry['description'],
+                        'added_date'       => $transaction_date,
+                        'added_by'         => $this->Employee->get_logged_in_employee_info()->person_id,
+                        'transaction_type' => $entry['transaction_type'],
+                        'movement_type'    => $movement_type,
+                        'voucher_id'       => $voucher_id,
+                        'payment_methods'  => $payment_methods,
+                        'invoice_number'   => 'PAGO-' . $payment_data['loan_id'],
+                        'purchased_date'   => $transaction_date,
+                        'purchased_amount' => 0,
+                        'depreciate_amount'=> 0
+                    ];
+                    
+                    if (is_plugin_active("branches")) {
+                        $transaction_data["branch_id"] = $this->session->userdata("branch_id");
+                    }
+                    
+                    $this->db->insert('c19_accounting_transactions', $transaction_data);
+                }
+            }
+
+            return $voucher_id;
+            
+        } catch (Exception $e) {
+            // Log the error but don't break the main payment process
+            log_message('error', 'Error creating payment voucher: ' . $e->getMessage());
+            return null;
+        }
     }
 
     function delete()
