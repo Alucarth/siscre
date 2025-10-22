@@ -1,4 +1,6 @@
 /uploads/
 /downloads/
 /demo/
+/logs/
+/temp/
 application/config/database.php
