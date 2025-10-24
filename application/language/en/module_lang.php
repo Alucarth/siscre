@@ -36,3 +36,5 @@ $lang["module_messages"] = "Mensajes";
 $lang["module_messages_desc"] = "Agregar, actualizar, eliminar y buscar mensajes";
 $lang["module_emails"] = "Plantillas de correo electrónico";
 $lang["module_emails_desc"] = "Listar y buscar plantillas de correo electrónico";
+$lang["module_general_ledger"] = "Libro diario";
+$lang["module_accounting"] = "Contabilidad";

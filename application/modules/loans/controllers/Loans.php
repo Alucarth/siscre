@@ -838,7 +838,6 @@ class Loans extends Secure_area implements iData_controller
 	        // Fecha para las transacciones
 	        $transaction_date = date('Y-m-d H:i:s');
 	
-	        // Definir las entradas contables (partida doble)
 	        $transaction_entries = [
 	            [
 	                'account_id' => 58,  // Cuenta: Préstamos por cobrar (activo)
@@ -858,16 +857,12 @@ class Loans extends Secure_area implements iData_controller
 	
 	        // Insertar cada entrada contable
 	        foreach ($transaction_entries as $entry) {
-	            // Solo insertar si hay monto en débito o crédito
 	            if ($entry['debit'] > 0 || $entry['credit'] > 0) {
-	                // Determinar el monto de la transacción
 	                $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
-	                // Determinar el tipo de movimiento (débito o crédito)
 	                $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
 	
-	                // Preparar datos de la transacción
 	                $transaction_data = [
-	                    'account_id'       => $entry['account_id'], // ID de la cuenta contable
+	                    'account_id'       => $entry['account_id'],
 	                    'amount'           => $amount_entry, // Monto de la transacción
 	                    'description'      => $entry['description'], // Descripción
 	                    'added_date'       => $transaction_date, // Fecha de la transacción
@@ -887,7 +882,6 @@ class Loans extends Secure_area implements iData_controller
 	                    $transaction_data["branch_id"] = $this->session->userdata("branch_id");
 	                }
 	                
-	                // Insertar transacción en la base de datos
 	                $this->db->insert('c19_accounting_transactions', $transaction_data);
 	            }
 	        }
