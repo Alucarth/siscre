@@ -116,7 +116,11 @@ class Loan extends CI_Model {
             {
                 $this->db->where("my_customer.branch_id", $filters["branch_id"]);
             }
-            $this->db->where("my_customer.branch_id", $this->session->userdata('branch_id'));        
+            else
+            {
+                // Solo aplicar sucursal de sesión si no hay filtro específico
+                $this->db->where("my_customer.branch_id", $this->session->userdata('branch_id'));
+            }
         }
         if ( isset($filters["applied_from_date"]) && trim($filters["applied_from_date"]) != '' )
         {

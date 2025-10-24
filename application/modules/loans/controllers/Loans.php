@@ -136,9 +136,10 @@ class Loans extends Secure_area implements iData_controller
         {
             $filters["approved_to_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($approved_to_date) . " 23:00:00") : strtotime($approved_to_date . " 23:00:00");
         }
-        if (is_plugin_active("branches") )
-        {
-            $filters["branch_id"] = $this->input->post("branch_id");
+        if (is_plugin_active("branches")) {
+            $branch_id = $this->input->post("branch_id");
+            // Asegurar que "Todas" envíe 0 o null
+            $filters["branch_id"] = ($branch_id && $branch_id > 0) ? $branch_id : 0;
         }
         $loans = $this->Loan->get_all($limit, $offset, $keywords, $order, $status, $selected_user, $filters);
         $count_all = $this->Loan->get_all($limit, $offset, $keywords, $order, $status, $selected_user, $filters, 1);
@@ -791,110 +792,102 @@ class Loans extends Secure_area implements iData_controller
         }
     }
 
-	private function _create_loan_approval_voucher($loan_id, $loan_data)
-	{
-	    // Verificar si el módulo contable está activo - aquí deberías implementar tu propia condición
-	    if (!/* condición para activar contabilidad */ true) {
-	        return null; // Retorna null si la contabilidad no está activa
-	    }
-	    
-	    try {
-	        // Obtener información del empleado logueado
-	        $employee_info = $this->Employee->get_logged_in_employee_info();
-	        // Obtener información del cliente
-	        $customer_info = $this->Customer->get_info($loan_data['customer_id']);
-	        
-	        // Validar que exista información del empleado y cliente
-	        if (!$employee_info || !$customer_info) {
-	            return null; // Retorna null si falta información esencial
-	        }
-	        
-	        // Obtener el monto del préstamo y convertirlo a float
-	        $amount = floatval($loan_data['apply_amount']);
-	        // Crear descripción del comprobante
-	        $descripcion = "Desembolso de préstamo #" . $loan_id . " - Cliente: " . $customer_info->first_name . " " . $customer_info->last_name;
-	
-	        // Preparar datos del comprobante
-	        $voucher_data = [
-	            'voucher_date' => date('Y-m-d H:i:s'), // Fecha actual del comprobante
-	            'voucher_type' => 'egreso', // Tipo de comprobante: egreso
-	            'description'  => $descripcion, // Descripción del comprobante
-	            'total_debit'  => $amount, // Total débito (igual al monto)
-	            'total_credit' => $amount, // Total crédito (igual al monto)
-	            'added_by'     => $employee_info->person_id, // ID del usuario que crea
-	            'added_date'   => date('Y-m-d H:i:s') // Fecha de creación
-	        ];
-	        
-	        // Si el plugin de sucursales está activo, agregar branch_id
-	        if (is_plugin_active("branches")) {
-	            $voucher_data["branch_id"] = $this->session->userdata("branch_id");
-	        }
-	        
-	        // Insertar comprobante en la base de datos
-	        $this->db->insert('c19_accounting_vouchers', $voucher_data);
-	        // Obtener el ID del comprobante recién insertado
-	        $voucher_id = $this->db->insert_id();
-	
-	        // Fecha para las transacciones
-	        $transaction_date = date('Y-m-d H:i:s');
-	
-	        $transaction_entries = [
-	            [
-	                'account_id' => 58,  // Cuenta: Préstamos por cobrar (activo)
-	                'debit'      => $amount, // Débito: aumenta el activo
-	                'credit'     => 0, // Sin crédito
-	                'description' => $descripcion . ' - Préstamo por cobrar', // Descripción específica
-	                'transaction_type' => 'asset' // Tipo de transacción: activo
-	            ],
-	            [
-	                'account_id' => 5,  // Cuenta: Caja/Bancos (activo)
-	                'debit'      => 0, // Sin débito
-	                'credit'     => $amount, // Crédito: disminuye el activo
-	                'description' => $descripcion . ' - Desembolso en caja', // Descripción específica
-	                'transaction_type' => 'asset' // Tipo de transacción: activo
-	            ]
-	        ];
-	
-	        // Insertar cada entrada contable
-	        foreach ($transaction_entries as $entry) {
-	            if ($entry['debit'] > 0 || $entry['credit'] > 0) {
-	                $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
-	                $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
-	
-	                $transaction_data = [
-	                    'account_id'       => $entry['account_id'],
-	                    'amount'           => $amount_entry, // Monto de la transacción
-	                    'description'      => $entry['description'], // Descripción
-	                    'added_date'       => $transaction_date, // Fecha de la transacción
-	                    'added_by'         => $employee_info->person_id, // Usuario que crea
-	                    'transaction_type' => $entry['transaction_type'], // Tipo de transacción
-	                    'movement_type'    => $movement_type, // Tipo de movimiento (débito/crédito)
-	                    'voucher_id'       => $voucher_id, // ID del comprobante padre
-	                    'payment_methods'  => 'efectivo', // Método de pago
-	                    'invoice_number'   => 'LOAN-' . $loan_id, // Número de factura/referencia
-	                    'purchased_date'   => $transaction_date, // Fecha de compra
-	                    'purchased_amount' => 0, // Monto de compra (no aplica)
-	                    'depreciate_amount'=> 0 // Monto de depreciación (no aplica)
-	                ];
-	                
-	                // Si el plugin de sucursales está activo, agregar branch_id
-	                if (is_plugin_active("branches")) {
-	                    $transaction_data["branch_id"] = $this->session->userdata("branch_id");
-	                }
-	                
-	                $this->db->insert('c19_accounting_transactions', $transaction_data);
-	            }
-	        }
-	
-	        // Retornar el ID del comprobante creado
-	        return $voucher_id;
-	        
-	    } catch (Exception $e) {
-	        // Registrar error en logs pero no interrumpir el proceso principal del préstamo
-	        log_message('error', 'Error creating loan approval voucher: ' . $e->getMessage());
-	        return null; // Retornar null en caso de error
-	    }
-	}
+	private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null)
+    {
+        if (!/* condición para activar contabilidad */ true) {
+            return null; // Retorna null si la contabilidad no está activa
+        }
+        
+        try {
+            if ($employee_id === null) {
+                $employee_info = $this->Employee->get_logged_in_employee_info();
+            } else {
+                $employee_info = $this->Employee->get_info($employee_id);
+            }
+            
+            $customer_info = $this->Customer->get_info($loan_data['customer_id']);
+            
+            if (!$employee_info || !$customer_info) {
+                return null;
+            }
+            
+            $amount = floatval($loan_data['apply_amount']);
+            $descripcion = "Desembolso de préstamo #" . $loan_id . " - Cliente: " . $customer_info->first_name . " " . $customer_info->last_name;
+
+            // Preparar datos del comprobante
+            $voucher_data = [
+                'voucher_date' => date('Y-m-d H:i:s'),
+                'voucher_type' => 'egreso',
+                'description'  => $descripcion,
+                'total_debit'  => $amount,
+                'total_credit' => $amount,
+                'added_by'     => $employee_info->person_id,
+                'added_date'   => date('Y-m-d H:i:s')
+            ];
+            
+            if (is_plugin_active("branches")) {
+                $voucher_data["branch_id"] = $this->session->userdata("branch_id");
+            }
+            
+            $this->db->insert('c19_accounting_vouchers', $voucher_data);
+            $voucher_id = $this->db->insert_id();
+
+            $transaction_date = date('Y-m-d H:i:s');
+
+            $transaction_entries = [
+                [
+                    'account_id' => 58,
+                    'debit'      => $amount,
+                    'credit'     => 0,
+                    'description' => $descripcion . ' - Préstamo por cobrar',
+                    'transaction_type' => 'asset'
+                ],
+                [
+                    'account_id' => 5,
+                    'debit'      => 0,
+                    'credit'     => $amount,
+                    'description' => $descripcion . ' - Desembolso en caja',
+                    'transaction_type' => 'asset'
+                ]
+            ];
+
+            // Insertar cada entrada contable
+            foreach ($transaction_entries as $entry) {
+                if ($entry['debit'] > 0 || $entry['credit'] > 0) {
+                    $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
+                    $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
+
+                    $transaction_data = [
+                        'account_id'       => $entry['account_id'],
+                        'amount'           => $amount_entry,
+                        'description'      => $entry['description'],
+                        'added_date'       => $transaction_date,
+                        'added_by'         => $employee_info->person_id,
+                        'transaction_type' => $entry['transaction_type'],
+                        'movement_type'    => $movement_type,
+                        'voucher_id'       => $voucher_id,
+                        'payment_methods'  => 'efectivo',
+                        'invoice_number'   => 'LOAN-' . $loan_id,
+                        'purchased_date'   => $transaction_date,
+                        'purchased_amount' => 0,
+                        'depreciate_amount'=> 0
+                    ];
+                    
+                    if (is_plugin_active("branches")) {
+                        $transaction_data["branch_id"] = $this->session->userdata("branch_id");
+                    }
+                    
+                    $this->db->insert('c19_accounting_transactions', $transaction_data);
+                }
+            }
+
+            return $voucher_id;
+            
+        } catch (Exception $e) {
+            log_message('error', 'Error creating loan approval voucher: ' . $e->getMessage());
+            return null;
+        }
+    }
 
     function delete()
     {

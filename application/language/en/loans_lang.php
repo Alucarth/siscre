@@ -20,6 +20,7 @@ $lang["loans_paid"] = "Pagado";
 $lang["loans_by_status"] = "Por estado";
 $lang["loans_by_staff"] = "Por personal";
 $lang["loans_by_customer"] = "Por el cliente";
+$lang["loans_by_branch"] = "Por sucursal";
 $lang["loans_approved_date_to"] = "Fecha de aprobación hasta";
 $lang["loans_approved_date_from"] = "Fecha de aprobación desde";
 $lang["loans_applied_date_to"] = "Fecha de aplicación a";

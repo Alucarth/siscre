@@ -119,8 +119,23 @@
                                         </select>
                                     </div>
                                 </div>
-
-
+                                <div class="form-group">
+                                    <label><?= ktranslate("loans_by_branch")?>:</label>
+                                    <div>
+                                        <select class="form-control hidden-xs" name="branch_id">
+                                            <option value="0">Elegir</option>
+                                            <?php if (is_plugin_active('branches') && isset($branches)): ?>
+                                                <?php foreach ($branches as $branch): ?>
+                                                    <option value="<?= $branch->id; ?>" <?= ((isset($_GET['branch_id'])) && $_GET['branch_id'] == $branch->id) ? 'selected="selected"' : ""; ?>>
+                                                        <?= $branch->branch_name; ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <option value="0">Sucursales no disponibles</option>
+                                            <?php endif; ?>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="form-group">
                                     <label><?= ktranslate("loans_by_staff")?>:</label>
                                     <div>
@@ -246,116 +261,143 @@
     }
 
     $(document).ready(function () {
-        $(document).on("click", "#btn-export-csv", function () {
-            var url = '<?= site_url('loans/export_csv'); ?>';
-            var params = $("#dt-extra-params input, #dt-extra-params select").serialize();
-            params += '&softtoken=' + $("input[name='softtoken']").val();
-            
-            $.post(url, params, function(data){
-                if ( data.status == "OK" )
-                {
-                    window.location.href = data.url;
-                }
-            }, "json");
-        });
+    // Configurar el datatable para enviar parámetros adicionales via POST
+    var table = $("#tbl_loans_transactions").DataTable();
+    
+    // Función para aplicar búsqueda avanzada
+    function applyAdvancedSearch() {
+        table.ajax.reload();
+    }
+
+    // Configurar el evento preXhr para enviar todos los parámetros
+    table.on('preXhr.dt', function (e, settings, data) {
+        // Agregar los parámetros de búsqueda avanzada a cada solicitud AJAX
+        data.due_from_date = $("input[name='due_from_date']").val();
+        data.due_to_date = $("input[name='due_to_date']").val();
+        data.applied_from_date = $("input[name='applied_from_date']").val();
+        data.applied_to_date = $("input[name='applied_to_date']").val();
+        data.approved_from_date = $("input[name='approved_from_date']").val();
+        data.approved_to_date = $("input[name='approved_to_date']").val();
+        data.customer_id = $("select[name='customer_id']").val();
+        data.branch_id = $("select[name='branch_id']").val();
+        data.employee_id = $("select[name='employee_id']").val();
+        data.status = $("select[name='status']").val();
+    });
+
+    $(document).on("click", "#btn-export-csv", function () {
+        var url = '<?= site_url('loans/export_csv'); ?>';
+        var params = $("#dt-extra-params input, #dt-extra-params select").serialize();
+        params += '&softtoken=' + $("input[name='softtoken']").val();
         
-        $("#btn-clear-search").click(function(){
-            $("#dt-extra-params input").val("");
-            $("#dt-extra-params select[name='employee_id']").val('0');
-            $("#dt-extra-params select[name='customer_id']").val('0');
-            $("#dt-extra-params select[name='status']").val("all");
-            $("select").trigger("change.select2");
-        });
-        
-        $("#btn-close").click(function(){
-            $(".toggle-search").trigger("click");
-        });
-        
-        $(".toggle-search").click(function () {
-            if ($(this).attr("data-status") == "show")
+        $.post(url, params, function(data){
+            if ( data.status == "OK" )
             {
-                $(".panel-search").addClass("col-lg-3");
-                $(".panel-search").removeClass("hidden");
-                $(".panel-list").removeClass("col-lg-12");
-                $(".panel-list").addClass("col-lg-9");
-                $(this).attr("data-status", "hide");
-                $(this).html('<span class="fa fa-angle-double-left"></span> <?=ktranslate("loans_hide_advance_search")?>')
-            } else
-            {
-                $(".panel-search").removeClass("col-lg-3");
-                $(".panel-search").addClass("hidden");
-                $(".panel-list").addClass("col-lg-12");
-                $(".panel-list").removeClass("col-lg-9");
-                $(this).attr("data-status", "show");
-                $(this).html('<span class="fa fa-angle-double-right"></span> <?=ktranslate("loans_show_advance_search")?>')
+                window.location.href = data.url;
             }
-        });
+        }, "json");
+    });
 
-        $('.input-group.date').datepicker({
-            language: 'es',
-            format: '<?= calendar_date_format(); ?>',
-            todayBtn: "linked",
-            keyboardNavigation: false,
-            forceParse: false,
-            calendarWeeks: true,
-            autoclose: true
-        });
+    $("#btn-clear-search").click(function(){
+        $("#dt-extra-params input").val("");
+        $("#dt-extra-params select[name='employee_id']").val('0');
+        $("#dt-extra-params select[name='customer_id']").val('0');
+        $("#dt-extra-params select[name='branch_id']").val('0');
+        $("#dt-extra-params select[name='status']").val("all");
+        $("select").trigger("change.select2");
+        
+        // Aplicar la búsqueda limpia
+        applyAdvancedSearch();
+    });
+    
+    $("#btn-close").click(function(){
+        $(".toggle-search").trigger("click");
+    });
+    
+    $(".toggle-search").click(function () {
+        if ($(this).attr("data-status") == "show")
+        {
+            $(".panel-search").addClass("col-lg-3");
+            $(".panel-search").removeClass("hidden");
+            $(".panel-list").removeClass("col-lg-12");
+            $(".panel-list").addClass("col-lg-9");
+            $(this).attr("data-status", "hide");
+            $(this).html('<span class="fa fa-angle-double-left"></span> <?=ktranslate("loans_hide_advance_search")?>')
+        } else
+        {
+            $(".panel-search").removeClass("col-lg-3");
+            $(".panel-search").addClass("hidden");
+            $(".panel-list").addClass("col-lg-12");
+            $(".panel-list").removeClass("col-lg-9");
+            $(this).attr("data-status", "show");
+            $(this).html('<span class="fa fa-angle-double-right"></span> <?=ktranslate("loans_show_advance_search")?>')
+        }
+    });
 
-        $("#btn-search").click(function () {
-            $("#tbl_loans_transactions").DataTable().ajax.reload();
-        });
+    $('.input-group.date').datepicker({
+        language: 'es',
+        format: '<?= calendar_date_format(); ?>',
+        todayBtn: "linked",
+        keyboardNavigation: false,
+        forceParse: false,
+        calendarWeeks: true,
+        autoclose: true
+    });
 
-        $("#tbl_loans_transactions_filter").prepend("<a href='<?= site_url('loans/view/-1') ?>' class='btn btn-primary pull-left'><?=ktranslate("loans_new")?></a>");
-        $("#tbl_loans_transactions_filter input[type='search']").attr("placeholder", "<?=ktranslate("common_search")?>");
-        $("#tbl_loans_transactions_filter input[type='search']").removeClass("input-sm");
-        $("#tbl_loans_transactions_filter").append($(".extra-filters").html());
+    $("#btn-search").click(function () {
+        applyAdvancedSearch();
+    });
 
-        $(document).on("click", "#btn-export-pdf", function () {
-            var clone = $("#tbl_loans_transactions_wrapper .dataTables_scrollBody").clone();
+    $("#tbl_loans_transactions_filter").prepend("<a href='<?= site_url('loans/view/-1') ?>' class='btn btn-primary pull-left'><?=ktranslate("loans_new")?></a>");
+    $("#tbl_loans_transactions_filter input[type='search']").attr("placeholder", "<?=ktranslate("common_search")?>");
+    $("#tbl_loans_transactions_filter input[type='search']").removeClass("input-sm");
+    $("#tbl_loans_transactions_filter").append($(".extra-filters").html());
 
-            $(clone).find("table").attr("border", 1);
-            $(clone).find("table").attr("cellpadding", 5);
-            $(clone).find("table").attr("cellspacing", 1);
-            $(clone).find("table").attr("width", "100%");
-            $(clone).find("table th:nth-child(1)").remove();
-            $(clone).find("table td:nth-child(1)").remove();
+    $(document).on("click", "#btn-export-pdf", function () {
+        var clone = $("#tbl_loans_transactions_wrapper .dataTables_scrollBody").clone();
 
-            var total_proceeds = $(".dataTables_scrollFoot .tf-total-proceeds.dt-min-width").html();
-            var total_net_proceeds = $(".dataTables_scrollFoot .tf-total-net-proceeds.dt-min-width").html();
-            var total_balance = $(".dataTables_scrollFoot .tf-total-balance.dt-min-width").html();
-            $(clone).find("tfoot").html('<tr><td colspan="4" style="text-align:right">Total:</td><td style="text-align:right">' + total_proceeds + '</td><td style="text-align:right">' + total_net_proceeds + '</td><td style="text-align:right">' + total_balance + '</td><td colspan="5"></td></tr>');
+        $(clone).find("table").attr("border", 1);
+        $(clone).find("table").attr("cellpadding", 5);
+        $(clone).find("table").attr("cellspacing", 1);
+        $(clone).find("table").attr("width", "100%");
+        $(clone).find("table th:nth-child(1)").remove();
+        $(clone).find("table td:nth-child(1)").remove();
 
-            var url = '<?= site_url('printing/print_list/transactions.pdf'); ?>';
-            var params = {
-                softtoken: $("input[name='softtoken']").val(),
-                title: '<?= ktranslate2("Loan Transaction Report")?>',
-                html: clone.html()
-            };
-            blockElement("#btn-export-pdf");
+        var total_proceeds = $(".dataTables_scrollFoot .tf-total-proceeds.dt-min-width").html();
+        var total_net_proceeds = $(".dataTables_scrollFoot .tf-total-net-proceeds.dt-min-width").html();
+        var total_balance = $(".dataTables_scrollFoot .tf-total-balance.dt-min-width").html();
+        $(clone).find("tfoot").html('<tr><td colspan="4" style="text-align:right">Total:</td><td style="text-align:right">' + total_proceeds + '</td><td style="text-align:right">' + total_net_proceeds + '</td><td style="text-align:right">' + total_balance + '</td><td colspan="5"></td></tr>');
+
+        var url = '<?= site_url('printing/print_list/transactions.pdf'); ?>';
+        var params = {
+            softtoken: $("input[name='softtoken']").val(),
+            title: '<?= ktranslate2("Loan Transaction Report")?>',
+            html: clone.html()
+        };
+        blockElement("#btn-export-pdf");
+        $.post(url, params, function (data) {
+            if (data.status == "OK")
+            {
+                window.open(data.url, '_blank');
+            }
+            unblockElement("#btn-export-pdf");
+        }, "json");
+    });
+
+    $(document).on("click", ".btn-delete", function () {
+        var $this = $(this);
+        alertify.confirm("<?=ktranslate2("Are you sure you wish to delete this transaction")?>?", function () {
+            var url = $("#frmLoansDelete").attr("action");
+            var params = $("#frmLoansDelete").serialize();
+            params += '&id=' + $this.attr("data-loan-id");
             $.post(url, params, function (data) {
                 if (data.status == "OK")
                 {
-                    window.open(data.url, '_blank');
+                    $("#tbl_loans_transactions").DataTable().ajax.reload();
                 }
-                unblockElement("#btn-export-pdf");
             }, "json");
         });
-
-        $(document).on("click", ".btn-delete", function () {
-            var $this = $(this);
-            alertify.confirm("<?=ktranslate2("Are you sure you wish to delete this transaction")?>?", function () {
-                var url = $("#frmLoansDelete").attr("action");
-                var params = $("#frmLoansDelete").serialize();
-                params += '&id=' + $this.attr("data-loan-id");
-                $.post(url, params, function (data) {
-                    if (data.status == "OK")
-                    {
-                        $("#tbl_loans_transactions").DataTable().ajax.reload();
-                    }
-                }, "json");
-            });
-        });
     });
+});
 </script>
 
 <?php $this->load->view("partial/footer"); ?>
