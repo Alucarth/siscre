@@ -112,13 +112,15 @@ class Loan extends CI_Model {
         }
         if (is_plugin_active("branches"))
         {
-            if ( isset($filters["branch_id"]) && $filters["branch_id"] > 0 )
+            if ( isset($filters["branch_id"]) ) 
             {
-                $this->db->where("my_customer.branch_id", $filters["branch_id"]);
+                if ($filters["branch_id"] > 0)
+                {
+                    $this->db->where("my_customer.branch_id", $filters["branch_id"]);
+                }
             }
             else
             {
-                // Solo aplicar sucursal de sesión si no hay filtro específico
                 $this->db->where("my_customer.branch_id", $this->session->userdata('branch_id'));
             }
         }

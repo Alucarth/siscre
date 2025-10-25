@@ -119,23 +119,18 @@
                                         </select>
                                     </div>
                                 </div>
+                                <?php if (is_plugin_active('branches') && isset($branches)): ?>
                                 <div class="form-group">
-                                    <label><?= ktranslate("loans_by_branch")?>:</label>
-                                    <div>
-                                        <select class="form-control hidden-xs" name="branch_id">
-                                            <option value="0">Elegir</option>
-                                            <?php if (is_plugin_active('branches') && isset($branches)): ?>
-                                                <?php foreach ($branches as $branch): ?>
-                                                    <option value="<?= $branch->id; ?>" <?= ((isset($_GET['branch_id'])) && $_GET['branch_id'] == $branch->id) ? 'selected="selected"' : ""; ?>>
-                                                        <?= $branch->branch_name; ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            <?php else: ?>
-                                                <option value="0">Sucursales no disponibles</option>
-                                            <?php endif; ?>
-                                        </select>
-                                    </div>
+                                    <label for="branch_id"><?= ktranslate("loans_by_branch"); ?>:</label>
+                                    <select name="branch_id" id="branch_id" class="form-control">
+                                        <?php foreach($branches as $branch): ?>
+                                            <option value="<?php echo $branch->id; ?>" <?php echo ($branch->id == 0) ? 'selected' : ''; ?>>
+                                                <?php echo $branch->branch_name; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="form-group">
                                     <label><?= ktranslate("loans_by_staff")?>:</label>
                                     <div>
@@ -282,57 +277,58 @@
         data.branch_id = $("select[name='branch_id']").val();
         data.employee_id = $("select[name='employee_id']").val();
         data.status = $("select[name='status']").val();
-    });
-
-    $(document).on("click", "#btn-export-csv", function () {
-        var url = '<?= site_url('loans/export_csv'); ?>';
-        var params = $("#dt-extra-params input, #dt-extra-params select").serialize();
-        params += '&softtoken=' + $("input[name='softtoken']").val();
         
-        $.post(url, params, function(data){
-            if ( data.status == "OK" )
-            {
-                window.location.href = data.url;
-            }
-        }, "json");
+        console.log("Enviando parámetros:", data); // Para debugging
     });
 
+    // Botón de búsqueda
+    $("#btn-search").click(function () {
+        applyAdvancedSearch();
+    });
+
+    // Botón limpiar búsqueda - CORREGIDO
     $("#btn-clear-search").click(function(){
         $("#dt-extra-params input").val("");
         $("#dt-extra-params select[name='employee_id']").val('0');
         $("#dt-extra-params select[name='customer_id']").val('0');
         $("#dt-extra-params select[name='branch_id']").val('0');
         $("#dt-extra-params select[name='status']").val("all");
-        $("select").trigger("change.select2");
+        
+        // Trigger change para select2 si está en uso
+        if ($.fn.select2) {
+            $("#dt-extra-params select").trigger("change.select2");
+        } else {
+            $("#dt-extra-params select").trigger("change");
+        }
         
         // Aplicar la búsqueda limpia
         applyAdvancedSearch();
     });
     
+    // Resto del código JavaScript...
     $("#btn-close").click(function(){
         $(".toggle-search").trigger("click");
     });
     
     $(".toggle-search").click(function () {
-        if ($(this).attr("data-status") == "show")
-        {
+        if ($(this).attr("data-status") == "show") {
             $(".panel-search").addClass("col-lg-3");
             $(".panel-search").removeClass("hidden");
             $(".panel-list").removeClass("col-lg-12");
             $(".panel-list").addClass("col-lg-9");
             $(this).attr("data-status", "hide");
-            $(this).html('<span class="fa fa-angle-double-left"></span> <?=ktranslate("loans_hide_advance_search")?>')
-        } else
-        {
+            $(this).html('<span class="fa fa-angle-double-left"></span> <?=ktranslate("loans_hide_advance_search")?>');
+        } else {
             $(".panel-search").removeClass("col-lg-3");
             $(".panel-search").addClass("hidden");
             $(".panel-list").addClass("col-lg-12");
             $(".panel-list").removeClass("col-lg-9");
             $(this).attr("data-status", "show");
-            $(this).html('<span class="fa fa-angle-double-right"></span> <?=ktranslate("loans_show_advance_search")?>')
+            $(this).html('<span class="fa fa-angle-double-right"></span> <?=ktranslate("loans_show_advance_search")?>');
         }
     });
 
+    // Inicializar datepickers
     $('.input-group.date').datepicker({
         language: 'es',
         format: '<?= calendar_date_format(); ?>',
@@ -343,15 +339,13 @@
         autoclose: true
     });
 
-    $("#btn-search").click(function () {
-        applyAdvancedSearch();
-    });
-
+    // Agregar botones de acción
     $("#tbl_loans_transactions_filter").prepend("<a href='<?= site_url('loans/view/-1') ?>' class='btn btn-primary pull-left'><?=ktranslate("loans_new")?></a>");
     $("#tbl_loans_transactions_filter input[type='search']").attr("placeholder", "<?=ktranslate("common_search")?>");
     $("#tbl_loans_transactions_filter input[type='search']").removeClass("input-sm");
     $("#tbl_loans_transactions_filter").append($(".extra-filters").html());
 
+    // Export PDF
     $(document).on("click", "#btn-export-pdf", function () {
         var clone = $("#tbl_loans_transactions_wrapper .dataTables_scrollBody").clone();
 
@@ -375,14 +369,40 @@
         };
         blockElement("#btn-export-pdf");
         $.post(url, params, function (data) {
-            if (data.status == "OK")
-            {
+            if (data.status == "OK") {
                 window.open(data.url, '_blank');
             }
             unblockElement("#btn-export-pdf");
         }, "json");
     });
 
+    // Export CSV
+    $(document).on("click", "#btn-export-csv", function () {
+        var url = '<?= site_url('loans/export_csv'); ?>';
+        
+        // Recoger todos los parámetros de filtro actuales
+        var params = {
+            due_from_date: $("input[name='due_from_date']").val(),
+            due_to_date: $("input[name='due_to_date']").val(),
+            applied_from_date: $("input[name='applied_from_date']").val(),
+            applied_to_date: $("input[name='applied_to_date']").val(),
+            approved_from_date: $("input[name='approved_from_date']").val(),
+            approved_to_date: $("input[name='approved_to_date']").val(),
+            customer_id: $("select[name='customer_id']").val(),
+            branch_id: $("select[name='branch_id']").val(),
+            employee_id: $("select[name='employee_id']").val(),
+            status: $("select[name='status']").val(),
+            softtoken: $("input[name='softtoken']").val()
+        };
+        
+        $.post(url, params, function(data){
+            if ( data.status == "OK" ) {
+                window.location.href = data.url;
+            }
+        }, "json");
+    });
+
+    // Eliminar préstamo
     $(document).on("click", ".btn-delete", function () {
         var $this = $(this);
         alertify.confirm("<?=ktranslate2("Are you sure you wish to delete this transaction")?>?", function () {
@@ -390,8 +410,7 @@
             var params = $("#frmLoansDelete").serialize();
             params += '&id=' + $this.attr("data-loan-id");
             $.post(url, params, function (data) {
-                if (data.status == "OK")
-                {
+                if (data.status == "OK") {
                     $("#tbl_loans_transactions").DataTable().ajax.reload();
                 }
             }, "json");

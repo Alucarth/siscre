@@ -29,13 +29,20 @@ class Loans extends Secure_area implements iData_controller
         $data["tbl_loan_transactions"] = $this->datatablelib->render();
         $data["customers"] = $this->get_customers();
         
-        if ( is_plugin_active('branches') )
-        {
+        if (is_plugin_active('branches')) {
             $this->load->model('branches/Branch_model');
-            $data["branches"] = $this->Branch_model->get_branches();
+            $branches = $this->Branch_model->get_branches();
+            
+            // Agregar opción "Todos" al inicio
+            $all_option = new stdClass();
+            $all_option->id = 0; // Usamos 0 para "Todos"
+            $all_option->branch_name = 'Todos';
+            array_unshift($branches, $all_option);
+            
+            $data["branches"] = $branches;
         }
-        
-        $this->load->view('loans/list', $data);
+    
+    $this->load->view("loans/list", $data);
     }
     
     private function get_customers()
@@ -138,8 +145,9 @@ class Loans extends Secure_area implements iData_controller
         }
         if (is_plugin_active("branches")) {
             $branch_id = $this->input->post("branch_id");
-            // Asegurar que "Todas" envíe 0 o null
-            $filters["branch_id"] = ($branch_id && $branch_id > 0) ? $branch_id : 0;
+            if ($branch_id !== null && $branch_id !== '') {
+                $filters["branch_id"] = $branch_id;
+            }      
         }
         $loans = $this->Loan->get_all($limit, $offset, $keywords, $order, $status, $selected_user, $filters);
         $count_all = $this->Loan->get_all($limit, $offset, $keywords, $order, $status, $selected_user, $filters, 1);
@@ -149,6 +157,8 @@ class Loans extends Secure_area implements iData_controller
         $tbl_net_proceeds = 0;
         $tbl_proceeds = 0;
         $tbl_balance = 0;
+        $search = $this->input->post("search") ? $this->input->post("search") : "";
+        $status = $this->input->post("status") ? $this->input->post("status") : "";
         foreach ($loans->result() as $loan)
         {
             $loan_status = $loan->loan_status;
@@ -792,7 +802,7 @@ class Loans extends Secure_area implements iData_controller
         }
     }
 
-	private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null)
+    private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null)
     {
         if (!/* condición para activar contabilidad */ true) {
             return null; // Retorna null si la contabilidad no está activa
@@ -826,7 +836,10 @@ class Loans extends Secure_area implements iData_controller
             ];
             
             if (is_plugin_active("branches")) {
-                $voucher_data["branch_id"] = $this->session->userdata("branch_id");
+                $current_branch_id = $this->session->userdata("branch_id");
+                if ($current_branch_id != 1) {
+                    $voucher_data["branch_id"] = $current_branch_id;
+                }
             }
             
             $this->db->insert('c19_accounting_vouchers', $voucher_data);
@@ -874,7 +887,10 @@ class Loans extends Secure_area implements iData_controller
                     ];
                     
                     if (is_plugin_active("branches")) {
-                        $transaction_data["branch_id"] = $this->session->userdata("branch_id");
+                        $current_branch_id = $this->session->userdata("branch_id");
+                        if ($current_branch_id != 1) {
+                            $transaction_data["branch_id"] = $current_branch_id;
+                        }
                     }
                     
                     $this->db->insert('c19_accounting_transactions', $transaction_data);
