@@ -753,10 +753,10 @@ class Loans extends Secure_area implements iData_controller
         if ($this->Loan->save($loan_data, $loan_id))
         {
 			// LLAMADA A LA NUEVA FUNCIÓN PARA CREAR COMPROBANTE CONTABLE
-        	// Solo si el préstamo está siendo aprobado y es un nuevo préstamo
 	        if ($loan_status == 'approved' && $loan_id == -1) {
-	            $this->_create_loan_approval_voucher($loan_data['loan_id'], $loan_data);
-	        }
+                $new_loan_id = $loan_data['loan_id'];
+                $this->_create_loan_approval_voucher($new_loan_id, $loan_data);
+            }
             if ( $is_reverted )
             {
                 $log_data = [];
@@ -802,55 +802,120 @@ class Loans extends Secure_area implements iData_controller
         }
     }
 
-    private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null)
+    private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null, $branch_id = null)
     {
         if (!is_plugin_active('accounting')) {
+            log_message('error', 'Accounting plugin not active');
             return null;
         }
         
         try {
+            if (empty($loan_id) || empty($loan_data)) {
+                log_message('error', 'Missing loan_id or loan_data in voucher creation');
+                return null;
+            }
+            
             if ($employee_id === null) {
                 $employee_info = $this->Employee->get_logged_in_employee_info();
+                if (!$employee_info) {
+                    log_message('error', 'No logged in employee found');
+                    return null;
+                }
+                $employee_id = $employee_info->person_id;
             } else {
                 $employee_info = $this->Employee->get_info($employee_id);
+                if (!$employee_info) {
+                    log_message('error', 'Employee not found: ' . $employee_id);
+                    return null;
+                }
             }
             
-            if (!$employee_info) {
-                log_message('error', 'No employee info found for loan voucher creation');
-                return null;
+            if ($branch_id === null) {
+                if (is_plugin_active("branches")) {
+                    $branch_id = $this->session->userdata("branch_id");
+                    
+                    if (!$branch_id) {
+                        $customer_id = $loan_data['customer_id'] ?? null;
+                        if ($customer_id) {
+                            $this->load->model('Customer');
+                            $customer_info = $this->Customer->get_info($customer_id);
+                            if ($customer_info && isset($customer_info->branch_id)) {
+                                $branch_id = $customer_info->branch_id;
+                            }
+                        }
+                    }
+                    
+                    if (!$branch_id) {
+                        $branch_id = 1; // Sucursal por defecto
+                        log_message('info', 'Using default branch_id: 1');
+                    }
+                } else {
+                    $branch_id = 1; // Sucursal por defecto
+                }
             }
             
-            $customer_info = $this->Customer->get_info($loan_data['customer_id']);
-            if (!$customer_info) {
-                log_message('error', 'No customer info found for loan voucher creation - Customer ID: ' . $loan_data['customer_id']);
-                return null;
+            $customer_id = $loan_data['customer_id'] ?? null;
+            $customer_name = "Cliente";
+            
+            if ($customer_id) {
+                $this->load->model('Customer');
+                $customer_info = $this->Customer->get_info($customer_id);
+                if ($customer_info && !empty($customer_info->first_name)) {
+                    $customer_name = trim($customer_info->first_name . " " . ($customer_info->last_name ?? ''));
+                } else {
+                    $this->db->select('first_name, last_name');
+                    $this->db->from('people');
+                    $this->db->where('person_id', $customer_id);
+                    $query = $this->db->get();
+                    if ($query->num_rows() > 0) {
+                        $person = $query->row();
+                        $customer_name = trim($person->first_name . " " . ($person->last_name ?? ''));
+                    }
+                }
             }
             
-            $amount = floatval($loan_data['apply_amount']);
+            if (empty($customer_name) || $customer_name == "Cliente") {
+                $customer_name = "Cliente #" . $customer_id;
+            }
+            
+            $amount = floatval($loan_data['apply_amount'] ?? 0);
             if ($amount <= 0) {
-                log_message('error', 'Invalid loan amount for voucher: ' . $amount);
+                log_message('error', 'Invalid loan amount: ' . $amount);
                 return null;
             }
             
-            $descripcion = "Desembolso de préstamo #" . $loan_id . " - Cliente: " . $customer_info->first_name . " " . $customer_info->last_name;
+            $descripcion = "Desembolso de préstamo #" . $loan_id . " - Cliente: " . $customer_name;
 
+            $this->db->trans_start();
+            
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
                 'voucher_type' => 'egreso',
                 'description'  => $descripcion,
                 'total_debit'  => $amount,
                 'total_credit' => $amount,
-                'added_by'     => $employee_info->person_id,
+                'added_by'     => $employee_id,
                 'added_date'   => date('Y-m-d H:i:s')
             ];
             
             if (is_plugin_active("branches")) {
-                $current_branch_id = $this->session->userdata("branch_id");
-                $voucher_data["branch_id"] = $current_branch_id;
+                $voucher_data["branch_id"] = $branch_id;
             }
             
-            $this->db->insert('c19_accounting_vouchers', $voucher_data);
+            $insert_result = $this->db->insert('c19_accounting_vouchers', $voucher_data);
+            if (!$insert_result) {
+                log_message('error', 'Failed to create voucher: ' . $this->db->error()['message']);
+                $this->db->trans_rollback();
+                return null;
+            }
+            
             $voucher_id = $this->db->insert_id();
+            
+            if (!$voucher_id) {
+                log_message('error', 'Failed to get voucher ID');
+                $this->db->trans_rollback();
+                return null;
+            }
             
             $transaction_date = date('Y-m-d H:i:s');
 
@@ -881,7 +946,7 @@ class Loans extends Secure_area implements iData_controller
                     'amount'           => $amount_entry,
                     'description'      => $entry['description'],
                     'added_date'       => $transaction_date,
-                    'added_by'         => $employee_info->person_id,
+                    'added_by'         => $employee_id,
                     'transaction_type' => $entry['transaction_type'],
                     'movement_type'    => $movement_type,
                     'voucher_id'       => $voucher_id,
@@ -893,23 +958,25 @@ class Loans extends Secure_area implements iData_controller
                 ];
                 
                 if (is_plugin_active("branches")) {
-                    $current_branch_id = $this->session->userdata("branch_id");
-                    $transaction_data["branch_id"] = $current_branch_id;
+                    $transaction_data["branch_id"] = $branch_id;
                 }
                 
                 $insert_result = $this->db->insert('c19_accounting_transactions', $transaction_data);
                 
                 if (!$insert_result) {
-                    log_message('error', 'Failed to insert transaction entry: ' . $this->db->error()['message']);
-                    $this->db->where('voucher_id', $voucher_id);
-                    $this->db->delete('c19_accounting_vouchers');
+                    $error = $this->db->error();
+                    log_message('error', 'Failed to insert transaction entry: ' . $error['message']);
+                    $this->db->trans_rollback();
                     return null;
                 }
             }
-
+            $this->db->trans_commit();
+            
+            log_message('info', 'Successfully created loan approval voucher: ' . $voucher_id . ' for loan: ' . $loan_id);
             return $voucher_id;
             
         } catch (Exception $e) {
+            $this->db->trans_rollback();
             log_message('error', 'Error creating loan approval voucher: ' . $e->getMessage());
             return null;
         }
