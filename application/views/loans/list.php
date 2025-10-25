@@ -124,7 +124,7 @@
                                     <label for="branch_id"><?= ktranslate("loans_by_branch"); ?>:</label>
                                     <select name="branch_id" id="branch_id" class="form-control">
                                         <?php foreach($branches as $branch): ?>
-                                            <option value="<?php echo $branch->id; ?>" <?php echo ($branch->id == 0) ? 'selected' : ''; ?>>
+                                            <option value="<?php echo $branch->id; ?>" <?php echo ($branch->id == $this->session->userdata('branch_id')) ? 'selected' : ''; ?>>
                                                 <?php echo $branch->branch_name; ?>
                                             </option>
                                         <?php endforeach; ?>

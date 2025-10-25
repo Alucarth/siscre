@@ -804,8 +804,8 @@ class Loans extends Secure_area implements iData_controller
 
     private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null)
     {
-        if (!/* condición para activar contabilidad */ true) {
-            return null; // Retorna null si la contabilidad no está activa
+        if (!is_plugin_active('accounting')) {
+            return null;
         }
         
         try {
@@ -815,16 +815,25 @@ class Loans extends Secure_area implements iData_controller
                 $employee_info = $this->Employee->get_info($employee_id);
             }
             
-            $customer_info = $this->Customer->get_info($loan_data['customer_id']);
+            if (!$employee_info) {
+                log_message('error', 'No employee info found for loan voucher creation');
+                return null;
+            }
             
-            if (!$employee_info || !$customer_info) {
+            $customer_info = $this->Customer->get_info($loan_data['customer_id']);
+            if (!$customer_info) {
+                log_message('error', 'No customer info found for loan voucher creation - Customer ID: ' . $loan_data['customer_id']);
                 return null;
             }
             
             $amount = floatval($loan_data['apply_amount']);
+            if ($amount <= 0) {
+                log_message('error', 'Invalid loan amount for voucher: ' . $amount);
+                return null;
+            }
+            
             $descripcion = "Desembolso de préstamo #" . $loan_id . " - Cliente: " . $customer_info->first_name . " " . $customer_info->last_name;
 
-            // Preparar datos del comprobante
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
                 'voucher_type' => 'egreso',
@@ -837,26 +846,24 @@ class Loans extends Secure_area implements iData_controller
             
             if (is_plugin_active("branches")) {
                 $current_branch_id = $this->session->userdata("branch_id");
-                if ($current_branch_id != 1) {
-                    $voucher_data["branch_id"] = $current_branch_id;
-                }
+                $voucher_data["branch_id"] = $current_branch_id;
             }
             
             $this->db->insert('c19_accounting_vouchers', $voucher_data);
             $voucher_id = $this->db->insert_id();
-
+            
             $transaction_date = date('Y-m-d H:i:s');
 
             $transaction_entries = [
                 [
-                    'account_id' => 58,
+                    'account_id' => 58, // Préstamo por cobrar
                     'debit'      => $amount,
                     'credit'     => 0,
                     'description' => $descripcion . ' - Préstamo por cobrar',
                     'transaction_type' => 'asset'
                 ],
                 [
-                    'account_id' => 5,
+                    'account_id' => 5, // Caja/Bancos
                     'debit'      => 0,
                     'credit'     => $amount,
                     'description' => $descripcion . ' - Desembolso en caja',
@@ -866,34 +873,37 @@ class Loans extends Secure_area implements iData_controller
 
             // Insertar cada entrada contable
             foreach ($transaction_entries as $entry) {
-                if ($entry['debit'] > 0 || $entry['credit'] > 0) {
-                    $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
-                    $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
+                $amount_entry = $entry['debit'] > 0 ? $entry['debit'] : $entry['credit'];
+                $movement_type = $entry['debit'] > 0 ? 'debit' : 'credit';
 
-                    $transaction_data = [
-                        'account_id'       => $entry['account_id'],
-                        'amount'           => $amount_entry,
-                        'description'      => $entry['description'],
-                        'added_date'       => $transaction_date,
-                        'added_by'         => $employee_info->person_id,
-                        'transaction_type' => $entry['transaction_type'],
-                        'movement_type'    => $movement_type,
-                        'voucher_id'       => $voucher_id,
-                        'payment_methods'  => 'efectivo',
-                        'invoice_number'   => 'LOAN-' . $loan_id,
-                        'purchased_date'   => $transaction_date,
-                        'purchased_amount' => 0,
-                        'depreciate_amount'=> 0
-                    ];
-                    
-                    if (is_plugin_active("branches")) {
-                        $current_branch_id = $this->session->userdata("branch_id");
-                        if ($current_branch_id != 1) {
-                            $transaction_data["branch_id"] = $current_branch_id;
-                        }
-                    }
-                    
-                    $this->db->insert('c19_accounting_transactions', $transaction_data);
+                $transaction_data = [
+                    'account_id'       => $entry['account_id'],
+                    'amount'           => $amount_entry,
+                    'description'      => $entry['description'],
+                    'added_date'       => $transaction_date,
+                    'added_by'         => $employee_info->person_id,
+                    'transaction_type' => $entry['transaction_type'],
+                    'movement_type'    => $movement_type,
+                    'voucher_id'       => $voucher_id,
+                    'payment_methods'  => 'efectivo',
+                    'invoice_number'   => 'LOAN-' . $loan_id,
+                    'purchased_date'   => $transaction_date,
+                    'purchased_amount' => 0,
+                    'depreciate_amount'=> 0
+                ];
+                
+                if (is_plugin_active("branches")) {
+                    $current_branch_id = $this->session->userdata("branch_id");
+                    $transaction_data["branch_id"] = $current_branch_id;
+                }
+                
+                $insert_result = $this->db->insert('c19_accounting_transactions', $transaction_data);
+                
+                if (!$insert_result) {
+                    log_message('error', 'Failed to insert transaction entry: ' . $this->db->error()['message']);
+                    $this->db->where('voucher_id', $voucher_id);
+                    $this->db->delete('c19_accounting_vouchers');
+                    return null;
                 }
             }
 
