@@ -575,12 +575,33 @@ class Loans extends Secure_area implements iData_controller
         $add_fee_amounts = $this->input->post("add_fee_amounts");
         
         $current_user_id = $this->Employee->get_logged_in_employee_info()->person_id;
-        // No permite modificar pr[estamos rechazados]
+        
+        // No permite modificar préstamos rechazados
         $loan_info = $this->Loan->get_info($loan_id);
         if ($loan_id > 0 && strtolower($loan_info->loan_status) === 'reject') {
             echo json_encode(array('success' => false, 'message' => 'No se puede modificar un préstamo rechazado. Cree un nuevo préstamo.'));
             return;
         }
+        
+        // VALIDACIÓN PARA EVITAR DOBLE DESEMBOLSO: Si el préstamo ya está aprobado, no permitir modificación
+        // (Esta validación se puede comentar si en el futuro se necesita permitir modificaciones)
+        if ($loan_id > 0 && strtolower($loan_info->loan_status) === 'approved') {
+            echo json_encode(array('success' => false, 'message' => 'No se puede modificar un préstamo ya aprobado. El desembolso contable ya fue realizado.'));
+            return;
+        }
+        
+        // Guardar el estado anterior del préstamo para detectar cambios
+        $previous_status = '';
+        if ($loan_id > 0) {
+            $previous_loan_info = $this->Loan->get_info($loan_id);
+            $previous_status = strtolower($previous_loan_info->loan_status);
+        }
+        
+        $current_status = strtolower($this->input->post("status"));
+        
+        // Determinar si es un cambio de pendiente a aprobado
+        $is_status_change_to_approved = ($previous_status === 'pending' || $previous_status === '') && 
+                                    $current_status === 'approved';
         
         if (is_plugin_active("holidays"))
         {
@@ -752,11 +773,20 @@ class Loans extends Secure_area implements iData_controller
 
         if ($this->Loan->save($loan_data, $loan_id))
         {
-			// LLAMADA A LA NUEVA FUNCIÓN PARA CREAR COMPROBANTE CONTABLE
-	        if ($loan_status == 'approved' && $loan_id == -1) {
-                $new_loan_id = $loan_data['loan_id'];
-                $this->_create_loan_approval_voucher($new_loan_id, $loan_data);
+            // LLAMADA A LA NUEVA FUNCIÓN PARA CREAR COMPROBANTE CONTABLE
+            // SOLO cuando cambia de estado "pending" a "approved"
+            if ($is_status_change_to_approved) {
+                $new_loan_id = ($loan_id == -1) ? $loan_data['loan_id'] : $loan_id;
+                $voucher_result = $this->_create_loan_approval_voucher($new_loan_id, $loan_data);
+                
+                if ($voucher_result === null) {
+                    // Log del error pero no impedimos que el préstamo se guarde
+                    log_message('error', 'No se pudo crear el comprobante contable para el préstamo: ' . $new_loan_id);
+                } else {
+                    log_message('info', 'Comprobante contable creado exitosamente. Voucher ID: ' . $voucher_result . ' para préstamo: ' . $new_loan_id);
+                }
             }
+            
             if ( $is_reverted )
             {
                 $log_data = [];
@@ -822,15 +852,11 @@ class Loans extends Secure_area implements iData_controller
                     return null;
                 }
                 $employee_id = $employee_info->person_id;
-            } else {
-                $employee_info = $this->Employee->get_info($employee_id);
-                if (!$employee_info) {
-                    log_message('error', 'Employee not found: ' . $employee_id);
-                    return null;
-                }
             }
             
             if ($branch_id === null) {
+                $branch_id = 1; // Valor por defecto
+                
                 if (is_plugin_active("branches")) {
                     $branch_id = $this->session->userdata("branch_id");
                     
@@ -839,18 +865,15 @@ class Loans extends Secure_area implements iData_controller
                         if ($customer_id) {
                             $this->load->model('Customer');
                             $customer_info = $this->Customer->get_info($customer_id);
-                            if ($customer_info && isset($customer_info->branch_id)) {
+                            if ($customer_info && isset($customer_info->branch_id) && $customer_info->branch_id) {
                                 $branch_id = $customer_info->branch_id;
                             }
                         }
                     }
                     
                     if (!$branch_id) {
-                        $branch_id = 1; // Sucursal por defecto
-                        log_message('info', 'Using default branch_id: 1');
+                        $branch_id = 1;
                     }
-                } else {
-                    $branch_id = 1; // Sucursal por defecto
                 }
             }
             
@@ -860,21 +883,26 @@ class Loans extends Secure_area implements iData_controller
             if ($customer_id) {
                 $this->load->model('Customer');
                 $customer_info = $this->Customer->get_info($customer_id);
-                if ($customer_info && !empty($customer_info->first_name)) {
-                    $customer_name = trim($customer_info->first_name . " " . ($customer_info->last_name ?? ''));
-                } else {
-                    $this->db->select('first_name, last_name');
-                    $this->db->from('people');
-                    $this->db->where('person_id', $customer_id);
-                    $query = $this->db->get();
-                    if ($query->num_rows() > 0) {
-                        $person = $query->row();
-                        $customer_name = trim($person->first_name . " " . ($person->last_name ?? ''));
+                
+                if ($customer_info) {
+                    $first_name = $customer_info->first_name ?? '';
+                    $last_name = $customer_info->last_name ?? '';
+                    $customer_name = trim($first_name . " " . $last_name);
+                    
+                    if (empty($customer_name) || $customer_name == " ") {
+                        $this->db->select('first_name, last_name');
+                        $this->db->from('people');
+                        $this->db->where('person_id', $customer_id);
+                        $query = $this->db->get();
+                        if ($query->num_rows() > 0) {
+                            $person = $query->row();
+                            $customer_name = trim(($person->first_name ?? '') . " " . ($person->last_name ?? ''));
+                        }
                     }
                 }
             }
             
-            if (empty($customer_name) || $customer_name == "Cliente") {
+            if (empty($customer_name) || trim($customer_name) == "") {
                 $customer_name = "Cliente #" . $customer_id;
             }
             
@@ -888,6 +916,7 @@ class Loans extends Secure_area implements iData_controller
 
             $this->db->trans_start();
             
+            // Crear el voucher
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
                 'voucher_type' => 'egreso',
@@ -904,7 +933,8 @@ class Loans extends Secure_area implements iData_controller
             
             $insert_result = $this->db->insert('c19_accounting_vouchers', $voucher_data);
             if (!$insert_result) {
-                log_message('error', 'Failed to create voucher: ' . $this->db->error()['message']);
+                $error = $this->db->error();
+                log_message('error', 'Failed to create voucher: ' . $error['message']);
                 $this->db->trans_rollback();
                 return null;
             }
@@ -919,6 +949,7 @@ class Loans extends Secure_area implements iData_controller
             
             $transaction_date = date('Y-m-d H:i:s');
 
+            // Definir las entradas contables
             $transaction_entries = [
                 [
                     'account_id' => 58, // Préstamo por cobrar
@@ -970,6 +1001,7 @@ class Loans extends Secure_area implements iData_controller
                     return null;
                 }
             }
+            
             $this->db->trans_commit();
             
             log_message('info', 'Successfully created loan approval voucher: ' . $voucher_id . ' for loan: ' . $loan_id);
