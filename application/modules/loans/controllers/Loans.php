@@ -583,14 +583,20 @@ class Loans extends Secure_area implements iData_controller
             return;
         }
         
-        // VALIDACIÓN PARA EVITAR DOBLE DESEMBOLSO: Si el préstamo ya está aprobado, no permitir modificación
-        // (Esta validación se puede comentar si en el futuro se necesita permitir modificaciones)
+        // VALIDACIÓN MEJORADA: Si el préstamo ya está aprobado, solo permite cambiar a "paid"
         if ($loan_id > 0 && strtolower($loan_info->loan_status) === 'approved') {
-            echo json_encode(array('success' => false, 'message' => 'No se puede modificar un préstamo ya aprobado. El desembolso contable ya fue realizado.'));
-            return;
+            $current_status = strtolower($this->input->post("status"));
+            $allowed_statuses = ['paid']; // Estados permitidos para préstamos aprobados
+            
+            if (!in_array($current_status, $allowed_statuses)) {
+                echo json_encode(array(
+                    'success' => false, 
+                    'message' => 'No se puede modificar un préstamo ya aprobado. Solo puede cambiar el estado a "Pagado". El desembolso contable ya fue realizado.'
+                ));
+                return;
+            }
         }
         
-        // Guardar el estado anterior del préstamo para detectar cambios
         $previous_status = '';
         if ($loan_id > 0) {
             $previous_loan_info = $this->Loan->get_info($loan_id);
@@ -599,7 +605,6 @@ class Loans extends Secure_area implements iData_controller
         
         $current_status = strtolower($this->input->post("status"));
         
-        // Determinar si es un cambio de pendiente a aprobado
         $is_status_change_to_approved = ($previous_status === 'pending' || $previous_status === '') && 
                                     $current_status === 'approved';
         
@@ -774,13 +779,11 @@ class Loans extends Secure_area implements iData_controller
         if ($this->Loan->save($loan_data, $loan_id))
         {
             // LLAMADA A LA NUEVA FUNCIÓN PARA CREAR COMPROBANTE CONTABLE
-            // SOLO cuando cambia de estado "pending" a "approved"
             if ($is_status_change_to_approved) {
                 $new_loan_id = ($loan_id == -1) ? $loan_data['loan_id'] : $loan_id;
                 $voucher_result = $this->_create_loan_approval_voucher($new_loan_id, $loan_data);
                 
                 if ($voucher_result === null) {
-                    // Log del error pero no impedimos que el préstamo se guarde
                     log_message('error', 'No se pudo crear el comprobante contable para el préstamo: ' . $new_loan_id);
                 } else {
                     log_message('info', 'Comprobante contable creado exitosamente. Voucher ID: ' . $voucher_result . ' para préstamo: ' . $new_loan_id);
