@@ -1,0 +1,106 @@
+<div class="content-wrapper">
+    <section class="content-header">
+        <h1>Libro Mayor</h1>
+    </section>
+
+    <section class="content">
+        <!-- Filtros -->
+        <div class="box box-primary">
+            <div class="box-header with-border">
+                <h3 class="box-title">Filtros</h3>
+            </div>
+            <div class="box-body">
+                <form method="get" action="<?= site_url('general_book') ?>">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Fecha Inicio</label>
+                                <input type="date" name="fecha_inicio" class="form-control" 
+                                       value="<?= $fecha_inicio ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Fecha Fin</label>
+                                <input type="date" name="fecha_fin" class="form-control" 
+                                       value="<?= $fecha_fin ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Cuenta</label>
+                                <select name="cuenta_id" class="form-control">
+                                    <option value="">Todas las cuentas</option>
+                                    <?php foreach ($cuentas as $cuenta): ?>
+                                        <option value="<?= $cuenta->id ?>" 
+                                                <?= $cuenta_id == $cuenta->id ? 'selected' : '' ?>>
+                                            <?= $cuenta->codigo ?> - <?= $cuenta->nombre ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group" style="margin-top: 25px;">
+                                <button type="submit" class="btn btn-primary">Filtrar</button>
+                                <a href="<?= site_url('general_book/exportar?' . $_SERVER['QUERY_STRING']) ?>" 
+                                   class="btn btn-success">Exportar</a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Reporte del Libro Mayor -->
+        <div class="box box-info">
+            <div class="box-header with-border">
+                <h3 class="box-title">Reporte de Libro Mayor</h3>
+            </div>
+            <div class="box-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Cuenta</th>
+                                <th>Descripción</th>
+                                <th>Debe</th>
+                                <th>Haber</th>
+                                <th>Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $saldo_acumulado = 0;
+                            $cuenta_actual = null;
+                            ?>
+                            
+                            <?php foreach ($ledger_data as $row): ?>
+                                <?php 
+                                // Calcular saldo
+                                $saldo_acumulado += ($row->debe - $row->haber);
+                                ?>
+                                
+                                <tr>
+                                    <td><?= date('d/m/Y', strtotime($row->fecha)) ?></td>
+                                    <td><?= $row->cuenta_codigo ?> - <?= $row->cuenta_nombre ?></td>
+                                    <td><?= $row->descripcion ?></td>
+                                    <td class="text-right"><?= number_format($row->debe, 2) ?></td>
+                                    <td class="text-right"><?= number_format($row->haber, 2) ?></td>
+                                    <td class="text-right"><?= number_format($saldo_acumulado, 2) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            
+                            <?php if (empty($ledger_data)): ?>
+                                <tr>
+                                    <td colspan="6" class="text-center">No se encontraron registros</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>

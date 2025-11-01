@@ -185,13 +185,11 @@
 
 <script>
 $(document).ready(function() {
-    // Inicializar datepicker
     $('.datepicker').datepicker({
         format: '<?php echo $this->config->item('date_format') == 'd/m/Y' ? 'dd/mm/yyyy' : 'yyyy-mm-dd'; ?>',
         autoclose: true
     });
     
-    // Plantilla para nuevas filas
     var rowTemplate = `
     <div class="account-row">
         <div class="debit-credit-box">

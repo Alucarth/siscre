@@ -576,7 +576,8 @@ class Accounting extends Secure_area implements iData_controller {
                     'invoice_number'    => $invoice_numbers[$i] ?? '',
                     'purchased_date'    => $purchased_date,
                     'purchased_amount'  => $purchased_amounts[$i] ?? 0,
-                    'depreciate_amount' => $depreciate_amounts[$i] ?? 0
+                    'depreciate_amount' => $depreciate_amounts[$i] ?? 0,
+                    'transaction_order' => $i
                 );
 
                 if (is_plugin_active("branches")) {

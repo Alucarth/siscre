@@ -15,13 +15,12 @@
         float:left;
     }
     
-    /* Estilos para pestañas con hover */
     .tabs-container {
         position: relative;
     }
     
     .nav-sidebar {
-        width: 40px; /* Ancho mínimo - solo iconos */
+        width: 40px;
         transition: width 0.3s ease;
         overflow: hidden;
         position: relative;
@@ -30,7 +29,7 @@
     }
     
     .nav-sidebar:hover {
-        width: 200px; /* Ancho expandido */
+        width: 200px;
     }
     
     .nav-sidebar .nav-link {
@@ -106,12 +105,6 @@
     .indent-2 { padding-left: 60px !important; }
     .indent-3 { padding-left: 70px !important; }
     .indent-4 { padding-left: 90px !important; }
-    
-    /* Iconos para niveles jerárquicos */
-    .account-name-cell {
-        position: relative;
-    }
-
 </style>
 
 <script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
@@ -136,9 +129,7 @@
                 <div class="card-block">
                     <div class="inqbox-content table-responsive">
                         
-                        <!-- PESTAÑAS VERTICALES CON HOVER -->
                         <div class="tabs-container d-flex">
-                            <!-- Sidebar de pestañas colapsable -->
                             <div class="nav-sidebar">
                                 <ul class="nav nav-pills flex-column h-100">
                                     <li class="nav-item">
@@ -169,7 +160,6 @@
                                 </ul>
                             </div>
                             
-                            <!-- Área de contenido -->
                             <div class="content-area flex-grow-1">
                                 <div class="tab-content p-3" style="min-height:250px;">
                                     <div id="tab-asset" class="tab-pane fade in active show">
@@ -190,8 +180,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- FIN DEL CAMBIO -->
-                        
                     </div>
                 </div>
             </div>
@@ -203,7 +191,6 @@
 <?php echo form_close();?>
 
 <script>
-    // Función para aplicar sangrías a las filas de la tabla
     function applyIndentation(tableId) {
         $('#' + tableId + ' tbody tr').each(function() {
             var row = $(this);
@@ -214,14 +201,10 @@
             accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4');
             accountNameCell.addClass('indent-' + indentLevel);
             
-            // Determinar si es cuenta padre (tiene subcuentas)
             var codeNumber = row.find('td:eq(1)').text().trim();
             var codeLength = codeNumber.replace(/[^0-9]/g, '').length;
-            
-            // Considerar como padre si tiene menos de 6 dígitos (podría tener hijos)
             var isParent = codeLength <= 4;
             
-            // Aplicar icono según el tipo
             accountNameCell.removeClass('has-children no-children');
             if (isParent && codeLength <= 4) {
                 accountNameCell.addClass('has-children');
@@ -239,13 +222,11 @@
         };
         $.post(url, params, function(data){
             $("#div-asset").html(data);
-            // Aplicar sangrías después de cargar
             setTimeout(function() {
                 applyIndentation('tbl_asset');
             }, 100);
         });
                 
-        // CAMBIO: data-toggle="pill" en lugar de "tab"
         $("a[href='#tab-asset']").click(function(){
             $("#div-asset").html('');
             var url = '<?=site_url('accounting/ajax');?>';

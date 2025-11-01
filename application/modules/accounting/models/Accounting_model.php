@@ -15,16 +15,16 @@ class Accounting_model extends CI_Model
             "code_number",
             "account_name",
             "description",
-        );
+        );  
         
         $str_where = "WHERE account_type = '{$filters["account_type"]}' ";
         $this->db->from('accounting_accounts aa');
         $this->db->where("account_type", $filters["account_type"]);
         
-        if(is_plugin_active("branches"))
-        {
-            $this->db->where("aa.branch_id", $this->session->userdata("branch_id"));
-        }
+            // if(is_plugin_active("branches"))
+            // {
+            //     $this->db->where("aa.branch_id", $this->session->userdata("branch_id"));
+            // }
         
         if ($search !== "")
         {
@@ -75,10 +75,10 @@ class Accounting_model extends CI_Model
     {
         $this->db->where("account_type", $account_type);
         
-        if(is_plugin_active("branches"))
-        {
-            $this->db->where("branch_id", $this->session->userdata("branch_id"));
-        }
+        // if(is_plugin_active("branches"))
+        // {
+        //     $this->db->where("branch_id", $this->session->userdata("branch_id"));
+        // }
         
         $query = $this->db->get("accounting_accounts");
         
@@ -870,10 +870,12 @@ class Accounting_model extends CI_Model
 
     function get_voucher_details($voucher_id)
     {
-        $this->db->select('avd.*, aa.account_name, aa.code_number');
-        $this->db->from('c19_accounting_voucher_details avd');
-        $this->db->join('c19_accounting_accounts aa', 'aa.id = avd.account_id');
-        $this->db->where('avd.voucher_id', $voucher_id);
+        $this->db->select('at.*, aa.account_name, aa.code_number');
+        $this->db->from('c19_accounting_transactions at');
+        $this->db->join('c19_accounting_accounts aa', 'aa.id = at.account_id');
+        $this->db->where('at.voucher_id', $voucher_id);
+        $this->db->order_by('at.transaction_order', 'asc');
+        
         return $this->db->get()->result();
     }
 }

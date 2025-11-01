@@ -71,7 +71,7 @@ class General_ledger_model extends CI_Model {
                     FROM c19_accounting_transactions t
                     LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
                     WHERE t.voucher_id = $voucher_id
-                    ORDER BY t.added_date DESC, t.id DESC
+                    ORDER BY t.transaction_order ASC
                 ";
                 
                 $query_transactions = $this->db->query($sql_transactions);

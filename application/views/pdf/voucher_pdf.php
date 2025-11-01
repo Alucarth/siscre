@@ -145,20 +145,8 @@
             $total_debit = 0;
             $total_credit = 0;
             
-            $debit_transactions = [];
-            $credit_transactions = [];
-            
-            foreach ($transactions as $transaction) {
-                if ($transaction->movement_type == 'debit') {
-                    $debit_transactions[] = $transaction;
-                    $total_debit += $transaction->amount;
-                } else {
-                    $credit_transactions[] = $transaction;
-                    $total_credit += $transaction->amount;
-                }
-            }
-            
-            $debit_transactions = array_reverse($debit_transactions);
+            // Mantener el orden original de las transacciones
+            // Ya no separamos en débitos y créditos, mantenemos el orden de creación
             ?>
             
             <table>
@@ -173,24 +161,24 @@
                 </thead>
                 <tbody>
                     <?php 
-                    foreach ($debit_transactions as $transaction): ?>
+                    // Mostrar transacciones en el orden exacto en que fueron añadidas
+                    foreach ($transactions as $transaction): 
+                        if ($transaction->movement_type == 'debit') {
+                            $total_debit += $transaction->amount;
+                        } else {
+                            $total_credit += $transaction->amount;
+                        }
+                    ?>
                         <tr>
                             <td><?= !empty($transaction->code_number) ? $transaction->code_number : 'N/A' ?></td>
                             <td><?= !empty($transaction->account_name) ? $transaction->account_name : 'Cuenta no especificada' ?></td>
                             <td><?= !empty($transaction->description) ? $transaction->description : '' ?></td>
-                            <td class="amount"><?= to_currency($transaction->amount) ?></td>
-                            <td class="amount">0,00</td>
-                        </tr>
-                    <?php endforeach; ?>
-                    
-                    <?php 
-                    foreach ($credit_transactions as $transaction): ?>
-                        <tr>
-                            <td><?= !empty($transaction->code_number) ? $transaction->code_number : 'N/A' ?></td>
-                            <td><?= !empty($transaction->account_name) ? $transaction->account_name : 'Cuenta no especificada' ?></td>
-                            <td><?= !empty($transaction->description) ? $transaction->description : '' ?></td>
-                            <td class="amount">0,00</td>
-                            <td class="amount"><?= to_currency($transaction->amount) ?></td>
+                            <td class="amount">
+                                <?= $transaction->movement_type == 'debit' ? to_currency($transaction->amount) : '0,00' ?>
+                            </td>
+                            <td class="amount">
+                                <?= $transaction->movement_type == 'credit' ? to_currency($transaction->amount) : '0,00' ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     

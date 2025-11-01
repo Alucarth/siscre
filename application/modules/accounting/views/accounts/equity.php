@@ -13,12 +13,19 @@
         float:left;
     }
 
-        /* ESTILOS NUEVOS PARA SANGRÍAS */
+    /* ESTILOS NUEVOS PARA SANGRÍAS */
     .indent-0 { padding-left: 8px !important; }
     .indent-1 { padding-left: 30px !important; }
     .indent-2 { padding-left: 60px !important; }
     .indent-3 { padding-left: 70px !important; }
     .indent-4 { padding-left: 90px !important; }
+    
+    .dataTables_filter {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
 </style>
 
 <script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
@@ -26,14 +33,10 @@
 
 <div class="section">
     <div class="row sameheight-container">
-
         <div class="col-lg-12">
             <div class="card" style="width:100%">
-
                 <div class="card-block">
-
                     <div class="inqbox-content table-responsive">
-
                         <table class="table table-hover table-bordered" id="tbl_equity">
                             <thead>
                                 <tr>
@@ -44,12 +47,8 @@
                                 </tr>
                             </thead>
                         </table>
-
                         <?= $tbl_equity; ?>
-
                     </div>
-
-
                 </div>
             </div>
         </div>
@@ -61,7 +60,6 @@
 </div>
 <div id="dt-extra-params"></div>
 
-<!-- Modal -->
 <div class="modal fade" id="md-equity" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content" style="width:600px">
@@ -89,11 +87,8 @@
                 <button type="button" class="btn btn-primary" id="btn-save-equity">Guardar</button>
             </div>
         </div>
-        <!-- /.modal-content -->
     </div>
-    <!-- /.modal-dialog -->
 </div>
-<!-- /.modal -->
 
 <?php echo form_open('accounting/ajax', 'id="frmAssetDelete"', ["type" => 2]); ?>
 <?php echo form_close(); ?>
@@ -102,43 +97,51 @@
     function applyIndentation(tableId) {
         $('#' + tableId + ' tbody tr').each(function() {
             var row = $(this);
-            var codeCell = row.find('td:eq(1)'); // Segunda columna (Código)
-            var accountNameCell = row.find('td:eq(2)'); // Tercera columna (Nombre de cuenta)
-            
+            var codeCell = row.find('td:eq(1)');
+            var accountNameCell = row.find('td:eq(2)');
             var codeNumber = codeCell.text().trim();
             var digitCount = codeNumber.replace(/[^0-9]/g, '').length;
             
-            // Calcular nivel de sangría basado en dígitos
             var indentLevel = 0;
             if (digitCount <= 2) {
-                indentLevel = 0; // 1-2 dígitos
+                indentLevel = 0;
             } else if (digitCount <= 4) {
-                indentLevel = 1; // 4 dígitos
+                indentLevel = 1;
             } else if (digitCount <= 6) {
-                indentLevel = 2; // 6 dígitos
+                indentLevel = 2;
             } else {
-                indentLevel = 3; // más de 6 dígitos
+                indentLevel = 3;
             }
             
-            // Aplicar clase de sangría
             accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4');
             accountNameCell.addClass('indent-' + indentLevel);
         });
     }
-    
-    $(document).ready(function () {
-        $("#tbl_equity_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-equity'>Nueva cuenta de patrimonio</a>");
-        $("#tbl_equity_filter input[type='search']").attr("placeholder", "Escriba su busqueda");
-        $("#tbl_equity_filter input[type='search']").removeClass("input-sm");
+
+    function initializeTableControls() {
+        var filterContainer = $("#tbl_equity_wrapper .dataTables_filter");
         
-        // Aplicar sangrías cuando se cargue o recargue la tabla
+        if (filterContainer.length > 0) {
+            filterContainer.prepend("<a href='javascript:void(0)' class='btn btn-primary' id='btn-new-equity'>Nueva cuenta de patrimonio</a>");
+            var searchInput = filterContainer.find("input[type='search']");
+            searchInput.attr("placeholder", "Escriba su búsqueda");
+            searchInput.removeClass("input-sm");
+        } else {
+            setTimeout(initializeTableControls, 100);
+        }
+    }
+
+    $(document).ready(function () {     
+        $('#tbl_equity').on('init.dt', function () {
+            setTimeout(initializeTableControls, 100);
+        });
+        
         $('#tbl_equity').on('draw.dt', function () {
             setTimeout(function() {
                 applyIndentation('tbl_equity');
             }, 100);
         });
-        
-        // Aplicar sangrías inicialmente
+    
         setTimeout(function() {
             applyIndentation('tbl_equity');
         }, 1000);
@@ -181,8 +184,6 @@
                     $.each(data.row, function(key, value){                        
                         $("#md-equity #" + key).val(value);
                     });
-                    
-//                    $("#md-equity #code_number").prop("disabled", true);
                     $("#md-equity").modal("show");
                 }
                 else
@@ -196,7 +197,7 @@
         $(document).on("click", ".btn-delete", function () {
             var $this = $(this);
             alertify.confirm("Esta seguro que desea eliminar este patrimonio?", function () {
-                var url = $("#frmAssetDelete").attr("action");/
+                var url = $("#frmAssetDelete").attr("action");
                 var params = $("#frmAssetDelete").serialize();
                 params += '&id=' + $this.attr("data-id");
                 $.post(url, params, function (data) {
