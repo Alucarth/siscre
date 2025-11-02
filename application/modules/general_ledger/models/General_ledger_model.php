@@ -27,7 +27,6 @@ class General_ledger_model extends CI_Model {
             $where_vouchers .= " AND v.branch_id = $branch_id";
         }
         
-        // CAMBIO PRINCIPAL: Orden descendente por voucher_number
         $sql_vouchers = "
             SELECT 
                 v.id as voucher_id,
@@ -47,8 +46,6 @@ class General_ledger_model extends CI_Model {
         if ($query_vouchers && $query_vouchers->num_rows() > 0) {
             foreach ($query_vouchers->result() as $voucher_row) {
                 $voucher_id = $voucher_row->voucher_id;
-                
-                // Inicializar el voucher
                 $vouchers[$voucher_id] = new stdClass();
                 $vouchers[$voucher_id]->voucher_info = new stdClass();
                 $vouchers[$voucher_id]->voucher_info->voucher_number = $voucher_row->voucher_number;
@@ -87,7 +84,6 @@ class General_ledger_model extends CI_Model {
                         $transaction->account_number = $trans_row->account_number;
                         $transaction->amount = $trans_row->amount;
                         
-                        // Determinar debe/haber según movement_type
                         if ($trans_row->movement_type == 'debit') {
                             $transaction->debit = $trans_row->amount;
                             $transaction->credit = 0;

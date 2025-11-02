@@ -14,6 +14,9 @@
     .dataTables_info {
         float:left;
     }
+    .btn-actions {
+        margin-bottom: 15px;
+    }
 </style>
 
 <script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
@@ -55,8 +58,21 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-lg-4">
+                                            <div class="form-group">
+                                                <label>Cuenta Contable:</label>
+                                                <select class="form-control" name="account_id" id="account_id">
+                                                    <option value="">Todas las cuentas</option>
+                                                    <?php foreach ($accounts as $account): ?>
+                                                    <option value="<?php echo $account->id; ?>">
+                                                        <?php echo $account->code_number . ' - ' . $account->account_name; ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                        </div>
 
-                                        <div class="col-lg-3">
+                                        <div class="col-lg-2">
                                             <div class="form-group">
                                                 <label>&nbsp;</label>
                                                 <div>
@@ -83,9 +99,18 @@
                 <div class="card-block">
                     <div class="row">
                         <div class="col-lg-12">
+                            <div id="div-actions" class="btn-actions" style="display: none;">
+                                <button type="button" class="btn btn-success" id="btn-print-pdf" style="background-color:#84ce36; border-color:#84ce36; color:#ffffff;">
+                                    <span class="fa fa-print"></span> Imprimir PDF
+                                </button>
+                                <button type="button" class="btn btn-info" id="btn-export-csv" style="background-color:#4bcf99; border-color:#4bcf99; color:#ffffff;">
+                                    <span class="fa fa-download"></span> Exportar CSV
+                                </button>
+                            </div>
+                            
                             <div id="div-show-data">
                                 <div class="alert alert-info">
-                                    <i class="fa fa-info-circle"></i> Seleccione un rango de fechas y haga clic en Buscar para generar el reporte del Libro Mayor.
+                                    <i class="fa fa-info-circle"></i> Seleccione un rango de fechas y opcionalmente una cuenta contable, luego haga clic en Buscar para generar el reporte del Libro Mayor.
                                 </div>
                             </div>
                         </div>
@@ -111,6 +136,14 @@
         $(document).on("click", "#btn-search", function () {
             load_ledger_data();
         });
+        
+        $(document).on("click", "#btn-print-pdf", function () {
+            print_pdf();
+        });
+        
+        $(document).on("click", "#btn-export-csv", function () {
+            export_csv();
+        });
     });
     
     function load_ledger_data()
@@ -120,16 +153,44 @@
             softtoken: $("input[name='softtoken']").val(),
             date_from: $("#filter_from_date").val(),
             date_to: $("#filter_to_date").val(),
+            account_id: $("#account_id").val()
         };
         
         blockElement("#div-show-data");
         $.post(url, params, function(html){
             $("#div-show-data").html(html);
+            $("#div-actions").show();
             unblockElement("#div-show-data");
         }).fail(function() {
             unblockElement("#div-show-data");
             alert("Error al cargar los datos. Intente nuevamente.");
         });
+    }
+    
+    function print_pdf()
+    {
+        var date_from = $("#filter_from_date").val();
+        var date_to = $("#filter_to_date").val();
+        var account_id = $("#account_id").val();
+        
+        var url = '<?=site_url('general_book/print_pdf')?>?date_from=' + encodeURIComponent(date_from) + 
+                  '&date_to=' + encodeURIComponent(date_to) + 
+                  '&account_id=' + encodeURIComponent(account_id);
+        
+        window.open(url, '_blank');
+    }
+    
+    function export_csv()
+    {
+        var date_from = $("#filter_from_date").val();
+        var date_to = $("#filter_to_date").val();
+        var account_id = $("#account_id").val();
+        
+        var url = '<?=site_url('general_book/export_csv')?>?date_from=' + encodeURIComponent(date_from) + 
+                  '&date_to=' + encodeURIComponent(date_to) + 
+                  '&account_id=' + encodeURIComponent(account_id);
+        
+        window.location.href = url;
     }
 </script>
 
