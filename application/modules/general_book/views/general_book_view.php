@@ -58,7 +58,7 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-lg-4">
+                                        <div class="col-lg-3">
                                             <div class="form-group">
                                                 <label>Cuenta Contable:</label>
                                                 <select class="form-control" name="account_id" id="account_id">
@@ -71,13 +71,29 @@
                                                 </select>
                                             </div>
                                         </div>
-
-                                        <div class="col-lg-2">
+                                        <div class="col-lg-3">
                                             <div class="form-group">
-                                                <label>&nbsp;</label>
-                                                <div>
-                                                    <button type="button" class="btn btn-primary" id="btn-search"><span class="fa fa-search"></span> Buscar</button>
-                                                </div>
+                                                <label>Sucursal:</label>
+                                                <select class="form-control" name="branch_id" id="branch_id">
+                                                    <option value="">Todas las sucursales</option>
+                                                    <?php 
+                                                    $current_branch_id = 1; // Valor por defecto
+                                                    if (method_exists($this->Employee, 'get_logged_in_employee_branch_id')) {
+                                                        $current_branch_id = $this->Employee->get_logged_in_employee_branch_id();
+                                                    }
+                                                    
+                                                    foreach ($branches as $branch): 
+                                                    ?>
+                                                    <option value="<?php echo $branch->id; ?>" <?php echo ($current_branch_id == $branch->id) ? 'selected' : ''; ?>>
+                                                        <?php echo $branch->branch_name; ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-12">
+                                            <div class="form-group">
+                                                <button type="button" class="btn btn-primary" id="btn-search"><span class="fa fa-search"></span> Buscar</button>
                                             </div>
                                         </div>
                                     </div>
@@ -110,7 +126,7 @@
                             
                             <div id="div-show-data">
                                 <div class="alert alert-info">
-                                    <i class="fa fa-info-circle"></i> Seleccione un rango de fechas y opcionalmente una cuenta contable, luego haga clic en Buscar para generar el reporte del Libro Mayor.
+                                    <i class="fa fa-info-circle"></i> Seleccione un rango de fechas y opcionalmente una cuenta contable y sucursal, luego haga clic en Buscar para generar el reporte del Libro Mayor.
                                 </div>
                             </div>
                         </div>
@@ -153,7 +169,8 @@
             softtoken: $("input[name='softtoken']").val(),
             date_from: $("#filter_from_date").val(),
             date_to: $("#filter_to_date").val(),
-            account_id: $("#account_id").val()
+            account_id: $("#account_id").val(),
+            branch_id: $("#branch_id").val()
         };
         
         blockElement("#div-show-data");
@@ -172,10 +189,12 @@
         var date_from = $("#filter_from_date").val();
         var date_to = $("#filter_to_date").val();
         var account_id = $("#account_id").val();
+        var branch_id = $("#branch_id").val();
         
         var url = '<?=site_url('general_book/print_pdf')?>?date_from=' + encodeURIComponent(date_from) + 
                   '&date_to=' + encodeURIComponent(date_to) + 
-                  '&account_id=' + encodeURIComponent(account_id);
+                  '&account_id=' + encodeURIComponent(account_id) + 
+                  '&branch_id=' + encodeURIComponent(branch_id);
         
         window.open(url, '_blank');
     }
@@ -185,10 +204,12 @@
         var date_from = $("#filter_from_date").val();
         var date_to = $("#filter_to_date").val();
         var account_id = $("#account_id").val();
+        var branch_id = $("#branch_id").val();
         
         var url = '<?=site_url('general_book/export_csv')?>?date_from=' + encodeURIComponent(date_from) + 
                   '&date_to=' + encodeURIComponent(date_to) + 
-                  '&account_id=' + encodeURIComponent(account_id);
+                  '&account_id=' + encodeURIComponent(account_id) + 
+                  '&branch_id=' + encodeURIComponent(branch_id);
         
         window.location.href = url;
     }

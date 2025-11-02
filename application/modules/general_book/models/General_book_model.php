@@ -11,10 +11,19 @@ class General_book_model extends CI_Model {
         
         return $query->result();
     }
+    
+    function get_branches()
+    {
+        $this->db->select('id, branch_name');
+        $this->db->from('c19_branches');
+        $this->db->order_by('branch_name', 'ASC');
+        $query = $this->db->get();
+        
+        return $query->result();
+    }
 
     function get_general_book_data($filters = [])
     {
-        // Construir la consulta manualmente como la que funciona
         $sql = "
             SELECT 
                 t.id as transaction_id,
@@ -25,6 +34,7 @@ class General_book_model extends CI_Model {
                 t.movement_type,
                 a.code_number,
                 a.account_name,
+                b.branch_name,
                 CASE 
                     WHEN t.movement_type = 'debit' THEN t.amount
                     ELSE 0 
@@ -35,10 +45,11 @@ class General_book_model extends CI_Model {
                 END as credit
             FROM c19_accounting_transactions t
             LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
+            LEFT JOIN c19_branches b ON b.id = t.branch_id
             WHERE 1=1
         ";
         
-        // Agregar filtros
+        // Filtros
         if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
             $date_from = date("Y-m-d", $filters["date_from"]);
             $sql .= " AND DATE(t.added_date) >= '$date_from'";
@@ -54,6 +65,12 @@ class General_book_model extends CI_Model {
             $account_id = $filters["account_id"];
             $sql .= " AND t.account_id = $account_id";
         }
+
+        // Filtro por sucursal
+        if (isset($filters["branch_id"]) && !empty($filters["branch_id"])) {
+            $branch_id = $filters["branch_id"];
+            $sql .= " AND t.branch_id = $branch_id";
+        }
         
         $sql .= " ORDER BY t.added_date ASC, t.id ASC";
         
@@ -66,8 +83,8 @@ class General_book_model extends CI_Model {
         if ($query && $query->num_rows() > 0) {
             foreach ($query->result() as $row) {
                 $transaction = new stdClass();
-                $transaction->id = $row->transaction_id; // ID de la transacción
-                $transaction->transaction_id = $row->transaction_id; // Columna adicional para N° de transacción
+                $transaction->id = $row->transaction_id;
+                $transaction->transaction_id = $row->transaction_id;
                 $transaction->fecha = $row->fecha;
                 $transaction->added_date = $row->added_date;
                 $transaction->description = $row->description;
@@ -75,6 +92,7 @@ class General_book_model extends CI_Model {
                 $transaction->account_id = $row->account_id;
                 $transaction->code_number = $row->code_number;
                 $transaction->account_name = $row->account_name;
+                $transaction->branch_name = $row->branch_name;
                 $transaction->amount = $row->amount;
                 $transaction->debit = $row->debit;
                 $transaction->credit = $row->credit;
@@ -119,6 +137,11 @@ class General_book_model extends CI_Model {
             $sql .= " AND account_id = $account_id";
         }
         
+        if (isset($filters["branch_id"]) && !empty($filters["branch_id"])) {
+            $branch_id = $filters["branch_id"];
+            $sql .= " AND branch_id = $branch_id";
+        }
+
         $query = $this->db->query($sql);
         
         if ($query && $query->num_rows() > 0) {

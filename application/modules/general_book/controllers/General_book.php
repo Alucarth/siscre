@@ -15,6 +15,7 @@ class General_book extends Secure_area implements iData_controller {
     {
         $data['page_title'] = 'Libro Mayor';
         $data['accounts'] = $this->general_book_model->get_accounts();
+        $data['branches'] = $this->general_book_model->get_branches();
         $this->load->view('general_book/general_book_view', $data);
     }
     
@@ -33,6 +34,8 @@ class General_book extends Secure_area implements iData_controller {
         $data["date_to"] = $this->input->post('date_to');
         $data["selected_account_id"] = $this->input->post('account_id');
         $data["selected_account_info"] = $this->get_account_info($this->input->post('account_id'));
+        $data["selected_branch_id"] = $this->input->post('branch_id');
+        $data["selected_branch_info"] = $this->get_branch_info($this->input->post('branch_id'));
         
         $this->load->view('general_book/general_book_report', $data);
     }
@@ -50,7 +53,8 @@ class General_book extends Secure_area implements iData_controller {
             'totals' => $totals,
             'date_from' => $this->input->get('date_from'),
             'date_to' => $this->input->get('date_to'),
-            'selected_account_info' => $this->get_account_info($this->input->get('account_id'))
+            'selected_account_info' => $this->get_account_info($this->input->get('account_id')),
+            'selected_branch_info' => $this->get_branch_info($this->input->get('branch_id'))
         ];
         
         $this->generate_mpdf($data);
@@ -64,6 +68,9 @@ class General_book extends Secure_area implements iData_controller {
         
         $account_id = $this->input->get('account_id');
         $selected_account_info = $this->get_account_info($account_id);
+
+        $branch_id = $this->input->get('branch_id');
+        $selected_branch_info = $this->get_branch_info($branch_id);
         
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="libro_mayor_' . date('Y-m-d_His') . '.csv"');
@@ -85,6 +92,13 @@ class General_book extends Secure_area implements iData_controller {
             fputcsv($output, ['Todas las cuentas'], ';');
         }
         
+        if(!empty($selected_branch_info)) {
+            $sucursal_info = 'Sucursal: ' . $selected_branch_info->branch_name;
+            fputcsv($output, [$sucursal_info], ';');
+        } else {
+            fputcsv($output, ['Todas las sucursales'], ';');
+        }
+
         fputcsv($output, [''], ';');
         
         $headers = ['N°', 'N° Transacción', 'Fecha', 'Razón Social', 'Glosa', 'Debe', 'Haber'];
@@ -127,6 +141,7 @@ class General_book extends Secure_area implements iData_controller {
         $date_from = $this->input->post('date_from') ?: $this->input->get('date_from');
         $date_to = $this->input->post('date_to') ?: $this->input->get('date_to');
         $account_id = $this->input->post('account_id') ?: $this->input->get('account_id');
+        $branch_id = $this->input->post('branch_id') ?: $this->input->get('branch_id');
         
         if ($date_from) {
             $filters["date_from"] = $this->config->item('date_format') == 'd/m/Y' 
@@ -142,6 +157,10 @@ class General_book extends Secure_area implements iData_controller {
         
         if (!empty($account_id)) {
             $filters["account_id"] = $account_id;
+        }
+
+        if (!empty($branch_id)) {
+            $filters["branch_id"] = $branch_id;
         }
         
         return $filters;
@@ -218,6 +237,11 @@ class General_book extends Secure_area implements iData_controller {
                     <?php else: ?>
                         <p><strong>Todas las cuentas</strong></p>
                     <?php endif; ?>
+                    <?php if(!empty($data['selected_branch_info'])): ?>
+                        <p><strong>Sucursal: <?= $data['selected_branch_info']->branch_name ?></strong></p>
+                    <?php else: ?>
+                        <p><strong>Todas las sucursales</strong></p>
+                    <?php endif; ?> 
                 </div>
             </div>
             
@@ -289,6 +313,24 @@ class General_book extends Secure_area implements iData_controller {
         $this->db->select('code_number, account_name');
         $this->db->from('c19_accounting_accounts');
         $this->db->where('id', $account_id);
+        $query = $this->db->get();
+        
+        if ($query->num_rows() > 0) {
+            return $query->row();
+        }
+        
+        return null;
+    }
+
+    private function get_branch_info($branch_id)
+    {
+        if (empty($branch_id)) {
+            return null;
+        }
+        
+        $this->db->select('branch_name');
+        $this->db->from('c19_branches');
+        $this->db->where('id', $branch_id);
         $query = $this->db->get();
         
         if ($query->num_rows() > 0) {

@@ -9,6 +9,11 @@
                 <?php else: ?>
                     <br><strong>Todas las cuentas</strong>
                 <?php endif; ?>
+                <?php if(!empty($selected_branch_info)): ?>
+                    <br><strong>Sucursal: <?= $selected_branch_info->branch_name ?></strong>
+                <?php else: ?>
+                    <br><strong>Todas las sucursales</strong>
+                <?php endif; ?>
                 <?php if(!empty($totals) && $totals->total_transactions > 0): ?>
                     - <strong><?= $totals->total_transactions ?></strong> transacciones encontradas
                 <?php endif; ?>
@@ -75,36 +80,15 @@
             },
             columnDefs: [
                 { 
-                    targets: [0, 1, 2, 3], 
-                    className: 'text-center',
-                    orderable: true 
+                    targets: [0, 1, 2, 5, 6], 
+                    className: 'text-center' 
                 },
                 { 
                     targets: [5, 6], 
-                    className: 'text-right',
-                    orderable: true 
-                },
-                { 
-                    targets: [0],
-                    orderable: true
+                    className: 'text-right' 
                 }
-            ],
-            ordering: true,
-            orderFixed: [0, 'asc']
+            ]
         });
     });
 </script>
-
-<style>
-    #tbl-general-book th {
-        background-color: #ffffffff;
-        color: black;
-        font-weight: bold;
-        
-    }
-    #tbl-general-book tfoot tr:first-child td {
-        background-color: #e9ecef;
-        font-weight: bold;
-    }
-</style>
 <?php endif; ?>
