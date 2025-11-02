@@ -35,6 +35,7 @@ class General_book_model extends CI_Model {
                 a.code_number,
                 a.account_name,
                 b.branch_name,
+                t.voucher_id,
                 CASE 
                     WHEN t.movement_type = 'debit' THEN t.amount
                     ELSE 0 
@@ -85,6 +86,7 @@ class General_book_model extends CI_Model {
                 $transaction = new stdClass();
                 $transaction->id = $row->transaction_id;
                 $transaction->transaction_id = $row->transaction_id;
+                $transaction->voucher_id = $row->voucher_id;
                 $transaction->fecha = $row->fecha;
                 $transaction->added_date = $row->added_date;
                 $transaction->description = $row->description;

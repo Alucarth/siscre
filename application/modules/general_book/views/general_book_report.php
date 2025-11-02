@@ -24,11 +24,12 @@
     <table class="table table-bordered table-striped" id="tbl-general-book" style="font-size: 12px;">
         <thead class="thead-dark">
             <tr>
-                <th width="5%" class="text-center">N°</th>
-                <th width="8%" class="text-center">N° Transacción</th>
+                <th width="6%" class="text-center">N°</th>
+                <th width="6%" class="text-center">N° Transacción</th>
+                <th width="6%" class="text-center">N° Voucher</th>
                 <th width="10%" class="text-center">Fecha</th>
                 <th width="17%" class="text-center">Razón Social</th>
-                <th width="35%" class="text-center">Glosa</th>
+                <th width="30%" class="text-center">Glosa</th>
                 <th width="10%" class="text-center">Debe</th>
                 <th width="10%" class="text-center">Haber</th>
             </tr>
@@ -42,6 +43,7 @@
                 <tr>
                     <td class="text-center"><?= $counter ?></td>
                     <td class="text-center"><?= $transaction->transaction_id ?></td>
+                    <td class="text-center"><?= $transaction->voucher_id ?></td>
                     <td class="text-center"><?= date('d/m/Y', strtotime($transaction->added_date)) ?></td>
                     <td class="text-center">CREDISURGIR S.R.L.</td>
                     <td><?= $transaction->description ?: 'Sin descripción' ?></td>
@@ -58,7 +60,7 @@
         </tbody>
         <tfoot>
             <tr style="background-color: #f8f9fa; font-weight: bold;">
-                <td colspan="5" class="text-right"><strong>TOTALES:</strong></td>
+                <td colspan="6" class="text-right"><strong>TOTALES:</strong></td>
                 <td class="text-right"><?= number_format($total_debit, 2) ?></td>
                 <td class="text-right"><?= number_format($total_credit, 2) ?></td>
             </tr>

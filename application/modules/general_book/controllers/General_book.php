@@ -101,7 +101,7 @@ class General_book extends Secure_area implements iData_controller {
 
         fputcsv($output, [''], ';');
         
-        $headers = ['N°', 'N° Transacción', 'Fecha', 'Razón Social', 'Glosa', 'Debe', 'Haber'];
+        $headers = ['N°', 'N° Transacción', 'N° Voucher', 'Fecha', 'Razón Social', 'Glosa', 'Debe', 'Haber'];
         fputcsv($output, $headers, ';');
         
         $counter = 1;
@@ -109,6 +109,7 @@ class General_book extends Secure_area implements iData_controller {
             $row = [
                 $counter++,
                 $transaction->transaction_id,
+                $transaction->voucher_id,
                 date('d/m/Y', strtotime($transaction->added_date)),
                 'CREDISURGIR S.R.L.',
                 $transaction->description ?: 'Sin descripción',
@@ -119,7 +120,7 @@ class General_book extends Secure_area implements iData_controller {
         }
         
         $total_row = [
-            '', '', '', '', 'TOTALES:',
+            '', '', '', '', '', 'TOTALES:',
             number_format($result['total_debit'], 2, '.', ''),
             number_format($result['total_credit'], 2, '.', '')
         ];
@@ -249,8 +250,9 @@ class General_book extends Secure_area implements iData_controller {
                 <thead>
                     <tr>
                         <th width="5%" class="text-center">N°</th>
-                        <th width="10%" class="text-center">N° Transacción</th>
-                        <th width="10%" class="text-center">Fecha</th>
+                        <th width="7%" class="text-center">N° Transacción</th>
+                        <th width="7%" class="text-center">N° Voucher</th>
+                        <th width="6%" class="text-center">Fecha</th>
                         <th width="15%" class="text-center">Razón Social</th>
                         <th width="35%" class="text-center">Glosa</th>
                         <th width="12%" class="text-center">Debe</th>
@@ -266,6 +268,7 @@ class General_book extends Secure_area implements iData_controller {
                         <tr>
                             <td class="text-center"><?= $counter ?></td>
                             <td class="text-center"><?= $transaction->transaction_id ?></td>
+                            <td class="text-center"><?= $transaction->voucher_id ?></td>
                             <td class="text-center"><?= date('d/m/Y', strtotime($transaction->added_date)) ?></td>
                             <td class="text-center">CREDISURGIR S.R.L.</td>
                             <td class="text-left"><?= $transaction->description ?: 'Sin descripción' ?></td>
@@ -282,7 +285,7 @@ class General_book extends Secure_area implements iData_controller {
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td colspan="5" class="text-right"><strong>TOTALES:</strong></td>
+                        <td colspan="6" class="text-right"><strong>TOTALES:</strong></td>
                         <td class="text-right"><strong><?= number_format($data['total_debit'], 2) ?></strong></td>
                         <td class="text-right"><strong><?= number_format($data['total_credit'], 2) ?></strong></td>
                     </tr>
