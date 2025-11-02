@@ -959,14 +959,16 @@ class Loans extends Secure_area implements iData_controller
                     'debit'      => $amount,
                     'credit'     => 0,
                     'description' => $descripcion . ' - Préstamo por cobrar',
-                    'transaction_type' => 'asset'
+                    'transaction_type' => 'asset',
+                    'transaction_order' => '0'
                 ],
                 [
                     'account_id' => 5, // Caja/Bancos
                     'debit'      => 0,
                     'credit'     => $amount,
                     'description' => $descripcion . ' - Desembolso en caja',
-                    'transaction_type' => 'asset'
+                    'transaction_type' => 'asset',
+                    'transaction_order' => '1'
                 ]
             ];
 
@@ -988,7 +990,8 @@ class Loans extends Secure_area implements iData_controller
                     'invoice_number'   => 'LOAN-' . $loan_id,
                     'purchased_date'   => $transaction_date,
                     'purchased_amount' => 0,
-                    'depreciate_amount'=> 0
+                    'depreciate_amount'=> 0,
+                    'transaction_order'=> $entry['transaction_order']
                 ];
                 
                 if (is_plugin_active("branches")) {

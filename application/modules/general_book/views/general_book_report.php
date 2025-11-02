@@ -91,4 +91,16 @@
         });
     });
 </script>
+<style>
+    #tbl-general-book th {
+        background-color: #ffffffff;
+        color: black;
+        font-weight: bold;
+        
+    }
+    #tbl-general-book tfoot tr:first-child td {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+</style>
 <?php endif; ?>

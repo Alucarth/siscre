@@ -478,14 +478,14 @@ class Payments extends Secure_area implements iData_controller {
             // Asignación de cuentas contables
             $transaction_entries = [
                 // Debe
-                ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT',                     'transaction_type' => 'expenses'],
-                ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset'],
+                ['account_id' => 165, 'debit' => $it,                     'credit' => 0, 'description' => $descripcion . ' - IT', 'transaction_type' => 'expenses', 'transaction_order' => '0'],
+                ['account_id' => 5,   'debit' => $caja_moneda_nacional,   'credit' => 0, 'description' => $descripcion . ' - Caja Moneda Nacional', 'transaction_type' => 'asset', 'transaction_order' => '1'],
                 
                 // Haber
-                ['account_id' => 58,  'debit' => 0, 'credit' => $capital_final,         'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset'],
-                ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income'],
-                ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability'],
-                ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability']
+                ['account_id' => 58,  'debit' => 0, 'credit' => $capital_final,         'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset', 'transaction_order' => '2'],
+                ['account_id' => 128, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income', 'transaction_order' => '3'],
+                ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability', 'transaction_order' => '4'],
+                ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability', 'transaction_order' => '5']
             ];
 
             foreach ($transaction_entries as $entry) {
@@ -506,7 +506,8 @@ class Payments extends Secure_area implements iData_controller {
                         'invoice_number'   => 'PAGO-' . $payment_data['loan_id'],
                         'purchased_date'   => $transaction_date,
                         'purchased_amount' => 0,
-                        'depreciate_amount'=> 0
+                        'depreciate_amount'=> 0,
+                        'transaction_order'=> $entry['transaction_order']
                     ];
                     
                     if (is_plugin_active("branches")) {

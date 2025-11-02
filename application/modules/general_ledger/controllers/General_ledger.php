@@ -32,11 +32,11 @@ class General_ledger extends Secure_area implements iData_controller {
         
         $accounting_transactions = $this->general_ledger_model->get_accounting_transactions($filters);
         
-        if (!empty($accounting_transactions)) {
-            uasort($accounting_transactions, function($a, $b) {
-                return $b->voucher_info->voucher_number - $a->voucher_info->voucher_number;
-            });
-        }
+        // if (!empty($accounting_transactions)) {
+        //     uasort($accounting_transactions, function($a, $b) {
+        //         return $b->voucher_info->voucher_number - $a->voucher_info->voucher_number;
+        //     });
+        // }
         
         $data["accounting_transactions"] = $accounting_transactions;
         

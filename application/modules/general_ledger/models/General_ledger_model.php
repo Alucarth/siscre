@@ -15,7 +15,7 @@ class General_ledger_model extends CI_Model {
         if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
             $date_from = date("Y-m-d", $filters["date_from"]);
             $where_vouchers .= " AND DATE(v.voucher_date) >= '$date_from'";
-        }
+        }   
         
         if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
             $date_to = date("Y-m-d", $filters["date_to"]);
@@ -28,7 +28,7 @@ class General_ledger_model extends CI_Model {
         }
         
         $sql_vouchers = "
-            SELECT 
+             SELECT 
                 v.id as voucher_id,
                 v.voucher_date,
                 v.description as voucher_description,
@@ -56,19 +56,20 @@ class General_ledger_model extends CI_Model {
                 $vouchers[$voucher_id]->transactions = [];
                 
                 $sql_transactions = "
-                    SELECT 
-                        t.id as transaction_id,
-                        t.amount,
-                        t.description as transaction_description,
-                        t.added_date,
-                        t.movement_type,
-                        a.account_name,
-                        a.code_number as account_number,
-                        a.account_type
-                    FROM c19_accounting_transactions t
-                    LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
-                    WHERE t.voucher_id = $voucher_id
-                    ORDER BY t.transaction_order ASC
+                SELECT 
+                    t.id as transaction_id,
+                    t.amount,
+                    t.description as transaction_description,
+                    t.added_date,
+                    t.movement_type,
+                    a.account_name,
+                    a.code_number as account_number,
+                    a.account_type,
+                    t.transaction_order
+                FROM c19_accounting_transactions t
+                LEFT JOIN c19_accounting_accounts a ON a.id = t.account_id
+                WHERE t.voucher_id = $voucher_id
+                ORDER BY t.transaction_order ASC
                 ";
                 
                 $query_transactions = $this->db->query($sql_transactions);
@@ -83,6 +84,7 @@ class General_ledger_model extends CI_Model {
                         $transaction->account_name = $trans_row->account_name;
                         $transaction->account_number = $trans_row->account_number;
                         $transaction->amount = $trans_row->amount;
+                        $transaction->transaction_order = $trans_row->transaction_order;
                         
                         if ($trans_row->movement_type == 'debit') {
                             $transaction->debit = $trans_row->amount;
@@ -97,6 +99,9 @@ class General_ledger_model extends CI_Model {
                         $vouchers[$voucher_id]->transactions[] = $transaction;
                     }
                 }
+                usort($vouchers[$voucher_id]->transactions, function($a, $b) {
+                return $a->transaction_order - $b->transaction_order;
+            });
             }
         }
         
@@ -135,11 +140,12 @@ class General_ledger_model extends CI_Model {
                         b.id code_number,
                         a.trans_type,
                         a.amount,
-                        a.trans_date 
+                        a.trans_date,
+                        a.transaction_order 
                FROM c19_account_transactions a
                LEFT JOIN c19_accounts b ON b.id = a.account_id
                WHERE 1 $where
-               ORDER BY a.trans_date
+               ORDER BY a.transaction_order ASC
             ";
         
         $query = $this->db->query( $sql );
@@ -154,6 +160,7 @@ class General_ledger_model extends CI_Model {
                 $obj->explanation = "";
                 $obj->account_name = $row->account_name;
                 $obj->account_number = $row->code_number;
+                $obj->transaction_order = $row->transaction_order;
                 
                 if ( $row->trans_type == 'withdraw' )
                 {
@@ -301,3 +308,4 @@ class General_ledger_model extends CI_Model {
         return $return;
     }
 }
+?>
