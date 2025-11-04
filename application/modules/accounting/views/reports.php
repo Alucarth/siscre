@@ -44,8 +44,12 @@
                                             <div class="form-group">
                                                 <label>Desde fecha:</label>
                                                 <div class="input-group date">
-                                                    <span class="input-group-addon input-group-prepend"><span class="input-group-text"><i class="fa fa-calendar"></i></span></span>
-                                                    <input type="text" class="form-control" id="filter_from_date" name="date_from" value="<?= date($this->config->item("date_format")); ?>" />
+                                                    <span class="input-group-addon input-group-prepend">
+                                                        <span class="input-group-text">
+                                                            <i class="fa fa-calendar"></i>
+                                                        </span>
+                                                    </span>
+                                                    <input type="text" class="form-control" id="filter_from_date" name="date_from" value="<?= date('d/m/Y', strtotime('01/01/' . date('Y'))); ?>" />
                                                 </div>
                                             </div>
                                         </div>
