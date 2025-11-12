@@ -2,6 +2,7 @@
 /downloads/
 /demo/
 /logs/
+application/logs/
 /temp/
 application/config/database.php
 *pdf

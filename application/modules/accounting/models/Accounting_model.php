@@ -253,7 +253,6 @@ class Accounting_model extends CI_Model
         return $tmp;
     }
 
-    // Función auxiliar para calcular saldos correctos en el balance de comprobación
     public function get_trial_balance_with_balances( $filters = [] )
     {
         $accounts = $this->get_trial_balance_data($filters);
@@ -295,7 +294,6 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND a.branch_id = $branch_id";
         }
         
-        // CONSULTA MEJORADA
         $sql = "
             SELECT 
                 b.account_type, 
@@ -316,7 +314,6 @@ class Accounting_model extends CI_Model
                 
         $query = $this->db->query($sql);
         
-        // Log de error de SQL si existe
         if (!$query) {
             $error = $this->db->error();
             return [];
@@ -590,6 +587,58 @@ class Accounting_model extends CI_Model
         ];
     }
     
+    public function get_cash_flow_data($filters = [])
+    {
+        log_message('debug', '=== INICIANDO GET_CASH_FLOW_DATA ===');
+        
+        $where = '';
+        if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
+            $date_from = date("Y-m-d", $filters["date_from"]);
+            $where .= " AND DATE(at.added_date) >= '$date_from'";
+            log_message('debug', 'Date from SQL: ' . $date_from);
+        }
+        if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
+            $date_to = date("Y-m-d", $filters["date_to"]);
+            $where .= " AND DATE(at.added_date) <= '$date_to'";
+            log_message('debug', 'Date to SQL: ' . $date_to);
+        }
+        
+        if(is_plugin_active("branches")) {
+            $where .= " AND at.branch_id = " . $this->session->userdata("branch_id");
+            log_message('debug', 'Branch condition added');
+        }
+        
+        $sql = "
+            SELECT 
+                aa.code_number,
+                aa.account_name,
+                aa.account_type,
+                at.amount,
+                at.movement_type,
+                at.added_date,
+                at.description
+            FROM c19_accounting_transactions at
+            INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
+            WHERE 1=1 $where
+            ORDER BY aa.account_type, aa.code_number, at.added_date
+        ";
+        
+        log_message('debug', 'SQL: ' . $sql);
+        
+        $query = $this->db->query($sql);
+        log_message('debug', 'Query executed, num rows: ' . $query->num_rows());
+        
+        $cash_flow_data = [];
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $cash_flow_data[] = $row;
+            }
+        }
+        
+        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_DATA ===');
+        return $cash_flow_data;
+    }
+
     public function get_account_data($account_type = '', $filters = [])
     {
         $where = '';

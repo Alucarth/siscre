@@ -773,9 +773,12 @@ class Accounting extends Secure_area implements iData_controller {
     
     public function report_export()
     {
+        log_message('debug', '=== INICIANDO REPORT_EXPORT - CASH_FLOW ===');
+        
         ini_set('memory_limit', '-1');
         
         $report_type = urldecode($this->input->get("report_type"));
+        log_message('debug', 'Report type: ' . $report_type);
         
         $_POST["date_from"] = urldecode($this->input->get("date_from"));
         $_POST["date_to"] = urldecode($this->input->get("date_to"));
@@ -786,6 +789,8 @@ class Accounting extends Secure_area implements iData_controller {
         
         $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
         $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
+        
+        log_message('debug', 'Datos cargados, accounts count: ' . (isset($data['accounts']) ? count($data['accounts']) : '0'));
         
         if ($report_type == 'balance_sheet') {
             $income_data = $this->accounting_model->get_consolidated_income_statement([
@@ -798,10 +803,12 @@ class Accounting extends Secure_area implements iData_controller {
             $data["net_income"] = $income_data['net_income'];
         }
         
+        log_message('debug', 'Cargando vista...');
         $html = $this->load->view('accounting/reports/' . $report_type, $data, true);
+        log_message('debug', 'Vista cargada');
         
         $timestamp = date('dmyHis');
-        $filename = "balance_sheet_{$timestamp}";
+        $filename = "{$report_type}_{$timestamp}";
         $pdfFilePath = FCPATH . "downloads/reports/{$filename}.pdf";
         
         $downloads_dir = FCPATH . "downloads/reports/";
@@ -815,17 +822,24 @@ class Accounting extends Secure_area implements iData_controller {
         
         $this->load->library('pdf');
         
-        if ($report_type == 'balance_sheet') {
+        if ( $report_type == 'balance_sheet' )
+        {
             $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
-        } else {
+        }
+        else
+        {
             $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
         }
         
         $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        log_message('debug', 'Generando PDF...');
         $pdf->WriteHTML($html);
         $pdf->Output($pdfFilePath, 'F');
+        log_message('debug', 'PDF generado');
 
         redirect(base_url("downloads/reports/{$filename}.pdf"));
+        
+        log_message('debug', '=== FINALIZADO REPORT_EXPORT ===');
     }
     
     public function report_csv()
@@ -854,6 +868,8 @@ class Accounting extends Secure_area implements iData_controller {
     
     private function _load_report_data( $report_type )
     {
+        log_message('debug', 'Cargando datos para: ' . $report_type);
+        
         $filters = [];
         
         if ($this->config->item('date_format') == 'd/m/Y') {
@@ -897,12 +913,13 @@ class Accounting extends Secure_area implements iData_controller {
                 break;
             case 'cash_flow':
                 $data["accounts"] = $this->accounting_model->get_cash_flow_data($filters);
+                log_message('debug', 'Cash flow data loaded: ' . count($data["accounts"]));
                 break;
             case 'statement_of_equity':
                 $data["accounts"] = $this->accounting_model->get_statement_of_equity_data($filters);
                 break;
             case 'aged_receivables':
-                $data["accounts"] = $this->accounting_model->get_aged_receivables_data($filters);
+                $data["accounts"] = $this->accounting_model->get_aged_receivables_data($filters);   
                 break;
             case 'aged_payables':
                 $data["accounts"] = $this->accounting_model->get_aged_payables_data($filters);
@@ -974,7 +991,11 @@ class Accounting extends Secure_area implements iData_controller {
         $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
         $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
         
-        $this->load->view('accounting/reports/' . $report_type, $data);
+        if ($report_type == 'cash_flow') {
+            $this->load->view('reports/cash_flow', $data);
+        } else {
+            $this->load->view('accounting/reports/' . $report_type, $data);
+        }
     }
     
     public function report_view()
