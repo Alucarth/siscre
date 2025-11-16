@@ -33,7 +33,7 @@ function load_config()
     }
     else
     {
-        date_default_timezone_set( 'America/New_York' );
+        date_default_timezone_set( 'America/La_Paz' );
     }
 }
 ?>

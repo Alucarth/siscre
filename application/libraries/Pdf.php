@@ -15,7 +15,7 @@ class Pdf {
         // Soporta string viejo y/o array nuevo
         if ($params === NULL) {
             // valores por defecto “seguros” (A5 vertical, márgenes pequeños)
-            $params = ['en-GB-x','A5','','',8,8,8,8,0,0,'P'];
+            $params = ['utf-8','Letter','','',8,8,10,10,0,0,'P'];
         } elseif (is_string($params)) {
             $tmp = explode(',', $params);
             $params = [];

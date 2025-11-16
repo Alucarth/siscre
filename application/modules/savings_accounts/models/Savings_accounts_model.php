@@ -69,26 +69,9 @@ class Savings_accounts_model extends CI_Model
     {
         // 1) Generar account_number si no viene en $data
         if (empty($data['account_number'])) {
-            // Definir prefijo (ajústalo si quieres otro)
-            $prefix = 'SA-';
-            // Tomar el último número generado
-            $row = $this->db
-                ->select('account_number')
-                ->like('account_number', $prefix, 'after')
-                ->order_by('savings_account_id','DESC')
-                ->limit(1)
-                ->get($this->table)
-                ->row();
-
-            if ($row) {
-                // Extraer parte numérica y sumar 1
-                $last = (int) str_replace($prefix, '', $row->account_number);
-                $next = $last + 1;
-            } else {
-                $next = 1;
-            }
-            // Formatear con 4 dígitos (por ejemplo): SA-0001, SA-0002, …
-            $data['account_number'] = $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+            $type_id   = (int)$data['savings_account_type_id'];
+            $person_id = (int)$data['person_id'];
+            $data['account_number'] = $this->compose_account_number($type_id, $person_id);
         }
 
         // 2) Maturity date si aplica (plazo fijo)
@@ -96,8 +79,8 @@ class Savings_accounts_model extends CI_Model
             ['savings_account_type_id'=>$data['savings_account_type_id']])->row();
         if ($tipo && $tipo->is_fixed_term) {
             $data['maturity_date'] = date(
-            'Y-m-d',
-            strtotime("+{$tipo->term_days} days", strtotime($data['opening_date']))
+                'Y-m-d',
+                strtotime("+{$tipo->term_days} days", strtotime($data['opening_date']))
             );
         }
 
@@ -108,7 +91,6 @@ class Savings_accounts_model extends CI_Model
 
         return $this->db->insert($this->table, $data);
     }
-
 
     public function update($id,$data)
     {
@@ -179,6 +161,62 @@ class Savings_accounts_model extends CI_Model
     public function disable_account($account_id, $reason = '', $actor_id = 0)
     {
         return $this->set_status($account_id, 0, $reason, $actor_id);
+    }
+
+    private function person_identifier($person_id)
+    {
+        $pid = (int)$person_id;
+
+        // 1) CI desde leads.id_no (match: leads.customer_id == accounts.person_id), solo dígitos
+        $lead = $this->db->select('id_no')
+                        ->from('leads')           // CI aplicará prefijo c19_
+                        ->where('customer_id', $pid)
+                        ->limit(1)
+                        ->get()->row();
+
+        if ($lead) {
+            $digits = preg_replace('/\D+/', '', (string)$lead->id_no); // quita todo salvo 0-9
+            if ($digits !== '') {
+                return $digits;
+            }
+        }
+
+        // 2) Fallback: person_id (ya es numérico)
+        return (string)$pid;
+    }
+
+    private function type_alias($type_id)
+    {
+        $t = $this->db->select('account_type_alias, code, name')
+                    ->from('savings_account_types')
+                    ->where('savings_account_type_id', (int)$type_id)
+                    ->get()->row();
+        if ($t && !empty($t->account_type_alias)) return strtoupper($t->account_type_alias);
+        if ($t && !empty($t->code))               return strtoupper(str_replace('-', '', $t->code));
+        // Fallback muy defensivo
+        $pre = strtoupper(substr(preg_replace('/[^A-Za-z]/','', (string)($t->name ?? 'SAT')), 0, 3));
+        if ($pre === '') $pre = 'SAT';
+        return $pre.'001';
+    }
+
+    private function next_seq_for_person_type($person_id, $type_id)
+    {
+        $row = $this->db->select('COUNT(1) AS c', FALSE)
+                        ->from('savings_accounts')
+                        ->where('person_id', (int)$person_id)
+                        ->where('savings_account_type_id', (int)$type_id)
+                        ->where('status', 1) // solo activas
+                        ->get()->row();
+        $n = (int)($row->c ?? 0) + 1;
+        return str_pad((string)$n, 3, '0', STR_PAD_LEFT);
+    }
+
+    private function compose_account_number($type_id, $person_id)
+    {
+        $alias = $this->type_alias($type_id);              // p.ej. CAJ001
+        $ident = $this->person_identifier($person_id);     // CI o person_id
+        $seq   = $this->next_seq_for_person_type($person_id, $type_id); // 001
+        return "{$alias}-{$ident}-{$seq}";
     }
 
 }

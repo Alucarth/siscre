@@ -10,7 +10,7 @@ class Savings_account_transactions extends MX_Controller
 
         $this->require_owner_auth = (bool)($this->config->item('savings_require_owner_auth') ?? false);
         // si quieres forzar sin tocar config.php, descomenta la siguiente:
-        $this->require_owner_auth = false;
+        //$this->require_owner_auth = false;
 
         // Sidebar/header
         $this->load->model('Employee');
@@ -43,6 +43,11 @@ class Savings_account_transactions extends MX_Controller
             'q'             => $this->input->get('q', TRUE),
         ];
 
+        // justo después de construir $filters:
+        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
+        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+
+
         // --- Paginación (query string) ---
         $this->load->library('pagination');
 
@@ -57,19 +62,113 @@ class Savings_account_transactions extends MX_Controller
         $max_page = max(1, (int)ceil($total / $limit));
         $page = min($req_page, $max_page);
         $offset = ($page - 1) * $limit;
+        
+        // Si pidieron una página mayor al máximo, redirige a la última (evita URLs 'page=50' con mismo contenido)
+        if ($req_page > $max_page) {
+            $qs = $this->input->get(NULL, TRUE) ?: [];
+            $qs['page'] = $max_page;
+            redirect(current_url() . '?' . http_build_query($qs), 'location', 302);
+            return;
+        }
 
         // ahora sí, traer filas de la página correcta
         $rows = $this->Savings_account_transactions_model->get_all($filters, $limit, $offset);
 
+        // inicializa variables usadas más abajo
+        $saldo_inicial_periodo = null;
+        $saldo_final_periodo   = null;
+
+        // --- Saldos de apertura/cierre del PERÍODO (si hay cuenta seleccionada) ---
+        if (!empty($filters['account_id'])) {
+            $acc_id = (int)$filters['account_id'];
+
+            // Saldo actual de la cuenta
+            $acc = $this->Savings_accounts_model->get($acc_id);
+            $now_balance = (float)($acc->current_balance ?? 0);
+
+            // Cierre del período: saldo al final del rango seleccionado
+            if ($end_dt) {
+                // OJO: para saldo, NO aplicar otros filtros (branch, registered_by, etc.)
+                $sum_newer_than_end = $this->_sum_signed(
+                    $acc_id,
+                    "trans_date > ".$this->db->escape($end_dt),
+                    ['trans_type'=>null]
+                );
+                $saldo_final_periodo = $now_balance - $sum_newer_than_end;
+            } else {
+                // Sin fecha fin: el cierre es el saldo actual
+                $saldo_final_periodo = $now_balance;
+            }
+
+            // Apertura del período: saldo justo antes de $start_dt
+            if ($start_dt) {
+                $saldo_inicial_periodo = $this->_opening_balance_at($acc_id, $start_dt);
+            }
+        }
+
+        // Si ya existe balance_after persistido, úsalo directo para la columna "Saldo resultante"
+        $__has_persisted = $this->_normalize_running_balance_with_persisted($rows);
+
+        // NUEVO: poblar running_balance desde balance_after (o fallback)
+        $rows = $this->_apply_balance_after($rows);
+
         // paginador
         $config = [
-            'base_url'             => site_url('savings_accounts/savings_account_transactions'),
+            'base_url'             => current_url(),
             'total_rows'           => $total,
             'per_page'             => $limit,
+
+            'use_page_numbers'     => TRUE,
             'page_query_string'    => TRUE,
             'query_string_segment' => 'page',
             'reuse_query_string'   => TRUE,
+
+            // 🔧 fuerza la página “clamp” que calculaste (evita que CI crea que sigues en ?page=50)
+            'cur_page'             => $page,
         ];
+
+        // (Opcional) preserva el resto de filtros en los enlaces
+        $qs_all = $this->input->get(NULL, TRUE) ?: [];
+        unset($qs_all['page']);
+        $qs_keep = http_build_query(array_filter($qs_all, fn($v) => $v !== '' && $v !== null));
+        if ($qs_keep !== '') {
+            $config['suffix']    = '&' . $qs_keep;
+            $config['first_url'] = current_url() . '?page=1&' . $qs_keep;
+        }
+
+        // Apariencia y usabilidad
+        $config['num_links']        = 3; // cuántos números a cada lado
+        $config['first_link']       = '« Primero';
+        $config['last_link']        = 'Último »';
+        $config['next_link']        = 'Siguiente ›';
+        $config['prev_link']        = '‹ Anterior';
+
+        // Contenedor <nav><ul>
+        $config['full_tag_open']    = '<nav aria-label="Paginación"><ul class="pagination pagination-sm justify-content-end" style="margin:0">';
+        $config['full_tag_close']   = '</ul></nav>';
+
+        // Items <li>
+        $config['num_tag_open']     = '<li class="page-item">';
+        $config['num_tag_close']    = '</li>';
+
+        $config['cur_tag_open']     = '<li class="page-item active" aria-current="page"><span class="page-link">';
+        $config['cur_tag_close']    = '</span></li>';
+
+        $config['next_tag_open']    = '<li class="page-item">';
+        $config['next_tag_close']   = '</li>';
+
+        $config['prev_tag_open']    = '<li class="page-item">';
+        $config['prev_tag_close']   = '</li>';
+
+        $config['first_tag_open']   = '<li class="page-item">';
+        $config['first_tag_close']  = '</li>';
+
+        $config['last_tag_open']    = '<li class="page-item">';
+        $config['last_tag_close']   = '</li>';
+
+        // Enlaces <a> con clase page-link
+        $config['attributes']       = ['class' => 'page-link'];
+
         $this->pagination->initialize($config);
 
         // --- Catálogos ---
@@ -120,113 +219,110 @@ class Savings_account_transactions extends MX_Controller
         // ================================
         // Saldos período + running balance
         // ================================
-        $saldo_inicial_periodo = null;
-        $saldo_final_periodo   = null;
+        if (!$__has_persisted) {
+            
+            // --- Caso A: UNA cuenta (como antes)
+            if (!empty($filters['account_id'])) {
+                $acc_id = (int)$filters['account_id'];
+                $acc    = $this->Savings_accounts_model->get($acc_id);
+                $now_balance = (float)($acc->current_balance ?? 0);
 
-        $start_dt = !empty($filters['date_from']) ? $filters['date_from'].' 00:00:00' : null;
-        $end_dt   = !empty($filters['date_to'])   ? $filters['date_to'].' 23:59:59' : null;
+                if ($end_dt) {
+                    $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+                    $saldo_final_periodo = $now_balance - $sum_newer_than_end;
+                } else {
+                    $saldo_final_periodo = $now_balance;
+                }
 
-        // --- Caso A: UNA cuenta (como antes)
-        if (!empty($filters['account_id'])) {
-            $acc_id = (int)$filters['account_id'];
-            $acc    = $this->Savings_accounts_model->get($acc_id);
-            $now_balance = (float)($acc->current_balance ?? 0);
+                if ($start_dt) {
+                    $sum_newer_than_start = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($start_dt), $filters);
+                    $saldo_inicial_periodo = $now_balance - $sum_newer_than_start;
+                }
 
-            if ($end_dt) {
-                $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
-                $saldo_final_periodo = $now_balance - $sum_newer_than_end;
-            } else {
-                $saldo_final_periodo = $now_balance;
+                if (!empty($rows)) {
+                    $first = $rows[0];
+                    $conds = [];
+                    $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
+                    if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
+                    if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+
+                    $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
+                    $seed = $saldo_final_periodo - $sum_newer_in_period;
+
+                    $running = $seed;
+                    foreach ($rows as &$r) {
+                        $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                        $r->running_balance = $running;      // saldo después de ese movimiento
+                        $running -= ($sign * (float)$r->amount);
+                    }
+                    unset($r);
+                }
             }
+            // --- Caso B: VARIAS cuentas (nuevo) -> running balance por cuenta
+            else if (!empty($rows)) {
 
-            if ($start_dt) {
-                $sum_newer_than_start = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($start_dt), $filters);
-                $saldo_inicial_periodo = $now_balance - $sum_newer_than_start;
-            }
+                // 1) Primer movimiento mostrado por cuenta (en esta página)
+                $first_by_acc = [];           // acc_id => primera fila (objeto)
+                $acc_ids = [];
+                foreach ($rows as $rr) {
+                    $aid = (int)$rr->savings_account_id;
+                    if (!isset($first_by_acc[$aid])) {
+                        $first_by_acc[$aid] = $rr;
+                        $acc_ids[] = $aid;
+                    }
+                }
 
-            if (!empty($rows)) {
-                $first = $rows[0];
-                $conds = [];
-                $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
-                if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
-                if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+                // 2) Saldo actual por cuenta (una consulta IN)
+                $acc_balances = []; // acc_id => current_balance
+                if (!empty($acc_ids)) {
+                    $acc_rows = $this->db->select('savings_account_id, current_balance')
+                                        ->from($this->db->dbprefix('savings_accounts'))
+                                        ->where_in('savings_account_id', $acc_ids)
+                                        ->get()->result();
+                    foreach ($acc_rows as $ar) {
+                        $acc_balances[(int)$ar->savings_account_id] = (float)$ar->current_balance;
+                    }
+                }
 
-                $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
-                $seed = $saldo_final_periodo - $sum_newer_in_period;
+                // 3) Cálculo de seed y recorrido por cuenta
+                $closing_by_acc = [];  // acc_id => closing balance del período
+                $seed_by_acc    = [];  // acc_id => seed para la primera fila de esa cuenta en esta página
 
-                $running = $seed;
+                foreach ($first_by_acc as $aid => $first) {
+                    $now_balance = (float)($acc_balances[$aid] ?? 0);
+
+                    // closing (saldo al final del período para esa cuenta)
+                    if ($end_dt) {
+                        $sum_newer_than_end = $this->_sum_signed($aid, "trans_date > ".$this->db->escape($end_dt), $filters);
+                        $closing_by_acc[$aid] = $now_balance - $sum_newer_than_end;
+                    } else {
+                        $closing_by_acc[$aid] = $now_balance;
+                    }
+
+                    // sumas más nuevas que la PRIMERA fila de esa cuenta en esta página, dentro del período
+                    $conds = [];
+                    $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
+                    if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
+                    if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+
+                    $sum_newer_in_period = $this->_sum_signed($aid, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
+
+                    // seed por cuenta
+                    $seed_by_acc[$aid] = $closing_by_acc[$aid] - $sum_newer_in_period;
+                }
+
+                // 4) Asignar running_balance por cuenta respetando el orden de la página
+                $running_by_acc = $seed_by_acc; // copia inicial
                 foreach ($rows as &$r) {
+                    $aid  = (int)$r->savings_account_id;
                     $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
-                    $r->running_balance = $running;      // saldo después de ese movimiento
-                    $running -= ($sign * (float)$r->amount);
+                    $r->running_balance = isset($running_by_acc[$aid]) ? $running_by_acc[$aid] : null;
+                    $running_by_acc[$aid] = ($running_by_acc[$aid] ?? 0) - ($sign * (float)$r->amount);
                 }
                 unset($r);
             }
         }
-        // --- Caso B: VARIAS cuentas (nuevo) -> running balance por cuenta
-        else if (!empty($rows)) {
-
-            // 1) Primer movimiento mostrado por cuenta (en esta página)
-            $first_by_acc = [];           // acc_id => primera fila (objeto)
-            $acc_ids = [];
-            foreach ($rows as $rr) {
-                $aid = (int)$rr->savings_account_id;
-                if (!isset($first_by_acc[$aid])) {
-                    $first_by_acc[$aid] = $rr;
-                    $acc_ids[] = $aid;
-                }
-            }
-
-            // 2) Saldo actual por cuenta (una consulta IN)
-            $acc_balances = []; // acc_id => current_balance
-            if (!empty($acc_ids)) {
-                $acc_rows = $this->db->select('savings_account_id, current_balance')
-                                    ->from($this->db->dbprefix('savings_accounts'))
-                                    ->where_in('savings_account_id', $acc_ids)
-                                    ->get()->result();
-                foreach ($acc_rows as $ar) {
-                    $acc_balances[(int)$ar->savings_account_id] = (float)$ar->current_balance;
-                }
-            }
-
-            // 3) Cálculo de seed y recorrido por cuenta
-            $closing_by_acc = [];  // acc_id => closing balance del período
-            $seed_by_acc    = [];  // acc_id => seed para la primera fila de esa cuenta en esta página
-
-            foreach ($first_by_acc as $aid => $first) {
-                $now_balance = (float)($acc_balances[$aid] ?? 0);
-
-                // closing (saldo al final del período para esa cuenta)
-                if ($end_dt) {
-                    $sum_newer_than_end = $this->_sum_signed($aid, "trans_date > ".$this->db->escape($end_dt), $filters);
-                    $closing_by_acc[$aid] = $now_balance - $sum_newer_than_end;
-                } else {
-                    $closing_by_acc[$aid] = $now_balance;
-                }
-
-                // sumas más nuevas que la PRIMERA fila de esa cuenta en esta página, dentro del período
-                $conds = [];
-                $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)." OR (trans_date = ".$this->db->escape($first->trans_date)." AND transaction_id > ".(int)$first->transaction_id."))";
-                if ($start_dt) $conds[] = "trans_date >= ".$this->db->escape($start_dt);
-                if ($end_dt)   $conds[] = "trans_date <= ".$this->db->escape($end_dt);
-
-                $sum_newer_in_period = $this->_sum_signed($aid, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
-
-                // seed por cuenta
-                $seed_by_acc[$aid] = $closing_by_acc[$aid] - $sum_newer_in_period;
-            }
-
-            // 4) Asignar running_balance por cuenta respetando el orden de la página
-            $running_by_acc = $seed_by_acc; // copia inicial
-            foreach ($rows as &$r) {
-                $aid  = (int)$r->savings_account_id;
-                $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
-                $r->running_balance = isset($running_by_acc[$aid]) ? $running_by_acc[$aid] : null;
-                $running_by_acc[$aid] = ($running_by_acc[$aid] ?? 0) - ($sign * (float)$r->amount);
-            }
-            unset($r);
-        }
-
+            
         // ================================
         // Totales del PERÍODO (sin paginar)
         // ================================
@@ -301,10 +397,6 @@ class Savings_account_transactions extends MX_Controller
         unset($qs['page']);
         $qs_str = http_build_query(array_filter($qs, fn($v) => $v !== '' && $v !== null));
 
-        // Aliases para compatibilidad con la vista (solo si es 1 cuenta tiene sentido mostrarlos)
-        $opening_balance = $saldo_inicial_periodo;
-        $closing_balance = $saldo_final_periodo;
-
         // --- Interés estimado del período (solo si hay UNA cuenta y rango completo) ---
         $period_interest = null;
         if (!empty($filters['account_id']) && $start_dt && $end_dt) {
@@ -340,83 +432,156 @@ class Savings_account_transactions extends MX_Controller
             'export_pdf_url'    => site_url('savings_accounts/savings_account_transactions/export_pdf') . ($qs_str ? '?'.$qs_str : ''),
         ];
 
+        foreach ($rows as &$r) {
+            $r->trans_type_label = $this->_label_tx_row($r);
+        }
+        unset($r);
+
         $this->load->view('savings_accounts/savings_account_transactions/index', $data);
     }
 
     /**
-     * Suma firmada (depósito=+, retiro=-) para una cuenta y una condición extra.
-     * Respeta filters: branch_id, registered_by, status, date_from/date_to (si le pasas en $filters).
+     * Suma firmada (depósito=+, retiro=-) para una cuenta.
+     * - Por defecto hereda filtros de $filters (status, branch_id, registered_by, date_from/to).
+     * - Puedes pasar $range_override = ['from' => 'Y-m-d H:i:s'|null, 'to' => 'Y-m-d H:i:s'|null]
+     *   para forzar un rango específico y evitar mezclar con date_from/date_to del filtro.
+     * - $extra_where debe venir de código interno controlado (no input de usuario).
      */
-    private function _sum_signed(int $account_id, string $extra_where = '1=1', array $filters = [])
-    {
+    private function _sum_signed(
+        int $account_id,
+        string $extra_where = '1=1',
+        array $filters = [],
+        array $range_override = null,
+        bool $inherit_filters = true
+    ) {
         $tb = $this->db->dbprefix('savings_account_transactions');
 
-        $this->db->select("COALESCE(SUM(CASE WHEN trans_type='withdraw' THEN -amount ELSE amount END),0) AS s", false)
-                ->from($tb)
-                ->where('savings_account_id', $account_id);
-
-        // Estado si se pidió (1/0)
-        if (isset($filters['status']) && $filters['status'] !== '' && $filters['status'] !== null) {
-            $this->db->where('status', (int)$filters['status']);
+        // ---------- Memoization (evita recomputar con mismos parámetros) ----------
+        static $cache = [];
+        $cache_key = md5(json_encode([
+            'acc'    => $account_id,
+            'extra'  => $extra_where,
+            'f'      => $inherit_filters ? $filters : [],
+            'range'  => $range_override,
+        ], JSON_UNESCAPED_UNICODE));
+        if (isset($cache[$cache_key])) {
+            return $cache[$cache_key];
         }
 
-        // Filtros de sucursal / operador
-        if (!empty($filters['branch_id']))     $this->db->where('branch_id', (int)$filters['branch_id']);
-        if (!empty($filters['registered_by'])) $this->db->where('registered_by', (int)$filters['registered_by']);
+        // ---------- Build query ----------
+        // Nota: usamos LOWER(trans_type) para blindar mayúsculas/minúsculas
+        $this->db->select("
+                COALESCE(SUM(
+                    CASE WHEN LOWER(trans_type)='withdraw' THEN -amount ELSE amount END
+                ),0) AS s
+            ", false)
+            ->from($tb)
+            ->where('savings_account_id', $account_id);
 
-        // Si viene rango por filtros, aplícalo aquí también (pero cuidado: el seed ya arma su propio rango)
-        if (!empty($filters['date_from'])) $this->db->where('trans_date >=', $filters['date_from'].' 00:00:00');
-        if (!empty($filters['date_to']))   $this->db->where('trans_date <=', $filters['date_to'].' 23:59:59');
+        // Filtros heredados (si procede)
+        if ($inherit_filters) {
+            if (isset($filters['status']) && $filters['status'] !== '' && $filters['status'] !== null) {
+                $this->db->where('status', (int)$filters['status']);
+            }
+            if (!empty($filters['branch_id']))     $this->db->where('branch_id', (int)$filters['branch_id']);
+            if (!empty($filters['registered_by'])) $this->db->where('registered_by', (int)$filters['registered_by']);
 
-        // Extra WHERE libre (para "newer than" etc.)
+            // Solo aplicamos date_from/date_to si NO nos pasaron override explícito
+            if ($range_override === null) {
+                if (!empty($filters['date_from'])) $this->db->where('trans_date >=', $filters['date_from'].' 00:00:00');
+                if (!empty($filters['date_to']))   $this->db->where('trans_date <=', $filters['date_to'].' 23:59:59');
+            }
+        }
+
+        // Rango explícito (no se mezcla con filtros)
+        if (is_array($range_override)) {
+            if (!empty($range_override['from'])) $this->db->where('trans_date >=', $range_override['from']);
+            if (!empty($range_override['to']))   $this->db->where('trans_date <=', $range_override['to']);
+        }
+
+        // Extra WHERE (solo para cláusulas internas, controladas por nosotros)
         if ($extra_where && trim($extra_where) !== '1=1') {
             $this->db->where($extra_where, null, false);
         }
 
         $row = $this->db->get()->row();
-        return (float)($row->s ?? 0);
+        // Importante: MySQL DECIMAL viene como string; si prefieres evitar floats, devuelve (string)$row->s
+        $sum = (float)($row->s ?? 0);
+
+        // Cachea y retorna
+        $cache[$cache_key] = $sum;
+        return $sum;
     }
 
     public function owner_info($account_id)
     {
         $account_id = (int)$account_id;
+        if ($account_id <= 0) {
+            return $this->output
+                ->set_status_header(400)
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false, 'error'=>'account_id inválido']));
+        }
+
+        // Memoization simple por request
+        static $cache = [];
+        if (isset($cache[$account_id])) {
+            return $this->output->set_content_type('application/json')
+                ->set_output(json_encode($cache[$account_id]));
+        }
+
+        // Subselect determinístico para CI (id_no): último lead del titular
+        // Si no tienes updated_at/created_at, usamos el mayor lead_id como “más reciente”.
+        $tbl_sa   = $this->db->dbprefix('savings_accounts');
+        $tbl_p    = $this->db->dbprefix('people');
+        $tbl_lead = $this->db->dbprefix('leads');
 
         $sql = "
             SELECT 
                 sa.savings_account_id,
                 p.person_id,
-                CONCAT(p.first_name,' ',p.last_name) AS full_name,
+                TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))) AS full_name,
                 p.photo_url,
-                l.id_no,
-                c.password AS customer_password
+                (
+                    SELECT l.id_no
+                    FROM {$this->db->dbprefix('leads')} l
+                    WHERE l.customer_id = sa.person_id
+                    AND l.id_no IS NOT NULL AND l.id_no <> ''
+                    LIMIT 1
+                ) AS id_no
             FROM {$this->db->dbprefix('savings_accounts')} sa
             JOIN {$this->db->dbprefix('people')} p
-                ON p.person_id = sa.person_id
-            LEFT JOIN {$this->db->dbprefix('leads')} l
-                ON l.customer_id = sa.person_id
-            LEFT JOIN {$this->db->dbprefix('customers')} c
-                ON c.person_id = sa.person_id
+            ON p.person_id = sa.person_id
             WHERE sa.savings_account_id = ?
             LIMIT 1
         ";
 
-        // 👇 ESTA LÍNEA ES CLAVE
-        $row = $this->db->query($sql, [$account_id])->row();
+        $row = $this->db->query($sql, [(int)$account_id])->row();
 
         if (!$row) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false]));
+            return $this->output
+                ->set_status_header(404)
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['ok'=>false, 'error'=>'Cuenta no encontrada']));
         }
 
+        // Limpieza opcional de CI a sólo dígitos (si prefieres conservar formato original, usa $row->id_no tal cual)
+        $id_no_raw = (string)($row->id_no ?? '');
+        $id_no_digits = preg_replace('/\D+/', '', $id_no_raw) ?: $id_no_raw;
+
+        // Resolver foto a URL pública
         $photo_full = $this->_photo_url((int)$row->person_id, (string)($row->photo_url ?? ''));
 
         $out = [
             'ok'        => true,
             'person_id' => (int)$row->person_id,
             'full_name' => (string)$row->full_name,
-            'id_no'     => (string)($row->id_no ?? ''),
+            'id_no'     => $id_no_digits,
             'photo_url' => $photo_full,
         ];
+
+        // Cache por request
+        $cache[$account_id] = $out;
 
         return $this->output->set_content_type('application/json')
             ->set_output(json_encode($out));
@@ -431,15 +596,26 @@ class Savings_account_transactions extends MX_Controller
 
         $this->load->model('Savings_account_transactions_model');
 
-        // ==== Datos base para la vista ====
+        // Cacheo de columnas (evita múltiples field_exists)
+        static $colmap = null;
+        if ($colmap === null) {
+            $colmap = [
+                'has_is_active' => $this->db->field_exists('is_active', 'savings_accounts'),
+                'has_status'    => $this->db->field_exists('status', 'savings_accounts'),
+                'has_disabled'  => $this->db->field_exists('disabled', 'savings_accounts'),
+                'has_time_dep'  => $this->db->field_exists('time_deposit',  'savings_accounts'),
+                'has_mat'       => $this->db->field_exists('maturity_date', 'savings_accounts'),
+            ];
+        }
+
         $data = [];
         // === Opciones de cuenta, a prueba de columnas faltantes ===
-        $activeWhere = '';  // no filtra por activo si no hay columna
-        if ($this->db->field_exists('is_active', 'savings_accounts')) {
+        $activeWhere = '';
+        if ($colmap['has_is_active']) {
             $activeWhere = 'COALESCE(sa.is_active,1) = 1';
-        } elseif ($this->db->field_exists('status', 'savings_accounts')) {
+        } elseif ($colmap['has_status']) {
             $activeWhere = 'COALESCE(sa.status,1) = 1';
-        } elseif ($this->db->field_exists('disabled', 'savings_accounts')) {
+        } elseif ($colmap['has_disabled']) {
             $activeWhere = 'COALESCE(sa.disabled,0) = 0';
         }
 
@@ -485,11 +661,18 @@ class Savings_account_transactions extends MX_Controller
 
         // ==== POST ====
         if ($this->input->post()) {
-            $trans_type = strtolower((string)$this->input->post('trans_type'));
-            $account_id = (int)$this->input->post('savings_account_id');
-            $amount     = (float)$this->input->post('amount');
-            $desc       = trim((string)$this->input->post('description'));
-            $trans_dt   = (string)$this->input->post('trans_date');
+            $trans_type = strtolower((string)$this->input->post('trans_type', TRUE));
+            $account_id = (int)$this->input->post('savings_account_id', TRUE);
+            $amount     = (float)$this->input->post('amount', TRUE);
+            $desc       = trim((string)$this->input->post('description', TRUE));
+            $trans_dt   = (string)$this->input->post('trans_date', TRUE);
+            // Normaliza $trans_dt a 'Y-m-d H:i:s' o now()
+            if ($trans_dt) {
+                $t = strtotime($trans_dt);
+                $trans_dt = $t ? date('Y-m-d H:i:s', $t) : date('Y-m-d H:i:s');
+            } else {
+                $trans_dt = date('Y-m-d H:i:s');
+            }
 
             // Validación mínima común
             if (!in_array($trans_type, ['deposit','withdraw','transfer'], true) || $account_id <= 0 || $amount <= 0) {
@@ -505,23 +688,18 @@ class Savings_account_transactions extends MX_Controller
             $hasPF       = $this->db->field_exists('time_deposit',  'savings_accounts');
             $hasMat      = $this->db->field_exists('maturity_date', 'savings_accounts');
 
-            if ($this->db->field_exists('is_active','savings_accounts')) {
+            if ($colmap['has_is_active']) {
                 $selectParts[] = 'COALESCE(sa.is_active,1) AS is_active';
-            } elseif ($this->db->field_exists('status','savings_accounts')) {
+            } elseif ($colmap['has_status']) {
                 $selectParts[] = 'COALESCE(sa.status,1) AS is_active';
-            } elseif ($this->db->field_exists('disabled','savings_accounts')) {
-                // disabled=0 => activo
+            } elseif ($colmap['has_disabled']) {
                 $selectParts[] = 'CASE WHEN COALESCE(sa.disabled,0)=0 THEN 1 ELSE 0 END AS is_active';
             } else {
-                // no hay columna de estado; asumir activo (no validamos estado)
                 $selectParts[] = '1 AS is_active';
             }
 
-            if ($hasPF)  { $selectParts[] = 'COALESCE(sa.time_deposit,0) AS is_time_deposit'; }
-            else         { $selectParts[] = '0 AS is_time_deposit'; }
-
-            if ($hasMat) { $selectParts[] = 'sa.maturity_date'; }
-            else         { $selectParts[] = 'NULL AS maturity_date'; }
+            $selectParts[] = $colmap['has_time_dep'] ? 'COALESCE(sa.time_deposit,0) AS is_time_deposit' : '0 AS is_time_deposit';
+            $selectParts[] = $colmap['has_mat'] ? 'sa.maturity_date' : 'NULL AS maturity_date';
 
             $src = $this->db->query("
                 SELECT ".implode(',', $selectParts)."
@@ -571,48 +749,16 @@ class Savings_account_transactions extends MX_Controller
 
             // ====== TRANSFERENCIA ======
             if ($trans_type === 'transfer') {
-            $dst_id = (int)$this->input->post('dst_account_id');
-            if ($dst_id <= 0 || $dst_id === $account_id) {
-                $this->session->set_flashdata('error','Datos inválidos para la transferencia.');
-                redirect(current_url()); return;
-            }
+                $dst_id = (int)$this->input->post('dst_account_id');
+                // usa el validador “puro” (no redirige ni setea flash por dentro)
+                $chk = $this->_validate_transfer($account_id, $dst_id, $amount);
+                if (!$chk['ok']) {
+                    $this->session->set_flashdata('error', $chk['msg'] ?: 'No se pudo validar la transferencia.');
+                    redirect(current_url());
+                    return;
+                }
 
-            $dstActiveSelect = '1 AS is_active';  // por defecto “activo” si no hay columna
-            if ($this->db->field_exists('is_active','savings_accounts')) {
-                $dstActiveSelect = 'COALESCE(sa.is_active,1) AS is_active';
-            } elseif ($this->db->field_exists('status','savings_accounts')) {
-                $dstActiveSelect = 'COALESCE(sa.status,1) AS is_active';
-            } elseif ($this->db->field_exists('disabled','savings_accounts')) {
-                $dstActiveSelect = 'CASE WHEN COALESCE(sa.disabled,0)=0 THEN 1 ELSE 0 END AS is_active';
-            }
-
-            $dst = $this->db->query("
-                SELECT sa.savings_account_id, $dstActiveSelect
-                FROM {$this->db->dbprefix('savings_accounts')} sa
-                WHERE sa.savings_account_id = ?
-                LIMIT 1
-            ", [$dst_id])->row();
-
-            if (!$dst) {
-                $this->session->set_flashdata('error','Cuenta destino no encontrada.');
-                redirect(current_url()); return;
-            }
-            // 🔒 Validación de cuenta DESTINO inactiva
-            if ((int)$dst->is_active !== 1) {
-                $this->session->set_flashdata('error', 'La cuenta destino está inactiva. No se puede realizar la transferencia.');
-                redirect(current_url());
-                return;
-            }
-            // solo aplica si realmente tenemos una columna de estado
-            if (($this->db->field_exists('is_active','savings_accounts')
-            || $this->db->field_exists('status','savings_accounts')
-            || $this->db->field_exists('disabled','savings_accounts'))
-                && (int)$dst->is_active !== 1) {
-                $this->session->set_flashdata('error','La cuenta destino está inactiva.');
-                redirect(current_url()); return;
-            }
-        
-                // Ejecutar la transferencia y salir
+                // Ejecutar la transferencia
                 $res = $this->Savings_account_transactions_model->create_transfer(
                     $account_id,                // origen
                     $dst_id,                    // destino
@@ -624,7 +770,7 @@ class Savings_account_transactions extends MX_Controller
 
                 if ($res && !empty($res['withdraw_id']) && !empty($res['deposit_id'])) {
                     $this->session->set_flashdata('success','Transferencia realizada correctamente.');
-                    // (opcional) Voucher:
+                    // Voucher opcional (como ya venías haciendo)
                     $this->session->set_flashdata(
                         'pdf_url',
                         site_url('savings_accounts/savings_account_transactions/voucher_transfer/'.$res['withdraw_id'].'/'.$res['deposit_id'])
@@ -637,7 +783,7 @@ class Savings_account_transactions extends MX_Controller
                     ? ($this->Savings_account_transactions_model->last_error ?: '')
                     : '';
                 if ($msg === '') {
-                    $msg = 'No se pudo completar la transferencia (saldo insuficiente, cuenta inactiva o plazo fijo no vencido).';
+                    $msg = 'No se pudo completar la transferencia.';
                 }
                 $this->session->set_flashdata('error', $msg);
                 redirect(current_url());
@@ -646,8 +792,8 @@ class Savings_account_transactions extends MX_Controller
 
             // ====== DEPÓSITO / RETIRO ======
             // Campos sólo para depósito
-            $dep_name = trim((string)($this->input->post('depositor_name') ?? ''));
-            $dep_doc  = trim((string)($this->input->post('depositor_document') ?? ''));
+            $dep_name = trim((string)($this->input->post('depositor_name', TRUE) ?? ''));
+            $dep_doc  = trim((string)($this->input->post('depositor_document', TRUE) ?? ''));
 
             if ($trans_type === 'deposit') {
                 if ($dep_name === '' || $dep_doc === '') {
@@ -701,268 +847,359 @@ class Savings_account_transactions extends MX_Controller
         $this->load->view('savings_accounts/savings_account_transactions/form', $data);
     }
    
-    /** helper privado en el mismo controlador **/
+    /** Helper privado: resuelve la URL de foto del titular con fallback seguro */
     private function _photo_url($person_id, $filename)
     {
-        if ($filename && file_exists(FCPATH."uploads/profile-$person_id/$filename")) {
-            // ¡OJO!: base_url, no site_url
-        return base_url("uploads/profile-$person_id/$filename");
+        $placeholder = base_url('uploads/people/placeholder-80x80.png');
+
+        // Normaliza entradas
+        $pid = (int)$person_id;
+        $fn  = trim((string)$filename);
+        if ($fn === '') return $placeholder;
+
+        // Si ya es URL absoluta, úsala
+        if (preg_match('#^https?://#i', $fn)) {
+            return $fn;
         }
-        // fallback local si tienes un avatar por defecto en tu tema
-        return base_url('uploads/people/avatar.png');
+
+        // Sanea nombre (sin ../ ni backslashes, sin prefijos con /)
+        $safe = ltrim(str_replace(['..', '\\'], '', $fn), '/');
+
+        // Cache simple por petición para no golpear disco repetidas veces
+        static $cache = [];
+        $ckey = $pid . ':' . $safe;
+        if (array_key_exists($ckey, $cache)) {
+            return $cache[$ckey];
+        }
+
+        // Candidatas en orden de preferencia
+        $candidates = [];
+        if ($pid > 0) $candidates[] = "uploads/profile-{$pid}/{$safe}";
+        $candidates[] = "uploads/people/{$safe}";
+
+        foreach ($candidates as $rel) {
+            $abs = FCPATH . $rel;
+            if (is_file($abs)) {
+                return $cache[$ckey] = base_url($rel);
+            }
+        }
+
+        // Fallback
+        return $cache[$ckey] = $placeholder;
     }
 
     public function delete($id = NULL)
     {
-        // Por ahora: soft-delete de la transacción (no revierte saldos).
-        // Si quieres reversar saldos al “eliminar”, lo hacemos en un paso siguiente.
-        if (is_null($id)) $id = $this->uri->segment(4);
-        if ($id && $this->Savings_account_transactions_model->delete($id)) {
+        // 1) Id seguro
+        if (is_null($id)) { $id = $this->uri->segment(4); }
+        $id = (int)$id;
+        if ($id <= 0) {
+            $this->session->set_flashdata('error','ID inválido.');
+            redirect('savings_accounts/savings_account_transactions'); return;
+        }
+
+        // 2) Debe existir
+        $tx = $this->Savings_account_transactions_model->find($id);
+        if (!$tx) {
+            $this->session->set_flashdata('error','La transacción no existe o ya fue deshabilitada.');
+            redirect('savings_accounts/savings_account_transactions'); return;
+        }
+
+        // 3) (Opcional pero recomendado) Solo permitir vía POST para tener CSRF
+        if (strtoupper($this->input->server('REQUEST_METHOD') ?? '') !== 'POST') {
+            $this->session->set_flashdata('error','Operación no permitida. Use el botón “Deshabilitar”.');
+            redirect('savings_accounts/savings_account_transactions'); return;
+        }
+
+        // 4) Transferencias: evitar borrar solo una pata
+        if (strtolower($tx->trans_type) === 'transfer') {
+            $this->session->set_flashdata('error','Esta transacción es parte de una transferencia. Use la opción específica para anular transferencias.');
+            redirect('savings_accounts/savings_account_transactions'); return;
+        }
+
+        // 5) Ejecutar soft-delete con auditoría mínima
+        $actor_id = (int)($this->session->userdata('person_id') ?: 0);
+        $reason   = trim((string)$this->input->post('reason') ?? 'Sin motivo');
+        $ok = $this->Savings_account_transactions_model->delete($id, [
+            'deleted_by' => $actor_id,
+            'delete_reason' => $reason,
+        ]);
+
+        if ($ok) {
             $this->session->set_flashdata('success','Transacción deshabilitada.');
+            // (E – próxima iteración) trigger para reflow si tenemos balance_after persistido
         } else {
             $this->session->set_flashdata('error','No fue posible deshabilitar la transacción.');
         }
         redirect('savings_accounts/savings_account_transactions');
     }
 
-    /* ==========================================================
-       Los siguientes métodos son opcionales si más adelante
-       decides separar formularios. Por ahora no se usan.
-       ========================================================== */
-
-    public function deposit($tx_id = NULL)
-    {
-        $accounts = $this->Savings_accounts_model->get_all();
-        $opts = [];
-        foreach ($accounts as $a) {
-            $owner = trim(($a->first_name ?? '').' '.($a->last_name ?? ''));
-            $opts[$a->savings_account_id] = ($a->account_number ?: 'CA-'.$a->savings_account_id).' – '.$owner;
-        }
-        $data['account_options'] = $opts;
-
-        if ($this->input->post()) {
-            $post = $this->input->post();
-            if ($this->Savings_account_transactions_model->insert($post)) {
-                $this->session->set_flashdata('success','Depósito registrado correctamente.');
-                redirect('savings_accounts/savings_account_transactions/index');
-                return;
-            } else {
-                $this->session->set_flashdata('error','Error al procesar el depósito.');
-            }
-        }
-
-        $data['tx'] = $tx_id ? $this->Savings_account_transactions_model->get($tx_id) : NULL;
-        $this->load->view('savings_accounts/savings_account_transactions/deposit_form', $data);
-    }
-
-    public function form_transfer()
-    {
-        $data['accounts'] = $this->Savings_accounts_model->get_all();
-        $this->load->view('savings_accounts/savings_account_transactions/form_transfer', $data);
-    }
-
+    /**
+     * Valida una transferencia entre cuentas.
+     * No hace redirects ni set_flashdata: SOLO devuelve ['ok'=>bool,'msg'=>string].
+     */
     private function _validate_transfer($src_id, $dst_id, $amount)
     {
+        $src_id = (int)$src_id;
+        $dst_id = (int)$dst_id;
         $amount = (float)$amount;
+
+        // 0) Reglas básicas
         if ($amount <= 0) {
-            return ['ok'=>false,'msg'=>'El monto debe ser mayor a cero.'];
+            return ['ok'=>false, 'msg'=>'El monto debe ser mayor a cero.'];
+        }
+        if ($src_id <= 0 || $dst_id <= 0) {
+            return ['ok'=>false, 'msg'=>'Debes seleccionar cuentas válidas.'];
+        }
+        if ($src_id === $dst_id) {
+            return ['ok'=>false, 'msg'=>'La cuenta de origen y destino no pueden ser la misma.'];
         }
 
-        $chk = $this->_validate_transfer($account_id, $dst_id, $amount);
-        if (!$chk['ok']) {
-            $this->session->set_flashdata('error', $chk['msg'] ?? 'No se pudo validar la transferencia.');
-            redirect(current_url());
-            return;
-        }   
+        // 1) Traer estado de ambas cuentas con columnas "flexibles"
+        //    (igual criterio que usaste en form(): is_active / plazo fijo / vencimiento / saldo actual)
+        $hasIsActive = $this->db->field_exists('is_active', 'savings_accounts')
+                    || $this->db->field_exists('status',   'savings_accounts')
+                    || $this->db->field_exists('disabled', 'savings_accounts');
 
-        $this->load->model('savings_accounts/Savings_account_transactions_model', 'txm');
-        $state = $this->txm->get_accounts_state($src_id, $dst_id);
-
-        if (!$state['src'] || !$state['dst']) {
-            return ['ok'=>false,'msg'=>'No se encontró información de las cuentas seleccionadas.'];
+        $selectActive = '1 AS is_active';
+        if ($this->db->field_exists('is_active','savings_accounts')) {
+            $selectActive = 'COALESCE(sa.is_active,1) AS is_active';
+        } elseif ($this->db->field_exists('status','savings_accounts')) {
+            $selectActive = 'COALESCE(sa.status,1) AS is_active';
+        } elseif ($this->db->field_exists('disabled','savings_accounts')) {
+            $selectActive = 'CASE WHEN COALESCE(sa.disabled,0)=0 THEN 1 ELSE 0 END AS is_active';
         }
 
-        $src = $state['src'];
-        $dst = $state['dst'];
+        $selectTimeDep = $this->db->field_exists('time_deposit','savings_accounts')
+            ? 'COALESCE(sa.time_deposit,0) AS is_time_deposit'
+            : '0 AS is_time_deposit';
 
-        // 1) Ambas activas
-        if ((int)$src->is_active !== 1) return ['ok'=>false,'msg'=>'La cuenta de origen está inactiva.'];
-        if ((int)$dst->is_active !== 1) return ['ok'=>false,'msg'=>'La cuenta de destino está inactiva.'];
+        $selectMaturity = $this->db->field_exists('maturity_date','savings_accounts')
+            ? 'sa.maturity_date'
+            : 'NULL AS maturity_date';
 
-        // 2) Plazo fijo: debe estar vencido
+        // saldo actual siempre
+        $selectBalance = 'COALESCE(sa.current_balance,0) AS current_balance';
+
+        // mínimo requerido (si existiera alguna columna de política; si no, 0)
+        $selectMinReq = $this->db->field_exists('min_transfer_amount','savings_accounts')
+            ? 'COALESCE(sa.min_transfer_amount,0) AS min_transfer_amount'
+            : '0 AS min_transfer_amount';
+
+        $tb = $this->db->dbprefix('savings_accounts');
+
+        $src = $this->db->query("
+            SELECT sa.savings_account_id, {$selectActive}, {$selectTimeDep}, {$selectMaturity},
+                {$selectBalance}, {$selectMinReq}
+            FROM {$tb} sa
+            WHERE sa.savings_account_id = ?
+            LIMIT 1
+        ", [$src_id])->row();
+
+        $dst = $this->db->query("
+            SELECT sa.savings_account_id, {$selectActive}, {$selectTimeDep}, {$selectMaturity},
+                {$selectBalance}, {$selectMinReq}
+            FROM {$tb} sa
+            WHERE sa.savings_account_id = ?
+            LIMIT 1
+        ", [$dst_id])->row();
+
+        if (!$src || !$dst) {
+            return ['ok'=>false, 'msg'=>'No se encontró información de las cuentas seleccionadas.'];
+        }
+
+        // 2) Activas
+        if ($hasIsActive) {
+            if ((int)$src->is_active !== 1) return ['ok'=>false,'msg'=>'La cuenta de origen está inactiva.'];
+            if ((int)$dst->is_active !== 1) return ['ok'=>false,'msg'=>'La cuenta de destino está inactiva.'];
+        }
+
+        // 3) Origen: plazo fijo → debe estar vencido
         if ((int)$src->is_time_deposit === 1) {
-            // si no manejas horas, comparamos fecha a medianoche
-            $hoy = date('Y-m-d');
-            $vence = $src->maturity_date ? substr($src->maturity_date,0,10) : null;
+            $hoy   = date('Y-m-d');
+            $vence = $src->maturity_date ? substr($src->maturity_date, 0, 10) : null;
             if (!$vence || $vence > $hoy) {
                 return ['ok'=>false,'msg'=>'La cuenta de origen es de plazo fijo y aún no ha vencido.'];
             }
         }
 
-        // 3) Mínimo requerido
-        // Si no tienes min_transfer_amount en la tabla de tipos, puedes fijar un mínimo global:
-        $min_req = isset($src->min_transfer_amount) ? (float)$src->min_transfer_amount : 0.00;
-
-        // Saldo suficiente (monto + mínimo requerido)
-        $disp = (float)$src->available_balance;
+        // 4) Saldo suficiente (saldo actual - mínimo requerido >= monto)
+        $min_req = (float)$src->min_transfer_amount;
+        $disp    = (float)$src->current_balance;
         if ($disp < ($amount + $min_req)) {
             $det = sprintf('Saldo disponible %.2f; mínimo requerido %.2f; monto %.2f.', $disp, $min_req, $amount);
-            return ['ok'=>false,'msg'=>"Saldo insuficiente para la transferencia. $det"];
+            return ['ok'=>false,'msg'=>"Saldo insuficiente para la transferencia. {$det}"];
         }
 
-        return ['ok'=>true,'msg'=>'OK'];
+        return ['ok'=>true, 'msg'=>'OK'];
     }
 
     public function store_transfer()
     {
-        $old = error_reporting();
-        error_reporting($old & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
-
+        // Asegura JSON siempre
         $this->output->set_content_type('application/json; charset=UTF-8');
 
-        try {
-            // Lee SIEMPRE por input->post
-            $src_id   = (int)$this->input->post('src_account_id');
-            $dst_id   = (int)$this->input->post('dst_account_id');
-            $amount   = (float)$this->input->post('amount');
-            $desc     = trim($this->input->post('description'));
+        // (Opcional pero recomendado)
+        if (method_exists($this->input, 'is_ajax_request') && !$this->input->is_ajax_request()) {
+            $this->output->set_status_header(400);
+            echo json_encode(['ok'=>false, 'message'=>'Solicitud inválida.']);
+            return;
+        }
 
-            // Validaciones mínimas (sin tocar reglas de negocio existentes)
+        try {
+            // Leer POST de forma consistente
+            $src_id = (int)$this->input->post('src_account_id', true);
+            $dst_id = (int)$this->input->post('dst_account_id', true);
+            $amount = (float)$this->input->post('amount', true);
+            // Normalizar descripción (máx. 255 por si el schema lo limita)
+            $desc   = substr(trim((string)$this->input->post('description')), 0, 255);
+
+            // Validaciones mínimas de forma de datos
             if ($src_id <= 0 || $dst_id <= 0 || $src_id === $dst_id) {
-                throw new Exception('Cuentas de origen/destino inválidas.');
+                $this->output->set_status_header(400);
+                echo json_encode(['ok'=>false, 'message'=>'Cuentas de origen/destino inválidas.']);
+                return;
             }
             if ($amount <= 0) {
-                throw new Exception('El monto debe ser mayor a 0.');
+                $this->output->set_status_header(400);
+                echo json_encode(['ok'=>false, 'message'=>'El monto debe ser mayor a 0.']);
+                return;
             }
 
-            // Llama a tu modelo que ya transfiere (no cambiamos lógica)
-            // Debe retornar ids de las 2 transacciones o booleano
-            $result = $this->Savings_account_transactions_model->transfer($src_id, $dst_id, $amount, $desc);
-
-            if (!$result) {
-                // Ideal: el modelo devuelve un mensaje de error
-                $msg = $this->Savings_account_transactions_model->last_error ?? 'No se pudo completar la transferencia.';
-                throw new Exception($msg);
+            // Reglas de negocio centralizadas
+            $chk = $this->_validate_transfer($src_id, $dst_id, $amount);
+            if (!$chk['ok']) {
+                $this->output->set_status_header(400);
+                echo json_encode(['ok'=>false, 'message'=>($chk['msg'] ?? 'No se pudo validar la transferencia.')]);
+                return;
             }
 
-            // Estandariza respuesta
-            $payload = [
-                'ok' => true,
+            // Ejecutar operación (armonizado con form(): create_transfer)
+            $res = $this->Savings_account_transactions_model->create_transfer(
+                $src_id,
+                $dst_id,
+                $amount,
+                $desc,
+                (int)($this->session->userdata('branch_id') ?? 0),
+                (int)($this->session->userdata('person_id') ?? 0)
+            );
+
+            if (!$res || empty($res['withdraw_id']) || empty($res['deposit_id'])) {
+                $msg = property_exists($this->Savings_account_transactions_model,'last_error')
+                    ? ($this->Savings_account_transactions_model->last_error ?: '')
+                    : '';
+                if ($msg === '') $msg = 'No se pudo completar la transferencia.';
+                $this->output->set_status_header(400);
+                echo json_encode(['ok'=>false, 'message'=>$msg]);
+                return;
+            }
+
+            // OK
+            $this->output->set_status_header(200);
+            echo json_encode([
+                'ok'      => true,
                 'message' => 'Transferencia realizada correctamente.',
-                'data' => $result, // ej: ['withdraw_id'=>..., 'deposit_id'=>...]
-            ];
-            echo json_encode($payload);
-        } catch (Exception $e) {
-            echo json_encode(['ok'=>false, 'message'=>$e->getMessage()]);
-        } finally {
-            error_reporting($old);
+                'data'    => $res, // ['withdraw_id'=>..., 'deposit_id'=>...]
+            ]);
+            return;
+
+        } catch (Throwable $e) {
+            $this->output->set_status_header(500);
+            echo json_encode(['ok'=>false, 'message'=>'Error interno: '.$e->getMessage()]);
+            return;
         }
-        return; // evita que CI siga procesando
     }
 
     public function voucher($transaction_id)
     {
         $tx_id = (int)$transaction_id;
 
-        // --- DATA ---
-        $sql = "
-            SELECT 
-                tx.*,
-                sa.account_number, sa.savings_account_id, sa.person_id AS owner_id,
-                sat.name AS account_type_name,
-                p.first_name, p.last_name,
-                l.id_no,
-                b.branch_name,
-                op.first_name AS op_first, op.last_name AS op_last
-            FROM {$this->db->dbprefix('savings_account_transactions')} tx
-            LEFT JOIN {$this->db->dbprefix('savings_accounts')} sa 
-                ON sa.savings_account_id = tx.savings_account_id
-            LEFT JOIN {$this->db->dbprefix('savings_account_types')} sat
-                ON sat.savings_account_type_id = sa.savings_account_type_id
-            LEFT JOIN {$this->db->dbprefix('people')} p 
-                ON p.person_id = sa.person_id
-            LEFT JOIN {$this->db->dbprefix('leads')} l 
-                ON l.customer_id = sa.person_id
-            LEFT JOIN {$this->db->dbprefix('branches')} b 
-                ON b.id = tx.branch_id
-            LEFT JOIN {$this->db->dbprefix('people')} op 
-                ON op.person_id = tx.registered_by
-            WHERE tx.transaction_id = ?
-            LIMIT 1
-        ";
-        $row = $this->db->query($sql, [$tx_id])->row();
-        // Asegura cargar la librería Pdf ANTES de usarla
-        if (!isset($this->pdf) || !is_object($this->pdf)) {
-            $this->load->library('pdf');   // Clase application/libraries/Pdf.php (P mayúscula)
+        // 1) Traer fila ya unida desde el modelo
+        $row = $this->Savings_account_transactions_model->get_one_with_joins($tx_id);
+        if (!$row) {
+            show_error('Transacción no encontrada.', 404, 'Voucher');
+            return;
         }
 
-        // Si antes usabas $this->_mpdf_load('P'), elimínalo y usa:
-        $mpdf = $this->pdf->load(['utf-8','A5','','',8,8,10,10,0,0,'P']);
+        // 2) Sucursal: sesión → por id → la del join
+        $branch_name = (string)($this->session->userdata('branch_name') ?: '');
+        if ($branch_name === '' && ($bid = (int)($this->session->userdata('branch_id') ?: 0))) {
+            if ($this->db->table_exists($this->db->dbprefix('branches'))) {
+                $b = $this->db->select('branch_name')
+                    ->from($this->db->dbprefix('branches'))
+                    ->where('id', $bid)->get()->row();
+                if ($b) $branch_name = (string)$b->branch_name;
+            }
+        }
+        if ($branch_name === '' && !empty($row->branch_name)) {
+            $branch_name = (string)$row->branch_name;
+        }
+        $row->branch_name = $branch_name;
 
-        // Escribe el HTML 1 sola vez (no inyectes CSS adicional aquí)
+        // 3) id_no
+        $personId = (int)($row->person_id ?? 0);
+        if ($personId > 0 && method_exists($this, '_person_id_no')) {
+            $row->id_no = (string)$this->_person_id_no($personId);
+        } else {
+            $row->id_no = (string)($row->id_no ?? '');
+        }
+
+        // 4) Contraparte (si es transferencia)
+        if (!empty($row->counterparty_account_id)) {
+            $cp = $this->db->select('sa.account_number, p.first_name, p.last_name')
+                ->from($this->db->dbprefix('savings_accounts').' sa')
+                ->join($this->db->dbprefix('people').' p','p.person_id=sa.person_id','left')
+                ->where('sa.savings_account_id', (int)$row->counterparty_account_id)
+                ->limit(1)->get()->row();
+
+            if ($cp) {
+                $row->counterparty_account_number = (string)($cp->account_number ?? '');
+                $row->counterparty_owner = trim((string)($cp->first_name ?? '').' '.(string)($cp->last_name ?? ''));
+            } else {
+                $row->counterparty_account_number = '';
+                $row->counterparty_owner = '';
+            }
+        }
+
+        // 5) Literal
+        $row->amount_literal = $this->_amount_literal_bs((float)($row->amount ?? 0));
+
+        // 6) PDF
+        if (!isset($this->pdf) || !is_object($this->pdf)) {
+            $this->load->library('pdf');
+        }
+
+        // *** ESTA es la parte que cambia ***
+        // Formato: [mode, format, default_font, margin_left, margin_right, margin_top, margin_bottom, margin_header, margin_footer, orientation]
+        // Usamos Letter, pero con 14mm de margen izq/der.
+        $mpdf = $this->pdf->load([
+            'utf-8',          // mode
+            'Letter',         // format
+            '',               // default font
+            14,               // margin_left
+            14,               // margin_right
+            10,               // margin_top
+            8,                // margin_bottom
+            0,                // margin_header
+            0,                // margin_footer
+            'P'               // orientation
+        ]);
+
         $html = $this->load->view('savings_accounts/vouchers/voucher_simple', ['tx'=>$row], TRUE);
+        if (!is_string($html)) { $html = (string)$html; }
 
-        // Limpia buffers ruidosos
         $old = error_reporting();
         error_reporting($old & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
-        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
-
-        $mpdf->SetDisplayMode('fullwidth');
-        $mpdf->SetAutoPageBreak(true, 8);
-        $mpdf->shrink_tables_to_fit = 1;
+        while (function_exists('ob_get_level') && ob_get_level() > 0) { @ob_end_clean(); }
 
         $mpdf->WriteHTML($html);
 
-        $filename = 'voucher_'.($row->account_number ?: 'CTA').'_'.$row->owner_id.'_'.date('Ymd_His', strtotime($row->trans_date)).'.pdf';
-        $mpdf->Output($filename, 'I');
+        $filename = 'voucher_'
+            . ($row->account_number ?: 'CTA')
+            . '_' . (int)($row->owner_id ?? 0)
+            . '_' . date('Ymd_His', strtotime($row->trans_date))
+            . '.pdf';
 
-        error_reporting($old);
-        exit;
-    }
-
-    public function voucher_transfer($withdraw_id, $deposit_id)
-    {
-        $wId = (int)$withdraw_id;
-        $dId = (int)$deposit_id;
-
-        $fetch = function($id){
-            return $this->db->query("
-                SELECT 
-                    tx.*,
-                    sa.account_number, sa.savings_account_id, sa.person_id AS owner_id,
-                    p.first_name, p.last_name,
-                    b.branch_name
-                FROM {$this->db->dbprefix('savings_account_transactions')} tx
-                LEFT JOIN {$this->db->dbprefix('savings_accounts')} sa ON sa.savings_account_id=tx.savings_account_id
-                LEFT JOIN {$this->db->dbprefix('people')} p ON p.person_id=sa.person_id
-                LEFT JOIN {$this->db->dbprefix('branches')} b ON b.id=tx.branch_id
-                WHERE tx.transaction_id=? LIMIT 1
-            ", [$id])->row();
-        };
-
-        $rowW = $fetch($wId);
-        $rowD = $fetch($dId);
-        if (!$rowW || !$rowD) show_error('Transacciones de transferencia no encontradas', 404);
-
-        $html = $this->load->view('savings_accounts/vouchers/voucher_transfer', ['w'=>$rowW,'d'=>$rowD], TRUE);
-
-        $this->load->library('pdf');
-        $mpdf = $this->pdf->load(['utf-8','Letter','',8,8,8,8,0,0,'P']);
-
-        $old = error_reporting();
-        error_reporting($old & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
-        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
-
-        $mpdf->SetAutoPageBreak(true, 8);
-        $mpdf->shrink_tables_to_fit = 1;
-        $mpdf->WriteHTML('<style>body{font-family:sans-serif;font-size:12px}</style>',1);
-        $mpdf->WriteHTML($html,2);
-
-        $filename = sprintf('voucher_transfer_%s_to_%s_%s.pdf',
-            $rowW->account_number ?: 'CTA_ORIG',
-            $rowD->account_number ?: 'CTA_DEST',
-            date('Ymd_His', strtotime($rowW->trans_date))
-        );
         $mpdf->Output($filename, 'I');
         error_reporting($old);
         exit;
@@ -987,91 +1224,118 @@ class Savings_account_transactions extends MX_Controller
         $old_level = error_reporting();
         error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
 
-        // Cerrar TODOS los buffers abiertos (por seguridad)
         if (function_exists('ob_get_level')) {
             while (ob_get_level() > 0) { @ob_end_clean(); }
         }
 
         // ---------- 3) Traer datos ----------
-        // Límite sano para exportar (ajusta si lo necesitas)
         $rows = $this->Savings_account_transactions_model->get_all($filters, 10000, 0);
 
-        // ¿Calculamos running balance? Solo si hay UNA cuenta seleccionada
-        $running_by_row = [];
-        if (!empty($filters['account_id'])) {
-            // Semilla: saldo después de la transacción más reciente del set exportado
-            $acc_id = (int)$filters['account_id'];
-            $acc    = $this->Savings_accounts_model->get($acc_id);
-            $now_balance = (float)($acc->current_balance ?? 0);
+        // Totales de depósitos y retiros (solo esos dos tipos)
+        $sum_dep = 0.0;
+        $sum_ret = 0.0;
+        foreach ($rows as $r) {
+            $tt = strtolower((string)$r->trans_type);
+            if ($tt === 'deposit')  { $sum_dep += (float)$r->amount; }
+            if ($tt === 'withdraw') { $sum_ret += (float)$r->amount; }
+        }
 
-            // Si hay tope superior del período, calcula saldo a esa fecha; si no, es el actual
-            $end_dt = !empty($filters['date_to']) ? $filters['date_to'].' 23:59:59' : null;
-            if ($end_dt) {
-                $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
-                $closing_period = $now_balance - $sum_newer_than_end;
-            } else {
-                $closing_period = $now_balance;
-            }
+        // Normaliza running_balance desde balance_after si está persistido
+        $__has_persisted = $this->_normalize_running_balance_with_persisted($rows);
+        $rows = $this->_apply_balance_after($rows); // si ya lo tienes, mantiene compatibilidad
 
-            // Orden de exportación es el mismo que en pantalla (desc): calculamos de nuevo el seed
-            if (!empty($rows)) {
-                $first = $rows[0];
-                $conds = [];
-                $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)
-                        ." OR (trans_date = ".$this->db->escape($first->trans_date)
-                        ." AND transaction_id > ".(int)$first->transaction_id."))";
+        // ¿Calculamos running balance? Solo si hay UNA cuenta seleccionada y no hay persisted
+        if (!$__has_persisted) {
+            $running_by_row = [];
+            if (!empty($filters['account_id'])) {
+                $acc_id = (int)$filters['account_id'];
+                $acc    = $this->Savings_accounts_model->get($acc_id);
+                $now_balance = (float)($acc->current_balance ?? 0);
 
-                if (!empty($filters['date_from'])) $conds[] = "trans_date >= ".$this->db->escape($filters['date_from'].' 00:00:00');
-                if ($end_dt)                         $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+                $end_dt = !empty($filters['date_to']) ? $filters['date_to'].' 23:59:59' : null;
+                if ($end_dt) {
+                    $sum_newer_than_end = $this->_sum_signed($acc_id, "trans_date > ".$this->db->escape($end_dt), $filters);
+                    $closing_period = $now_balance - $sum_newer_than_end;
+                } else {
+                    $closing_period = $now_balance;
+                }
 
-                // Para el seed ignoramos el filtro por tipo; el saldo depende de TODOS
-                $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
-                $seed = $closing_period - $sum_newer_in_period;
+                if (!empty($rows)) {
+                    $first = $rows[0];
+                    $conds = [];
+                    $conds[] = "(trans_date > ".$this->db->escape($first->trans_date)
+                            ." OR (trans_date = ".$this->db->escape($first->trans_date)
+                            ." AND transaction_id > ".(int)$first->transaction_id."))";
 
-                // Construir running balance para cada fila (desc)
-                $running = $seed;
-                foreach ($rows as $r) {
-                    $running_by_row[$r->transaction_id] = $running; // saldo después de esa transacción
-                    $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
-                    $running -= ($sign * (float)$r->amount);
+                    if (!empty($filters['date_from'])) $conds[] = "trans_date >= ".$this->db->escape($filters['date_from'].' 00:00:00');
+                    if ($end_dt)                         $conds[] = "trans_date <= ".$this->db->escape($end_dt);
+
+                    $sum_newer_in_period = $this->_sum_signed($acc_id, implode(' AND ', $conds), array_merge($filters, ['trans_type'=>null]));
+                    $seed = $closing_period - $sum_newer_in_period;
+
+                    $running = $seed;
+                    foreach ($rows as &$r) {
+                        $r->running_balance = $running; // saldo después de esa transacción
+                        $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+                        $running -= ($sign * (float)$r->amount);
+                    }
+                    unset($r);
                 }
             }
         }
 
         // ---------- 4) Enviar CSV ----------
         header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="transacciones'.(
-            !empty($filters['account_id'])
-                ? ('_'.$this->Savings_accounts_model->get((int)$filters['account_id'])->account_number.'_'.$this->Savings_accounts_model->get((int)$filters['account_id'])->person_id)
-                : ''
-        ).'_'.date('Ymd').'.csv"');
+        $fname_extra = '';
+        if (!empty($filters['account_id'])) {
+            $acc = $this->Savings_accounts_model->get((int)$filters['account_id']);
+            if ($acc) {
+                $accno = (string)($acc->account_number ?? '');
+                $pid   = (int)($acc->person_id ?? 0);
+                $fname_extra = '_'.$accno.'_'.$pid;
+            }
+        }
+        header('Content-Disposition: attachment; filename="transacciones'.$fname_extra.'_'.date('Ymd').'.csv"');
 
-        // BOM para Excel (opcional pero útil)
+        // BOM para Excel (UTF-8)
         echo "\xEF\xBB\xBF";
 
         $out = fopen('php://output','w');
-        // Usa “;” si tu Excel regional lo prefiere, si no cambia a “,”
-        $sep = ';';
+        $sep = ';'; // usa ; si tu Excel regional lo prefiere
 
         // Cabecera
         fputcsv($out, ['Fecha','Cuenta','Cliente','Tipo','Monto','Saldo resultante','Descripción'], $sep);
 
+        // Detalle
         foreach ($rows as $r) {
-            $cliente = trim(($r->first_name ?? '').' '.($r->last_name ?? ''));
-            $saldo   = '';
-            if (!empty($filters['account_id']) && isset($running_by_row[$r->transaction_id])) {
-                $saldo = number_format((float)$running_by_row[$r->transaction_id], 2, '.', '');
-            }
             fputcsv($out, [
-                date('Y-m-d H:i', strtotime($r->trans_date)),
-                (string)$r->account_number,
-                $cliente,
-                ucfirst((string)$r->trans_type),
+                date('d/m/Y H:i', strtotime($r->trans_date)),
+                $r->account_number,
+                trim(($r->first_name ?? '').' '.($r->last_name ?? '')),
+                $this->_label_tx_row($r),
                 number_format((float)$r->amount, 2, '.', ''),
-                $saldo,
-                (string)$r->description,
+                ($r->running_balance !== null ? number_format((float)$r->running_balance, 2, '.', '') : ''),
+                (string)($r->description ?? '')
             ], $sep);
         }
+
+        // --- Fila de totales (sin tocar la vista; solo CSV/PDF) ---
+        // Línea en blanco opcional
+        fputcsv($out, ['', '', '', '', '', '', ''], $sep);
+
+        // Misma cantidad de columnas:
+        // - "Monto" => total de Depósitos
+        // - "Saldo resultante" => total de Retiros
+        fputcsv($out, [
+            '',                         // Fecha
+            'TOTALES',                         // Cuenta
+            'Depósitos: ',                         // Cliente
+            number_format($sum_dep, 2, '.', ''),  // Monto => Depósitos
+            'Retiros: ',                  // Tipo
+            number_format($sum_ret, 2, '.', ''),  // Saldo resultante => Retiros
+            ''
+        ], $sep);
+
         fclose($out);
 
         // ---------- 5) Restaurar nivel de errores y salir ----------
@@ -1084,31 +1348,45 @@ class Savings_account_transactions extends MX_Controller
         $filters = $this->input->get(NULL, TRUE);
         $rows    = $this->Savings_account_transactions_model->get_all($filters, 1000, 0);
 
+        $__has_persisted = $this->_normalize_running_balance_with_persisted($rows);
+        $rows = $this->_apply_balance_after($rows);
         // Running balance si hay una cuenta
         $opening = $closing = $totals = null;
-        if (!empty($filters['account_id'])) {
-            list($rows, $opening, $closing, $totals) = $this->_with_running_balance($rows, $filters);
-        } else {
-            foreach ($rows as &$r) { $r->running_balance = null; } unset($r);
+        if (!$__has_persisted) {
+            if (!empty($filters['account_id'])) {
+                list($rows, $opening, $closing, $totals) = $this->_with_running_balance($rows, $filters);
+            } else {
+                foreach ($rows as &$r) { $r->running_balance = null; } unset($r);
+            }
         }
 
+        $sum_dep = 0.0;
+        $sum_ret = 0.0;
+        foreach ($rows as $r) {
+            $tt = strtolower((string)$r->trans_type);
+            if ($tt === 'deposit')  { $sum_dep += (float)$r->amount; }
+            if ($tt === 'withdraw') { $sum_ret += (float)$r->amount; }
+        }
+        
         // Cargar mPDF legacy
         $this->load->library('pdf');
-        $mpdf = $this->pdf->load('"en-GB-x","A4","","",10,10,10,10,6,3,"P"');
+        $mpdf = $this->pdf->load(['utf-8','A4','',10,10,10,10,6,3,'P']);
 
         // Blindaje mPDF legacy
         $old_level = error_reporting();
         error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
-        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
+        if (function_exists('ob_get_level')) {
+            while (ob_get_level() > 0) { @ob_end_clean(); }
+        }
 
         // Encabezado amigable
         $title = 'Reporte de Transacciones';
         $subtitle = '';
-        if (!empty($filters['account_id'])) {
-            $acc = $this->Savings_accounts_model->get((int)$filters['account_id']);
-            if ($acc) {
-                $subtitle = 'Cuenta: '.htmlspecialchars($acc->account_number).' · Cliente ID: '.(int)$acc->person_id;
-            }
+        $acc = null;
+        $filename = 'transacciones_'.date('Ymd').'.pdf';
+        if (!empty($filters['account_id']) && $acc) {
+            $filename = sprintf('transacciones_%s_%s_%s.pdf',
+                $acc->account_number, $acc->person_id, date('Ymd'));
         }
         if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
             $subtitle .= ($subtitle ? ' · ' : '');
@@ -1153,12 +1431,17 @@ class Savings_account_transactions extends MX_Controller
                 .  '<td>'.htmlspecialchars(date('d/m/Y H:i', strtotime($r->trans_date)), ENT_QUOTES, 'UTF-8').'</td>'
                 .  '<td>'.htmlspecialchars((string)$r->account_number, ENT_QUOTES, 'UTF-8').'</td>'
                 .  '<td>'.htmlspecialchars($cliente, ENT_QUOTES, 'UTF-8').'</td>'
-                .  '<td>'.htmlspecialchars(ucfirst((string)$r->trans_type), ENT_QUOTES, 'UTF-8').'</td>'
+                .  '<td>'.htmlspecialchars($this->_label_tx_row($r), ENT_QUOTES, 'UTF-8').'</td>'
                 .  '<td align="right">'.number_format((float)$r->amount, 2).'</td>'
                 .  '<td align="right">'.($r->running_balance!==null ? number_format((float)$r->running_balance,2) : '').'</td>'
                 .  '<td>'.htmlspecialchars((string)$r->description, ENT_QUOTES, 'UTF-8').'</td>'
                 .  '</tr>';
         }
+        $html .= '<tr style="font-weight:bold;">'
+                .  '<td colspan="4" style="text-align:right;border-top:1px solid #000;">TOTALES</td>'
+                .  '<td style="text-align:right;border-top:1px solid #000;">Depósitos: '.number_format($sum_dep,2,'.',',').'</td>'   // Depósitos en "Monto"
+                .  '<td style="text-align:right;border-top:1px solid #000;">Retiros: '.number_format($sum_ret,2,'.',',').'</td>'   // Retiros en "Saldo resultante"
+                .  '</tr>';
         $html .= '</tbody></table>';
         $html .= '</body></html>';
 
@@ -1464,7 +1747,9 @@ class Savings_account_transactions extends MX_Controller
         $this->load->library('pdf'); // usa application/libraries/Pdf.php
         // Tu Pdf::load recibe una cadena con parámetros (idioma,tamaño,márgenes,orientación)
         // Mantengo A4 y orientación variable:
-        $params = '"en-GB-x","A4","","",8,8,8,8,4,3,"'.($orientation === 'L' ? 'L' : 'P').'"';
+        //$params = ['utf-8','Letter','','',8,8,10,10,0,0,'P'];
+        //$params = '"en-GB-x","A4","","",8,8,8,8,4,3,"'.($orientation === 'L' ? 'L' : 'P').'"';
+        $params = '"utf-8","Letter","","",8,8,10,10,0,0,"'.($orientation === 'L' ? 'L' : 'P').'"';
         $mpdf = $this->pdf->load($params);
 
         // Opcionales, ayudan con imágenes y avisos
@@ -1595,6 +1880,218 @@ class Savings_account_transactions extends MX_Controller
         $t2 = strtotime($to);
         if ($t2 <= $t1) return 0.0;
         return ($t2 - $t1) / 86400.0;
+    }
+
+    private function _apply_balance_after(array $rows) {
+        // 1) Si ya viene balance_after, úsalo directo
+        $has_any = false;
+        foreach ($rows as $r) {
+            if (isset($r->balance_after) && $r->balance_after !== null) {
+                $r->running_balance = (float)$r->balance_after;
+                $has_any = true;
+            }
+        }
+        if ($has_any) return $rows;
+
+        // 2) Fallback (histórico sin backfill): correr acumulado por cuenta (orden DESC)
+        $seed = [];
+        foreach ($rows as $r) {
+            $aid = (int)$r->savings_account_id;
+            if (!array_key_exists($aid, $seed)) {
+                // Primer saldo mostrado para esta cuenta: cerrar con el saldo actual o con saldo a "date_to" si vino
+                $acc = $this->Savings_accounts_model->get($aid);
+                $seed[$aid] = (float)($acc->current_balance ?? 0);
+            }
+            $r->running_balance = $seed[$aid];
+            $sign = (strtolower($r->trans_type) === 'withdraw') ? -1 : 1;
+            $seed[$aid] = round($seed[$aid] - $sign * (float)$r->amount, 2);
+        }
+        return $rows;
+    }
+
+    /** Si las filas traen balance_after, lo copia a running_balance y devuelve TRUE.
+     *  Si no hay balance_after (o todo es NULL), devuelve FALSE y no toca nada.
+     */
+    private function _normalize_running_balance_with_persisted(&$rows)
+    {
+        if (empty($rows) || !isset($rows[0])) return FALSE;
+
+        $has = FALSE;
+        foreach ($rows as $r) {
+            if (property_exists($r, 'balance_after') && $r->balance_after !== null) { $has = TRUE; break; }
+        }
+        if (!$has) return FALSE;
+
+        foreach ($rows as &$r) {
+            $r->running_balance = (float)$r->balance_after;
+        }
+        unset($r);
+        return TRUE;
+    }
+
+    /** Traduce el tipo de transacción a etiqueta en español */
+    private function _label_trans_type($t) {
+        $t = strtolower((string)$t);
+        $map = [
+            'deposit'    => 'Depósito',
+            'withdraw'   => 'Retiro',
+            'transfer'   => 'Transferencia',
+            'interest'   => 'Interés',
+            'int'        => 'Interés',
+            'aju'        => 'Ajuste',
+            'adjust'     => 'Ajuste',
+            'fee'        => 'Comisión',
+        ];
+        return $map[$t] ?? ucfirst($t);
+    }
+
+    // ==================== PREVIEW & PRINT VOUCHER ====================
+
+    /** Devuelve el HTML del voucher (para el modal de vista previa) */
+    // controllers/Savings_account_transactions.php
+    public function voucher_preview($transaction_id)
+    {
+        $tx = $this->Savings_account_transactions_model->get_one_with_joins((int)$transaction_id);
+        if (!$tx) { show_404(); return; }
+
+        // Sucursal: primero sesión, luego la propia fila
+        $branch_name = (string)($this->session->userdata('branch_name') ?: '');
+        if ($branch_name === '' && ($bid = (int)($this->session->userdata('branch_id') ?: 0))) {
+            if ($this->db->table_exists($this->db->dbprefix('branches'))) {
+                $b = $this->db->select('branch_name')
+                    ->from($this->db->dbprefix('branches'))
+                    ->where('id', $bid)->get()->row();
+                if ($b) $branch_name = (string)$b->branch_name;
+            }
+        }
+        $tx->branch_name = $branch_name;
+
+        // id_no (respeta el del modelo; si tienes helper, úsalo)
+        $personId = (int)($tx->person_id ?? 0);
+        if ($personId > 0 && method_exists($this, '_person_id_no')) {
+            $tx->id_no = (string)$this->_person_id_no($personId);
+        } else {
+            $tx->id_no = (string)($tx->id_no ?? '');
+        }
+
+        // Datos de contraparte (si es transferencia)
+        if (!empty($tx->counterparty_account_id)) {
+            $cp = $this->db->select('sa.account_number, p.first_name, p.last_name')
+                ->from($this->db->dbprefix('savings_accounts').' sa')
+                ->join($this->db->dbprefix('people').' p', 'p.person_id=sa.person_id', 'left')
+                ->where('sa.savings_account_id', (int)$tx->counterparty_account_id)
+                ->limit(1)->get()->row();
+            if ($cp) {
+                $tx->counterparty_account_number = (string)($cp->account_number ?? '');
+                $tx->counterparty_owner = trim((string)($cp->first_name ?? '').' '.(string)($cp->last_name ?? ''));
+            } else {
+                $tx->counterparty_account_number = '';
+                $tx->counterparty_owner = '';
+            }
+        }
+
+        // Monto en literal (mismo helper que usa voucher)
+        $tx->amount_literal = $this->_amount_literal_bs((float)($tx->amount ?? 0));
+
+        // Renderiza la MISMA vista del PDF (sin mPDF)
+        $this->load->view(
+            'savings_accounts/vouchers/voucher_simple',
+            ['tx' => $tx, 'is_preview' => true]   // <<— banderita
+        );
+    }
+
+    private function _amount_literal_bs($amount): string
+    {
+        if (!function_exists('monto_literal_bs')) {
+            $this->load->helper('util'); // carga application/helpers/util_helper.php
+        }
+        try {
+            $txt = (string) monto_literal_bs((float)$amount);
+            return trim($txt) !== '' ? $txt : number_format((float)$amount, 2, '.', '').' (Bolivianos)';
+        } catch (\Throwable $e) {
+            return number_format((float)$amount, 2, '.', '').' (Bolivianos)';
+        }
+    }
+
+    /* Lee branding desde app_config (tabla key/value) y arma la URL pública del logo.
+     * Claves preferidas: app_logo, app_brand_name.
+     * Fallbacks: company_logo, company.
+     */
+    private function _get_branding()
+    {
+        $tbl = $this->db->dbprefix('app_config'); // c19_app_config
+
+        // Helper interno para leer una clave
+        $get = function($key, $default = '') use ($tbl) {
+            $row = $this->db->select('value')->from($tbl)->where('key', $key)->get()->row();
+            return $row ? (string)$row->value : $default;
+        };
+
+        // Lee claves (con fallback a nombres "clásicos")
+        $logo_file = $get('app_logo', $get('company_logo', 'logo_demo.png'));
+        $brand     = $get('app_brand_name', $get('company', ''));
+
+        // Construye la URL pública al logo (carpeta que nos diste)
+        $logo_url = base_url('uploads/app/' . ltrim($logo_file, '/'));
+
+        // (Opcional) Validar existencia física:
+        // $abs = FCPATH.'uploads/app/'.ltrim($logo_file,'/');
+        // if (!is_file($abs)) { $logo_url = base_url('uploads/people/placeholder-80x80.png'); }
+
+        // Fallback si por alguna razón quedó vacío
+        if ($logo_file === '' || $logo_file === null) {
+            $logo_url = base_url('uploads/people/placeholder-80x80.png');
+        }
+
+        return [
+            'brand_name' => $brand ?: '',
+            'logo_url'   => $logo_url,
+        ];
+    }
+
+    private function _cfg($key, $default = '')
+    {
+        $tbl = $this->db->dbprefix('app_config'); // c19_app_config
+        $row = $this->db->select('value')->from($tbl)->where('key', $key)->get()->row();
+        return $row ? (string)$row->value : $default;
+    }
+
+    private function _person_id_no(int $person_id): string
+    {
+        $sql = "
+            SELECT l.id_no
+            FROM {$this->db->dbprefix('leads')} l
+            WHERE l.customer_id = ?
+            AND l.id_no IS NOT NULL AND l.id_no <> ''
+            LIMIT 1
+        ";
+        $row = $this->db->query($sql, [$person_id])->row();
+        return (string)($row->id_no ?? '');
+    }
+
+    /** Etiqueta de tipo considerando transferencias (no rompe lo existente) */
+    private function _label_tx_row($r): string
+    {
+        // Si viene marcado como transferencia, etiqueta específica
+        if (!empty($r->transfer_group_id)) {
+            $role = strtolower((string)($r->transfer_kind ?? ''));
+            if ($role === 'withdraw') return 'Transferencia — Retiro';
+            if ($role === 'deposit') return 'Transferencia — Depósito';
+            return 'Transferencia';
+        }
+        // Fallback: etiqueta clásica
+        return $this->_label_trans_type((string)$r->trans_type);
+    }
+
+    private function _branch_name_by_id(int $branch_id): string
+    {
+        if ($branch_id <= 0) return '';
+        $row = $this->db->select('branch_name')
+                        ->from($this->db->dbprefix('branches'))
+                        ->where('id', $branch_id)
+                        ->limit(1)
+                        ->get()->row();
+        return (string)($row->branch_name ?? '');
     }
 
 }

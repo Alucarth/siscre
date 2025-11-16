@@ -19,7 +19,7 @@
                     <?php if (trim(trim($person_info->photo_url) !== "") && file_exists(FCPATH . "/uploads/profile-" . $person_info->person_id . "/" . $person_info->photo_url)): ?>
                         <img id="img-pic" style="width:80px;" src="<?= base_url("uploads/profile-" . $person_info->person_id . "/" . $person_info->photo_url); ?>"/>
                     <?php else: ?>
-                        <img id="img-pic" style="width:80px;" src="https://via.placeholder.com/80x80"/>
+                        <img id="img-pic" style="width:80px;" src="<?= base_url('uploads/people/placeholder-80x80.png') ?>"/>
                     <?php endif; ?>
                     <div>
                         <input type="file" id="photo_url" name="photo_url" />

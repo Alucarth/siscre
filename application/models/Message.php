@@ -269,7 +269,7 @@ class Message extends CI_Model {
                     if (strpos($headers['Content-Type'], 'image/') === FALSE)
                     {
                         // Not a regular image (including a 404).
-                        $image_url = "//via.placeholder.com/80x80";
+                        $image_url = "<?= base_url('uploads/people/placeholder-80x80.png') ?>";
                     }
                     else
                     {
@@ -279,7 +279,7 @@ class Message extends CI_Model {
                 else
                 {
                     // No 'Content-Type' returned.
-                    $image_url = "//via.placeholder.com/80x80";
+                    $image_url = "<?= base_url('uploads/people/placeholder-80x80.png') ?>";
                 }
 
                 $message->profile_pic = $image_url;
@@ -327,7 +327,7 @@ class Message extends CI_Model {
                     if (strpos($headers['Content-Type'], 'image/') === FALSE)
                     {
                         // Not a regular image (including a 404).
-                        $image_url = "//via.placeholder.com/80x80";
+                        $image_url = "<?= base_url('uploads/people/placeholder-80x80.png') ?>";
                     }
                     else
                     {
@@ -337,7 +337,7 @@ class Message extends CI_Model {
                 else
                 {
                     // No 'Content-Type' returned.
-                    $image_url = "//via.placeholder.com/80x80";
+                    $image_url = "<?= base_url('uploads/people/placeholder-80x80.png') ?>";
                 }
 
                 $alert->profile_pic = $image_url;

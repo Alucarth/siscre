@@ -172,6 +172,50 @@ class Savings_account_transactions_model extends CI_Model
         return $this->db->affected_rows() > 0;
     }
 
+    public function get_one_with_joins($transaction_id)
+    {
+        $tx_tbl  = $this->db->dbprefix('savings_account_transactions') . ' tx';
+        $sa_tbl  = $this->db->dbprefix('savings_accounts') . ' sa';
+        $sat_tbl = $this->db->dbprefix('savings_account_types') . ' sat';
+        $p_tbl   = $this->db->dbprefix('people') . ' p';
+        $b_tbl   = $this->db->dbprefix('branches') . ' b';
+        $e_tbl   = $this->db->dbprefix('employees') . ' e';
+        $op_tbl  = $this->db->dbprefix('people') . ' op';
+        $l_tbl   = $this->db->dbprefix('leads'); // para subconsulta
+
+        $sql = "
+            SELECT
+                tx.*,
+                sa.account_number,
+                sa.person_id AS owner_id,
+                sa.savings_account_type_id,
+                sat.name AS account_type_name,
+                p.first_name, p.last_name,
+                /* id_no sin depender de lead_id ni múltiples filas */
+                (
+                    SELECT l.id_no
+                    FROM {$l_tbl} l
+                    WHERE l.customer_id = sa.person_id
+                    AND l.id_no IS NOT NULL AND l.id_no <> ''
+                    LIMIT 1
+                ) AS id_no,
+                /* Sucursal correctamente unida por tx.branch_id → branches.id */
+                b.branch_name,
+                op.first_name AS op_first, op.last_name AS op_last
+            FROM {$tx_tbl}
+            JOIN {$sa_tbl}  ON sa.savings_account_id = tx.savings_account_id
+            LEFT JOIN {$sat_tbl} ON sat.savings_account_type_id = sa.savings_account_type_id
+            LEFT JOIN {$p_tbl}   ON p.person_id = sa.person_id
+            LEFT JOIN {$b_tbl}   ON b.id = tx.branch_id
+            LEFT JOIN {$e_tbl}   ON e.person_id = tx.registered_by
+            LEFT JOIN {$op_tbl}  ON op.person_id = e.person_id
+            WHERE tx.transaction_id = ?
+            LIMIT 1
+        ";
+
+        return $this->db->query($sql, [(int)$transaction_id])->row();
+    }
+
     public function reactivate_tx($id, $reason = '')
     {
         $tbl = $this->db->dbprefix($this->table);
@@ -273,6 +317,13 @@ class Savings_account_transactions_model extends CI_Model
         $this->db->set('current_balance', 'current_balance + '.$delta, FALSE)
                  ->where('savings_account_id', $acc_id)
                  ->update($this->db->dbprefix('savings_accounts'));
+        $new_balance = (float)$acc->current_balance + (float)$delta;
+
+        // Si existe la columna, persistimos el saldo resultante
+        if ($this->db->field_exists('balance_after', $this->db->dbprefix($this->table))) {
+            $this->db->where('transaction_id', $tx_id)
+                    ->update($this->table, ['balance_after' => $new_balance]);
+        }
 
         $this->db->trans_complete();
         return $this->db->trans_status() ? $tx_id : false;
@@ -323,10 +374,15 @@ class Savings_account_transactions_model extends CI_Model
             return FALSE;
         }
 
+        $gid = $this->generate_transfer_gid(); // o uniqid('', true) si no tienes UUID
+
         // Asiento 1: retiro en origen
         $row_withdraw = [
             'savings_account_id' => $src_account_id,
-            'trans_type'         => 'withdraw',
+            'counterparty_account_id' => $dst_account_id,
+            'trans_type'         => 'transfer',
+            'transfer_group_id'    => $gid,
+            'transfer_kind'        => 'withdraw',
             'amount'             => $amount,
             'trans_date'         => $now,
             'description'        => $description,
@@ -366,6 +422,11 @@ class Savings_account_transactions_model extends CI_Model
         $this->db->insert($this->table, $row_withdraw);
         $withdraw_id = (int)$this->db->insert_id();
 
+        if ($this->db->field_exists('balance_after', $this->db->dbprefix($this->table))) {
+            $this->db->where('transaction_id', $withdraw_id)
+                    ->update($this->table, ['balance_after' => (float)$src->current_balance - (float)$amount]);
+        }
+
         // Saldo origen
         $this->db->set('current_balance', 'current_balance - '.$amount, FALSE)
                  ->where('savings_account_id', $src_account_id)
@@ -374,7 +435,10 @@ class Savings_account_transactions_model extends CI_Model
         // Asiento 2: depósito en destino
         $row_deposit = [
             'savings_account_id' => $dst_account_id,
-            'trans_type'         => 'deposit',
+            'counterparty_account_id' => $src_account_id,
+            'trans_type'         => 'transfer',
+            'transfer_group_id'    => $gid,
+            'transfer_kind'        => 'deposit',
             'amount'             => $amount,
             'trans_date'         => $now,
             'description'        => $description,
@@ -412,6 +476,31 @@ class Savings_account_transactions_model extends CI_Model
 
         $this->db->insert($this->table, $row_deposit);
         $deposit_id  = (int)$this->db->insert_id();
+
+        // NEW: marcar pareja de transferencia (solo si existen las columnas)
+        $tx_tbl = $this->db->dbprefix($this->table);
+        $has_group = $this->db->field_exists('transfer_group_id', $tx_tbl);
+        $has_role  = $this->db->field_exists('transfer_role', $tx_tbl);
+
+        if ($has_group || $has_role) {
+            $group_id = $withdraw_id; // usamos el retiro como id de grupo
+
+            if ($has_group) {
+                $this->db->where_in('transaction_id', [$withdraw_id, $deposit_id])
+                        ->update($this->table, ['transfer_group_id' => $group_id]);
+            }
+            if ($has_role) {
+                $this->db->where('transaction_id', $withdraw_id)
+                        ->update($this->table, ['transfer_role' => 'withdraw']);
+                $this->db->where('transaction_id', $deposit_id)
+                        ->update($this->table, ['transfer_role' => 'deposit']);
+            }
+        }
+
+        if ($this->db->field_exists('balance_after', $this->db->dbprefix($this->table))) {
+            $this->db->where('transaction_id', $deposit_id)
+                    ->update($this->table, ['balance_after' => (float)$dst->current_balance + (float)$amount]);
+        }
 
         // Saldo destino
         $this->db->set('current_balance', 'current_balance + '.$amount, FALSE)
@@ -464,6 +553,171 @@ class Savings_account_transactions_model extends CI_Model
             if ((int)$r->savings_account_id === (int)$dst_id) $out['dst'] = $r;
         }
         return $out;
+    }
+
+    public function calc_month_interest($acc_id, $year, $month)
+    {
+        $acc_id = (int)$acc_id;
+
+        // 2.1 Toma parámetros
+        $CI = &get_instance();
+        $cfg = $CI->config->item('interest') ?: ['day_count'=>365,'rounding'=>'per_day'];
+        $DAY_COUNT = (int)($cfg['day_count'] ?? 365);
+        $ROUNDING  = (string)($cfg['rounding'] ?? 'per_day');
+
+        // 2.2 Tasa anual desde el tipo de cuenta (APY si disponible; si no, interest_rate %)
+        $row = $this->db->select('a.savings_account_id,
+                          a.savings_account_type_id,
+                          t.interest_rate,
+                          t.interest_rate_apy', false)
+            ->from($this->db->dbprefix('savings_accounts').' a')
+            ->join($this->db->dbprefix('savings_account_types').' t','t.savings_account_type_id = a.savings_account_type_id')
+            ->where('a.savings_account_id', $acc_id)
+            ->limit(1)->get()->row();
+
+
+        if (!$row) return ['amount'=>0.0,'daily'=>[]];
+
+        $apy_raw  = (float)($row->interest_rate_apy ?? 0); // puede venir 0.12 o 12.00
+        $apr_pct  = (float)($row->interest_rate ?? 0);     // típico 12.00
+
+        if ($apy_raw > 0) {
+            $annual = ($apy_raw > 1.0) ? ($apy_raw / 100.0) : $apy_raw; // normaliza a fracción
+        } else {
+            $annual = $apr_pct / 100.0; // % -> fracción
+        }
+        if ($annual <= 0) return ['amount'=>0.0,'daily'=>[]];
+
+        // 2.3 Rango del mes
+        $start_dt = new DateTime(sprintf('%04d-%02d-01 00:00:00', $year, $month));
+        $end_dt   = (clone $start_dt)->modify('last day of this month 23:59:59');
+        $start = $start_dt->format('Y-m-d H:i:s');
+        $end   = $end_dt->format('Y-m-d H:i:s');
+
+        // 2.4 Última transacción del día dentro del mes (para tomar balance_after = EOD)
+        $day_last = $this->db->query("
+            SELECT d, MAX(transaction_id) AS last_tx_id
+            FROM (
+            SELECT DATE(trans_date) AS d, transaction_id
+            FROM {$this->db->dbprefix('savings_account_transactions')}
+            WHERE savings_account_id = ?
+                AND trans_date BETWEEN ? AND ?
+            ) x
+            GROUP BY d
+            ORDER BY d ASC
+        ", [$acc_id, $start, $end])->result();
+
+        $last_map = []; foreach ($day_last as $r) { $last_map[$r->d] = (int)$r->last_tx_id; }
+
+        // 2.5 Mapear esos IDs a balance_after
+        $balance_map = [];
+        if (!empty($last_map)) {
+            $ids = array_values($last_map);
+            foreach (array_chunk($ids, 1000) as $chunk) {
+                $in = implode(',', array_map('intval', $chunk));
+                $rs = $this->db->query("
+                    SELECT transaction_id, balance_after
+                    FROM {$this->db->dbprefix('savings_account_transactions')}
+                    WHERE transaction_id IN ($in)
+                ")->result();
+                $by_id = [];
+                foreach ($rs as $b) $by_id[(int)$b->transaction_id] = (float)$b->balance_after;
+                foreach ($last_map as $d => $txid) {
+                    if (isset($by_id[$txid])) $balance_map[$d] = $by_id[$txid];
+                }
+            }
+        }
+
+        // 2.6 “Seed” anterior al inicio del mes (último balance_before del día previo)
+        $seed_row = $this->db->query("
+            SELECT balance_after
+            FROM {$this->db->dbprefix('savings_account_transactions')}
+            WHERE savings_account_id = ?
+            AND trans_date < ?
+            ORDER BY trans_date DESC, transaction_id DESC
+            LIMIT 1
+        ", [$acc_id, $start])->row();
+        $prev_eod = (float)($seed_row->balance_after ?? 0);
+
+        // 2.7 Recorrer cada día, arrastrando EOD si no hubo movimientos
+        $daily_rate = $annual / max(1,$DAY_COUNT);
+        $daily = [];
+        $sum = 0.0;
+        $cursor = clone $start_dt;
+        while ($cursor <= $end_dt) {
+            $d = $cursor->format('Y-m-d');
+            $eod = array_key_exists($d, $balance_map) ? (float)$balance_map[$d] : $prev_eod;
+
+            $int_d = $eod * $daily_rate;
+            if ($ROUNDING === 'per_day') { $int_d = round($int_d, 2); }
+            $sum += $int_d;
+
+            $daily[$d] = ['balance_eod'=>$eod, 'interest'=>($ROUNDING==='per_day'? $int_d : round($int_d, 6))];
+            $prev_eod = $eod;
+            $cursor->modify('+1 day');
+        }
+        if ($ROUNDING !== 'per_day') { $sum = round($sum, 2); }
+
+        return ['amount'=>$sum, 'daily'=>$daily, 'annual_rate'=>$annual, 'day_count'=>$DAY_COUNT];
+    }
+
+    /**
+     * Recalcula y persiste balance_after de TODAS las transacciones de una cuenta,
+     * recorriendo en orden DESC por fecha y transaction_id.
+     * Usa el current_balance como seed y va "deshaciendo" movimientos hacia atrás.
+     */
+    public function rebuild_balance_after($account_id)
+    {
+        $account_id = (int)$account_id;
+
+        // 1) seed = saldo actual de la cuenta
+        $acc = $this->db->select('current_balance')
+            ->from($this->db->dbprefix('savings_accounts'))
+            ->where('savings_account_id', $account_id)
+            ->get()->row();
+        $running = (float)($acc->current_balance ?? 0);
+
+        // 2) Traer todas las transacciones de la cuenta (más recientes primero)
+        $txs = $this->db->select('transaction_id, trans_type, amount')
+            ->from($this->db->dbprefix('savings_account_transactions'))
+            ->where('savings_account_id', $account_id)
+            ->order_by('trans_date', 'DESC')
+            ->order_by('transaction_id', 'DESC')
+            ->get()->result();
+
+        if (!$txs) return;
+
+        // 3) Recalcular balance_after y persistir
+        $updates = [];
+        foreach ($txs as $t) {
+            // balance después de ESTA transacción es el running actual
+            $updates[] = [
+                'transaction_id' => (int)$t->transaction_id,
+                'balance_after'  => $running,
+            ];
+
+            // mover el running "antes" de esta transacción
+            $sign = (strtolower($t->trans_type) === 'withdraw') ? -1 : 1;
+            $running -= $sign * (float)$t->amount;
+        }
+
+        // 4) Persistir en lotes
+        if (!empty($updates)) {
+            // Si usas CI3: update_batch por transaction_id
+            $this->db->update_batch(
+                $this->db->dbprefix('savings_account_transactions'),
+                $updates,
+                'transaction_id'
+            );
+        }
+    }
+
+    private function generate_transfer_gid(): string
+    {
+        if (function_exists('random_bytes')) {
+            return 'tg_' . bin2hex(random_bytes(8));
+        }
+        return 'tg_' . uniqid('', true);
     }
 
 }

@@ -28,6 +28,20 @@ $config['base_url'] = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on") ?
 $config['base_url'] .= "://".$_SERVER['HTTP_HOST'];
 $config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']),"",$_SERVER['SCRIPT_NAME']);
 
+// === BASE URL seguro para CLI y web ===
+$default_base = 'https://credisurgir.net/demo/cajas_ahorro/'; // ajusta si usas otro host/base
+
+if (PHP_SAPI === 'cli' || empty($_SERVER['HTTP_HOST'])) {
+    $config['base_url'] = $default_base; // evita Undefined index: HTTP_HOST
+} else {
+    $is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ((int)($_SERVER['SERVER_PORT'] ?? 80) === 443);
+    $config['base_url'] = ($is_https ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . '/demo/cajas_ahorro/';
+}
+
+// === LOGGING (evita Undefined index y mkdir invalid path) ===
+$config['log_path']      = APPPATH . 'logs/';   // application/logs/
+$config['log_threshold'] = 1;                   // 0..4 a gusto
+
 /*
 |--------------------------------------------------------------------------
 | Index File

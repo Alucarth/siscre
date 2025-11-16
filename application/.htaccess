@@ -1,1 +1,17 @@
-Deny from all
+RewriteEngine On
+RewriteBase /demo/cajas_ahorro/
+
+# Sirve archivos y directorios reales tal cual
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Fallback: si falta una imagen en uploads/people -> placeholder
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^uploads/people/.*\.(?:png|jpe?g|gif)$ uploads/people/placeholder-80x80.png [L,NC]
+
+# Front controller CI
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php/$1 [L]

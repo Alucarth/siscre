@@ -148,7 +148,7 @@
           <td><?= date('d/m/Y H:i', strtotime($t->trans_date)) ?></td>
           <td><?= htmlspecialchars($t->account_number) ?></td>
           <td><?= htmlspecialchars(trim(($t->first_name ?? '').' '.($t->last_name ?? ''))) ?></td>
-          <td><?= ucfirst($t->trans_type) ?></td>
+          <td><?= htmlspecialchars($t->trans_type_label ?? ucfirst($t->trans_type)) ?></td>
           <td class="text-right"><?= number_format($t->amount,2) ?></td>
           <td class="text-right">
             <?= isset($t->running_balance)
@@ -157,7 +157,9 @@
           </td>
           <td><?= htmlspecialchars((string)$t->description) ?></td>
           <td>
-            <a href="<?= site_url("savings_accounts/savings_account_transactions/form/{$t->transaction_id}") ?>" class="btn btn-xs btn-warning" title="Editar">✎</a>
+            <a href="javascript:void(0)" onclick="openTxPreview(<?= (int)$t->transaction_id ?>)" class="btn btn-xs btn-success" title="Ver voucher">
+              <span class="fa fa-eye"></span>
+            </a>
             <a href="<?= site_url('savings_accounts/savings_account_transactions/voucher/'.$t->transaction_id) ?>" class="btn btn-xs btn-info" target="_blank" title="Imprimir voucher">
               <span class="fa fa-print"></span>
             </a>
@@ -242,5 +244,59 @@ $print_transfer  = $this->session->flashdata('print_transfer');   // transferenc
   });
 </script>
 <?php endif; ?>
+
+<!-- ============ Modal Voucher (Listado) ============ -->
+<div id="txPreviewModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="txPreviewTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document" style="max-width:940px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="txPreviewTitle">Comprobante de transacción</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="background:#f8f8f8;">
+        <div style="background:#fff; padding:10px; border:1px solid #ddd;">
+          <iframe id="txPreviewFrame"
+                  title="Voucher preview"
+                  style="width:100%; height:40vh; border:0; display:block;"></iframe>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <a id="txPrintBtn" href="#" target="_blank" rel="noopener" class="btn btn-primary">
+          <span class="glyphicon glyphicon-print"></span> Imprimir
+        </a>
+        <!-- Si luego quieres PDF directo, lo mostramos; por ahora oculto -->
+        <a id="txPdfBtn" href="#" target="_blank" rel="noopener" class="btn btn-default" style="display:none">
+          <span class="glyphicon glyphicon-download"></span> PDF
+        </a>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  window.openTxPreview = function(txId){
+    var previewUrl = '<?= site_url('savings_accounts/savings_account_transactions/voucher_preview') ?>/' + txId;
+    var printUrl   = '<?= site_url('savings_accounts/savings_account_transactions/voucher') ?>/' + txId;
+
+    // Botón imprimir → al voucher real (PDF por mPDF en una pestaña nueva)
+    var printBtn = document.getElementById('txPrintBtn');
+    if (printBtn) printBtn.href = printUrl;
+
+    // Cargar la preview directamente en el iframe
+    var frame = document.getElementById('txPreviewFrame');
+    if (frame) frame.src = previewUrl;
+
+    // Mostrar modal
+    $('#txPreviewModal').modal('show');
+  };
+})();
+</script>
+
 
 <?php $this->load->view('partial/footer'); ?>

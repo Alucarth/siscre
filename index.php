@@ -314,4 +314,20 @@ switch (ENVIRONMENT)
  *
  * And away we go...
  */
+// --- Override de config para CLI: evita HTTP_HOST y logging vacíos ---
+if (PHP_SAPI === 'cli') {
+    // Si quieres, usa tu dominio real:
+    //$default_base = 'https://credisurgir.net/demo/cajas_ahorro/';
+
+    // $assign_to_config sobreescribe config items sin tocar los archivos de config
+    $assign_to_config = [
+        'base_url'      => $default_base,
+        'log_path'      => APPPATH . 'logs/',
+        'log_threshold' => 1, // 0..4 a gusto
+    ];
+
+    // Evita que algún código lea HTTP_HOST en CLI
+    if (empty($_SERVER['HTTP_HOST'])) $_SERVER['HTTP_HOST'] = 'localhost';
+}
+
 require_once BASEPATH.'core/CodeIgniter.php';

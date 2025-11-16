@@ -307,4 +307,130 @@
   </div>
 </div>
 
+<!-- ============ Modal Preview de Transacción ============ -->
+<div id="txPreviewModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="txPreviewTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document" style="max-width:940px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="txPreviewTitle">Confirmación de transacción</h5>
+        <div class="btn-group" role="group" aria-label="Acciones">
+          <a id="txPrintBtn" href="#" target="_blank" class="btn btn-sm btn-primary">
+            <span class="glyphicon glyphicon-print"></span> Imprimir
+          </a>
+          <a id="txPdfBtn" href="#" target="_blank" class="btn btn-sm btn-default">
+            <span class="glyphicon glyphicon-download"></span> PDF
+          </a>
+        </div>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar" style="margin-left:10px;">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" style="background:#f8f8f8;">
+        <div id="txPreviewBody" style="background:#fff; padding:10px; border:1px solid #ddd;">
+          <!-- Aquí inyectamos el HTML del voucher -->
+          <div class="text-center text-muted">Cargando vista previa…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a id="txEditBtn" href="#" class="btn btn-warning">Editar</a>
+        <a id="txNewBtn" href="<?= site_url('savings_accounts/savings_account_transactions/form') ?>" class="btn btn-default">Registrar otra</a>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // Utilidad: abre modal con el voucher de la transacción
+  window.openTxPreview = function(txId, pdfUrl){
+    var previewUrl = '<?= site_url('savings_accounts/savings_account_transactions/voucher_preview') ?>/' + txId;
+    var printUrl   = '<?= site_url('savings_accounts/savings_account_transactions/voucher_print') ?>/'   + txId;
+    var editUrl    = '<?= site_url('savings_accounts/savings_account_transactions/form') ?>/'           + txId;
+
+    // Botones
+    document.getElementById('txPrintBtn').href = printUrl;
+    document.getElementById('txEditBtn').href  = editUrl;
+    // Si tienes un generador PDF, usa su URL; si no, oculta el botón PDF
+    var pdfBtn = document.getElementById('txPdfBtn');
+    if (pdfUrl && pdfUrl.length) {
+      pdfBtn.href = pdfUrl;
+      pdfBtn.style.display = '';
+    } else {
+      pdfBtn.style.display = 'none';
+    }
+
+    // Carga HTML del voucher
+    var body = document.getElementById('txPreviewBody');
+    body.innerHTML = '<div class="text-center text-muted">Cargando vista previa…</div>';
+
+    fetch(previewUrl, { credentials: 'same-origin' })
+      .then(function(r){ return r.text(); })
+      .then(function(html){ body.innerHTML = html; })
+      .catch(function(){ body.innerHTML = '<div class="text-danger">No se pudo cargar la vista previa.</div>'; });
+
+    // Mostrar modal (Bootstrap)
+    $('#txPreviewModal').modal('show');
+  };
+
+  // Auto-abrir si vienes de un POST exitoso (usa flashdata si ya la usas)
+  <?php
+    $tx_id  = (int)($this->session->flashdata('print_tx_id') ?: 0);
+    $pdf_url = (string)$this->session->flashdata('pdf_url');
+    if ($tx_id > 0):
+  ?>
+    window.addEventListener('load', function(){
+      openTxPreview(<?= $tx_id ?>, <?= json_encode($pdf_url) ?>);
+    });
+  <?php endif; ?>
+})();
+</script>
+<script>
+(function () {
+  // IDs/names esperados en tu form:
+  var $selCuenta = document.querySelector('select[name="savings_account_id"]');
+  var $selTipo   = document.querySelector('select[name="trans_type"]');
+
+  // Destinos donde pintamos los datos (ajusta si tus IDs/clases cambian)
+  var $titular   = document.getElementById('owner_name');   // <span id="owner_name">—</span>
+  var $doc       = document.getElementById('owner_idno');   // <span id="owner_idno">—</span>
+  var $foto      = document.getElementById('owner_photo');  // <img id="owner_photo" ...>
+
+  function setOwnerUI(obj) {
+    if (!obj || obj.ok !== true) {
+      if ($titular) $titular.textContent = '—';
+      if ($doc)     $doc.textContent     = '—';
+      if ($foto)    $foto.src            = '<?= base_url('uploads/people/placeholder-80x80.png') ?>';
+      return;
+    }
+    if ($titular) $titular.textContent = obj.full_name || '—';
+    if ($doc)     $doc.textContent     = (obj.id_no && obj.id_no.trim() !== '') ? obj.id_no : '—';
+    if ($foto)    $foto.src            = obj.photo_url || '<?= base_url('uploads/people/placeholder-80x80.png') ?>';
+  }
+
+  function shouldLoadOwner() {
+    // Para depósito también puede servir, pero tu requerimiento fue retiro/transfer
+    var t = ($selTipo && $selTipo.value) ? $selTipo.value.toLowerCase() : '';
+    return (t === 'withdraw' || t === 'transfer' || t === 'deposit'); // deja 'deposit' si quieres ver al titular igual
+  }
+
+  function loadOwner() {
+    var accId = $selCuenta ? parseInt($selCuenta.value || '0', 10) : 0;
+    if (!accId || !shouldLoadOwner()) { setOwnerUI(null); return; }
+
+    var url = '<?= site_url('savings_accounts/savings_account_transactions/owner_info') ?>' + '/' + accId;
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { setOwnerUI(j); })
+      .catch(function () { setOwnerUI(null); });
+  }
+
+  if ($selCuenta)  $selCuenta.addEventListener('change', loadOwner);
+  if ($selTipo)    $selTipo.addEventListener('change',   loadOwner);
+
+  // dispara al cargar (por si el form ya trae valores)
+  loadOwner();
+})();
+</script>
+
 <?php $this->load->view('partial/footer'); ?>

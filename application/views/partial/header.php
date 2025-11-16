@@ -118,7 +118,51 @@
 
         <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/1.10.16/js/dataTables.bootstrap.min.js"></script>
 
+        <script>
+        /* Lazy/async global para todas las imágenes (sin tocar vistas) */
+        (function(){
+            var onReady = function(){
+            var imgs = document.getElementsByTagName('img');
+            for (var i=0; i<imgs.length; i++){
+                var img = imgs[i];
+                if (!img.hasAttribute('loading'))  img.setAttribute('loading','lazy');
+                if (!img.hasAttribute('decoding')) img.setAttribute('decoding','async');
+            }
+            };
+            if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', onReady);
+            } else {
+            onReady();
+            }
+        })();
+        </script>
 
+        <script>
+            (function () {
+            var BASE = "<?= rtrim(base_url(), '/') ?>/";
+            function fixSrc(img) {
+                var s = img.getAttribute('src') || '';
+                // caso A: nombre suelto "foto.jpg" -> /uploads/people/foto.jpg
+                if (/^[^:/?#]+\.(png|jpe?g|gif)$/i.test(s)) {
+                img.src = BASE + 'uploads/people/' + s;
+                return;
+                }
+                // caso B: "uploads/..." (sin slash absoluto) -> /uploads/...
+                if (/^uploads\//i.test(s)) {
+                img.src = BASE + s.replace(/^\/?/, '');
+                return;
+                }
+            }
+            var onReady = function () {
+                document.querySelectorAll('img[src]').forEach(fixSrc);
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', onReady);
+            } else {
+                onReady();
+            }
+            })();
+            </script>
 
         <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.5.1/css/buttons.bootstrap.min.css">
 
@@ -283,6 +327,7 @@
             }
 
         </style>
+        <base href="<?= rtrim(base_url(), '/') ?>/">
 
     </head>
 
@@ -644,7 +689,7 @@
 
                                     <?php else: ?>
 
-                                        <img src="https://via.placeholder.com/80x80" alt="" class="img media-object img-circle" />
+                                        <img src="<?= base_url('uploads/people/placeholder-80x80.png') ?>" alt="" class="img media-object img-circle" />
 
                                     <?php endif; ?>
 

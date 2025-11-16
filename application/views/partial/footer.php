@@ -58,6 +58,20 @@
 
 
 <!-- Custom and plugin javascript -->
+ <script>
+// Configurar Pace para que NO espere peticiones ni imágenes
+window.paceOptions = {
+  startOnPageLoad: true,
+  restartOnRequestAfter: false,
+  ajax: false,          // <-- clave: no rastrear XHR/fetch
+  document: false,      // no esperar parseo de documento
+  eventLag: false,      // no esperar 'event lag'
+  elements: false       // no escanear elementos
+  // Si prefieres rastrear XHR pero ignorar imágenes/ uploads:
+  // ajax: { trackMethods: ['GET','POST'], ignoreURLs: [/\.png$/i, /\.jpe?g$/i, /uploads\/people\//i] }
+};
+</script>
+
 <script src="<?php echo base_url(); ?>js/plugins/pace/pace.min.js"></script>
 
 <script src="<?php echo base_url('modular-admin/js/app.js')?>"></script>
