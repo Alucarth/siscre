@@ -129,7 +129,7 @@ class Savings_account_reports extends MX_Controller
         $params = [$date_from, $date_to];
 
         // si tu tabla tiene status, lo aplicamos sin romper si no existe
-        if ($this->db->field_exists('status', $dbp('savings_account_transactions'))) {
+        if ($this->db->field_exists('status', $dbp.'savings_account_transactions')) {
             $where[] = "tx.status = 1";
         }
         if (!empty($branch_id)) {
@@ -150,14 +150,14 @@ class Savings_account_reports extends MX_Controller
                 t.apy                                             AS apy,
                 COALESCE(SUM(CASE WHEN tx.trans_type = 'interest'
                                 THEN tx.amount ELSE 0 END),0)   AS interest
-            FROM {$dbp('savings_accounts')} acc
-            JOIN {$dbp('savings_account_types')} t
+            FROM {$dbp}savings_accounts acc
+            JOIN {$dbp}savings_account_types t
                 ON t.id = acc.type_id
-            JOIN {$dbp('customers')} c
+            JOIN {$dbp}customers c
                 ON c.person_id = acc.customer_id
-            JOIN {$dbp('people')} p
+            JOIN {$dbp}people p
                 ON p.person_id = c.person_id
-            LEFT JOIN {$dbp('savings_account_transactions')} tx
+            LEFT JOIN {$dbp}savings_account_transactions tx
                 ON tx.account_id = acc.id
             " . (!empty($where) ? "WHERE " . implode(' AND ',$where) : "") . "
             GROUP BY acc.id, acc.account_number, owner, t.type_name, t.apy
@@ -296,6 +296,152 @@ class Savings_account_reports extends MX_Controller
         ];
 
         $this->load->view('savings_accounts/reports/interest_summary', $data);
+    }
+
+        // 3) Estado de cuenta / Extracto por cliente
+    public function account_statement()
+    {
+        $data['active_tab'] = 'statement';
+
+        $f = $this->_statement_filters();
+        $person_q       = $f['person_q'];
+        $account_number = $f['account_number'];
+        $date_from      = $f['date_from'];
+        $date_to        = $f['date_to'];
+
+        $header        = null;
+        $rows          = [];
+        $totals        = ['debit'=>0.0,'credit'=>0.0,'opening'=>0.0,'closing'=>0.0];
+        $error         = '';
+        $accounts_list = [];
+
+        // 1) Si hay búsqueda por cliente pero todavía no se eligió cuenta → listar cuentas
+        if (!empty($person_q) && empty($account_number))
+        {
+            $dbp       = $this->db->dbprefix; // ej: c19_
+            $table_sa  = $dbp.'savings_accounts';
+            $table_sat = $dbp.'savings_account_types';
+            $table_p   = $dbp.'people';
+
+            $like = '%'.$this->db->escape_like_str($person_q).'%';
+
+            $accounts_list = $this->db->query("
+                SELECT
+                    sa.savings_account_id,
+                    sa.account_number,
+                    sa.status,
+                    sat.name AS type_name,
+                    p.first_name,
+                    p.last_name
+                FROM {$table_sa} sa
+                JOIN {$table_p}   p   ON p.person_id = sa.person_id
+                JOIN {$table_sat} sat ON sat.savings_account_type_id = sa.savings_account_type_id
+                WHERE CONCAT(p.first_name,' ',p.last_name) LIKE ?
+                ORDER BY p.first_name, p.last_name, sa.account_number
+                LIMIT 50
+            ", [$like])->result();
+        }
+
+        // 2) Si ya tenemos número de cuenta → cargar extracto
+        if (!empty($account_number) && !empty($date_from) && !empty($date_to)) {
+            list($header, $rows, $opening, $totals) = $this->_statement_data($account_number, $date_from, $date_to);
+            if (!$header) {
+                $error = 'No se encontró una cuenta con ese número.';
+            }
+        }
+
+                    // --- Catálogo de cuentas, igual que en transacciones ---
+        $accounts = $this->Savings_accounts_model->get_all_with_person_active();
+        $account_options = [];
+        foreach ($accounts as $a) {
+            $accno = $a->account_number ?: ('CA-' . str_pad($a->savings_account_id, 6, '0', STR_PAD_LEFT));
+            $owner = trim($a->person_name) !== '' ? trim($a->person_name) : ('ID ' . $a->person_id);
+            $label = '['.$accno.'] '.$owner.' — '.$a->type_name;
+            $account_options[$a->savings_account_id] = $label;
+        }
+
+        $data['filters']       = compact('person_q','account_number','date_from','date_to');
+        $data['header']        = $header;
+        $data['rows']          = $rows;
+        $data['totals']        = $totals;
+        $data['error']         = $error;
+        $data['accounts_list'] = $accounts_list;
+        $data['account_options'] = $account_options;   // ⬅️ nuevo
+
+        $this->load->view('savings_accounts/reports/account_statement', $data);
+    }
+
+        /* ================================
+       EXPORT: Estado de cuenta -> PDF
+       ================================ */
+    public function account_statement_export_pdf()
+    {
+        $f = $this->_statement_filters();
+        $account_number = $f['account_number'];
+        $date_from      = $f['date_from'];
+        $date_to        = $f['date_to'];
+
+        if (empty($account_number) || empty($date_from) || empty($date_to)) {
+            show_error('Debe indicar número de cuenta y rango de fechas.');
+        }
+
+        list($header, $rows, $opening, $totals) = $this->_statement_data($account_number, $date_from, $date_to);
+        if (!$header) {
+            show_error('No se encontró una cuenta con ese número.');
+        }
+
+        $old_level = error_reporting();
+        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
+
+        $this->load->library('pdf');
+        $mpdf = $this->pdf->load('"en-GB-x","A4","","",10,10,10,10,6,3,"P"');
+        $old_level = error_reporting();
+        error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
+        if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
+
+        $html  = '<html><head><meta charset="utf-8"></head><body>';
+        $html .= '<h3>Extracto de Caja de Ahorros</h3>';
+        $html .= '<p><small>Período: '.htmlspecialchars($date_from).' al '.htmlspecialchars($date_to).'</small></p>';
+
+        $html .= '<table width="100%" cellpadding="2" cellspacing="0">';
+        $html .= '<tr><td><strong>Titular:</strong> '.htmlspecialchars($header->owner).'</td>'
+              .  '<td align="right"><strong>Cuenta:</strong> '.htmlspecialchars($header->account_number).'</td></tr>';
+        $html .= '<tr><td><strong>Producto:</strong> '.htmlspecialchars($header->product).'</td>'
+              .  '<td align="right"><strong>Saldo inicial:</strong> '.number_format((float)$totals['opening'], 2).'</td></tr>';
+        $html .= '<tr><td colspan="2"><strong>Estado:</strong> '.htmlspecialchars($header->status).'</td></tr>';
+        $html .= '</table><br>';
+
+        $html .= '<table border="1" cellpadding="6" cellspacing="0" width="100%">';
+        $html .= '<thead><tr>
+                    <th>Fecha y hora</th>
+                    <th>Descripción</th>
+                    <th>Monto</th>
+                    <th>Saldo</th>
+                  </tr></thead><tbody>';
+
+        foreach ($rows as $r) {
+            $amt = (float)$r->amount;
+            $html .= '<tr>'
+                  .  '<td>'.date('d/m/Y H:i', strtotime($r->trans_date)).'</td>'
+                  .  '<td>'.htmlspecialchars($r->description).'</td>'
+                  .  '<td align="right">'.(($amt >= 0 ? '+' : '').number_format($amt, 2)).'</td>'
+                  .  '<td align="right">'.number_format((float)$r->balance, 2).'</td>'
+                  .  '</tr>';
+        }
+
+        $html .= '</tbody><tfoot><tr>'
+              .  '<th colspan="2" align="right">Totales</th>'
+              .  '<th align="right">'.number_format((float)$totals['credit'] - (float)$totals['debit'], 2).'</th>'
+              .  '<th align="right">'.number_format((float)$totals['closing'], 2).'</th>'
+              .  '</tr></tfoot>';
+        $html .= '</table></body></html>';
+
+        $mpdf->WriteHTML($html, 2);
+        $filename = 'account_statement_'.$account_number.'_'.$date_from.'_'.$date_to.'.pdf';
+        $mpdf->Output($filename, 'I');
+        error_reporting($old_level);
+        exit;
     }
 
     /* ============================
@@ -729,6 +875,147 @@ class Savings_account_reports extends MX_Controller
         $date_to   = $date;
 
         return compact('date','branch_id','date_from','date_to');
+    }
+
+        // Filtros para Estado de Cuenta (extracto por cuenta)
+    private function _statement_filters()
+    {
+        $person_q       = trim($this->input->get('person_q', TRUE));      // nombre/CI del cliente
+        $account_number = trim($this->input->get('account_number', TRUE));
+        $date_from      = $this->input->get('date_from', TRUE);
+        $date_to        = $this->input->get('date_to', TRUE);
+
+        // Por defecto: mes actual
+        if (empty($date_from) && empty($date_to)) {
+            $date_from = date('Y-m-01');
+            $date_to   = date('Y-m-t');
+        }
+
+        // Si sólo viene una fecha, usamos la misma para ambos extremos
+        if (!empty($date_from) && empty($date_to)) {
+            $date_to = $date_from;
+        }
+
+        return compact('person_q','account_number','date_from','date_to');
+    }
+
+        // Consulta de datos de cabecera + movimientos para el extracto
+    private function _statement_data($account_number, $date_from, $date_to)
+    {
+        $dbp = $this->db->dbprefix;
+        $table_trx = $dbp.'savings_account_transactions';
+
+        if (empty($account_number) || empty($date_from) || empty($date_to)) {
+            return [null, [], 0.0, ['debit'=>0.0, 'credit'=>0.0, 'opening'=>0.0, 'closing'=>0.0]];
+        }
+
+        // 1) Buscar la cuenta por número
+        $acc = $this->db->select('
+            sa.savings_account_id,
+            sa.account_number,
+            sa.status,
+            sat.name AS type_name,
+            sat.interest_rate_apy,
+            p.first_name,
+            p.last_name
+        ')
+        ->from($dbp.'savings_accounts sa')
+        ->join($dbp.'savings_account_types sat','sat.savings_account_type_id = sa.savings_account_type_id','left')
+        ->join($dbp.'people p','p.person_id = sa.person_id','left')
+        ->where('sa.account_number', $account_number)
+        ->get()
+        ->row();
+
+        if (!$acc) {
+            return [null, [], 0.0, ['debit'=>0.0, 'credit'=>0.0, 'opening'=>0.0, 'closing'=>0.0]];
+        }
+
+        $from_dt = $date_from.' 00:00:00';
+        $to_dt   = $date_to.' 23:59:59';
+
+        // 2) Saldo de apertura (misma lógica que usas para intereses)
+        $this->load->model('Savings_accounts_model');
+        $acc_model   = $this->Savings_accounts_model->get((int)$acc->savings_account_id);
+        $now_balance = (float)($acc_model->current_balance ?? 0);
+
+        $sum_newer_row = $this->db->query("
+            SELECT COALESCE(SUM(
+                        CASE
+                            WHEN trans_type='withdraw' THEN -amount
+                            WHEN trans_type='deposit'  THEN  amount
+                            ELSE 0
+                        END
+                    ),0) AS s
+            FROM {$table_trx}
+            WHERE savings_account_id = ?
+            AND trans_date > ?
+        ", [$acc->savings_account_id, $from_dt])->row();
+
+        $sum_newer = (float)($sum_newer_row->s ?? 0.0);
+
+        $opening = $now_balance - $sum_newer;
+
+        // 3) Movimientos del período
+        $rows_db = $this->db->query("
+                SELECT
+                    transaction_id,
+                    trans_date,
+                    trans_type,
+                    /* OJO: si tu tabla no tiene 'description', reemplaza por la columna de glosa/comentario */
+                    description,
+                    amount
+                FROM {$dbp}savings_account_transactions
+                WHERE savings_account_id = ?
+                  AND trans_date BETWEEN ? AND ?
+                ORDER BY trans_date ASC, transaction_id ASC
+            ", [$acc->savings_account_id, $from_dt, $to_dt])->result();
+
+        $balance       = $opening;
+        $rows          = [];
+        $total_debit   = 0.0;
+        $total_credit  = 0.0;
+
+        foreach ($rows_db as $r) {
+            $type  = strtolower($r->trans_type);
+            // Todo lo que sea retiro/cargo lo tratamos como débito
+            $sign  = in_array($type, ['withdraw','fee','debit']) ? -1 : 1;
+            $amt   = (float)$r->amount;
+
+            if ($sign < 0) {
+                $total_debit  += $amt;
+            } else {
+                $total_credit += $amt;
+            }
+
+            $balance += $sign * $amt;
+
+            $row = new stdClass();
+            $row->trans_date  = $r->trans_date;
+            $row->description = $r->description; // ajustar si tu columna se llama distinto
+            $row->trans_type  = $r->trans_type;
+            $row->amount      = $sign * $amt;   // monto ya con signo
+            $row->balance     = $balance;
+
+            $rows[] = $row;
+        }
+
+        $status_label = ((int)$acc->status === 1) ? 'Activa' : 'Inactiva';
+
+        $header = (object)[
+            'account_number' => $acc->account_number,
+            'owner'          => trim($acc->first_name.' '.$acc->last_name),
+            'product'        => $acc->type_name,
+            'status'         => $status_label,
+        ];
+
+        $totals = [
+            'debit'   => $total_debit,
+            'credit'  => $total_credit,
+            'opening' => $opening,
+            'closing' => $balance,
+        ];
+
+        return [$header, $rows, $opening, $totals];
     }
 
     private function _branches_data()

@@ -1,13 +1,27 @@
 <?php $this->load->view('partial/header'); ?>
 
-<ul class="nav nav-tabs" style="margin-bottom:15px">
-  <li class="<?= ($active_tab??'')==='daily'?'active':'' ?>">
-    <a href="<?= site_url('savings_accounts/savings_account_reports/daily_summary') ?>">Resumen diario</a>
-  </li>
-  <li class="<?= ($active_tab??'')==='interest'?'active':'' ?>">
-    <a href="<?= site_url('savings_accounts/savings_account_reports/interest_summary') ?>">Intereses</a>
-  </li>
-</ul>
+<div class="tabs-container">
+    <ul class="nav nav-tabs nav-tabs-bordered">
+        <li class="nav-item">
+            <a class="nav-link <?= ($active_tab === 'daily' ? 'active' : '') ?>"
+               href="<?= site_url('savings_accounts/savings_account_reports/daily_summary') ?>">
+                Resumen diario
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= ($active_tab === 'interest' ? 'active' : '') ?>"
+               href="<?= site_url('savings_accounts/savings_account_reports/interest_summary') ?>">
+                Intereses
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= ($active_tab === 'statement' ? 'active' : '') ?>"
+               href="<?= site_url('savings_accounts/savings_account_reports/account_statement') ?>">
+                Estado de cuenta
+            </a>
+        </li>
+    </ul>
+</div>
 
 <div class="title-block">
   <h3 class="title">Resumen diario de movimientos</h3>

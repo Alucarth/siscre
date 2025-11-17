@@ -7,13 +7,12 @@
 
 <div class="section">
   <!-- Filtros -->
-  <div class="card">
-    <div class="form-group">
+  <div class="form-group">
       <a href="<?= site_url('savings_accounts/savings_account_transactions/form') ?>" class="btn btn-success">
         <span class="glyphicon glyphicon-plus"></span> Nueva transacción
       </a>
     </div>
-    
+  <div class="card">
     <div class="card-block">
       
       <?= form_open(current_url(), ['method'=>'get','class'=>'form-horizontal']) ?>
