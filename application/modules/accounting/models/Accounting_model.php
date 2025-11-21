@@ -541,9 +541,7 @@ class Accounting_model extends CI_Model
     }
 
     public function get_equity_evolution_data($filters = [])
-    {
-        log_message('debug', '=== INICIANDO GET_EQUITY_EVOLUTION_DATA ===');
-        
+    {        
         $data = [];
         
         // Configurar filtros de fecha
@@ -561,119 +559,40 @@ class Accounting_model extends CI_Model
             $where .= " AND at.branch_id = " . $this->session->userdata("branch_id");
         }
 
-        // Obtener todas las cuentas patrimoniales (que empiezan con 3)
-        $sql_cuentas_patrimonio = "
+        // Obtener todas las cuentas patrimoniales que tienen transacciones
+        $sql_cuentas = "
             SELECT 
                 aa.id,
                 aa.code_number,
                 aa.account_name,
-                aa.account_type
-            FROM c19_accounting_accounts aa
-            WHERE aa.code_number LIKE '3%'
-            ORDER BY aa.code_number
-        ";
-        
-        $query_cuentas = $this->db->query($sql_cuentas_patrimonio);
-        $cuentas_patrimonio = [];
-        
-        if ($query_cuentas && $query_cuentas->num_rows() > 0) {
-            foreach ($query_cuentas->result() as $row) {
-                $cuentas_patrimonio[] = $row;
-            }
-        }
-
-        // Obtener saldos por período (mensual)
-        $sql_saldos_periodo = "
-            SELECT 
-                DATE_FORMAT(at.added_date, '%Y-%m') as periodo,
-                aa.id as cuenta_id,
-                aa.code_number,
-                aa.account_name,
+                aa.account_type,
                 SUM(CASE 
                     WHEN at.movement_type = 'credit' THEN at.amount 
                     WHEN at.movement_type = 'debit' THEN -at.amount 
-                END) as saldo_periodo
+                END) as saldo_total
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
             WHERE aa.code_number LIKE '3%'
             $where
-            GROUP BY DATE_FORMAT(at.added_date, '%Y-%m'), aa.id, aa.code_number, aa.account_name
-            ORDER BY periodo, aa.code_number
+            GROUP BY aa.id, aa.code_number, aa.account_name, aa.account_type
+            HAVING ABS(saldo_total) > 0.01
+            ORDER BY aa.code_number
         ";
         
-        $query_saldos = $this->db->query($sql_saldos_periodo);
-        $saldos_por_periodo = [];
-        $periodos = [];
+        $query_cuentas = $this->db->query($sql_cuentas);
+        $cuentas_con_saldo = [];
+        $total_general = 0;
         
-        if ($query_saldos && $query_saldos->num_rows() > 0) {
-            foreach ($query_saldos->result() as $row) {
-                $saldos_por_periodo[$row->periodo][$row->cuenta_id] = $row;
-                if (!in_array($row->periodo, $periodos)) {
-                    $periodos[] = $row->periodo;
-                }
-            }
-        }
-        
-        // Ordenar periodos cronológicamente
-        sort($periodos);
-        
-        // Calcular saldos acumulados
-        $saldos_acumulados = [];
-        $patrimonio_neto_por_periodo = [];
-        
-        foreach ($periodos as $periodo) {
-            $patrimonio_neto_por_periodo[$periodo] = 0;
-            
-            foreach ($cuentas_patrimonio as $cuenta) {
-                $saldo_actual = isset($saldos_por_periodo[$periodo][$cuenta->id]) ? 
-                    $saldos_por_periodo[$periodo][$cuenta->id]->saldo_periodo : 0;
-                
-                $saldo_anterior = isset($saldos_acumulados[$cuenta->id]) ? 
-                    $saldos_acumulados[$cuenta->id] : 0;
-                
-                $saldo_acumulado = $saldo_anterior + $saldo_actual;
-                $saldos_acumulados[$cuenta->id] = $saldo_acumulado;
-                
-                $patrimonio_neto_por_periodo[$periodo] += $saldo_acumulado;
+        if ($query_cuentas && $query_cuentas->num_rows() > 0) {
+            foreach ($query_cuentas->result() as $row) {
+                $cuentas_con_saldo[] = $row;
+                $total_general += $row->saldo_total;
             }
         }
 
         // Preparar datos para la vista
-        $data['cuentas_patrimonio'] = $cuentas_patrimonio;
-        $data['periodos'] = $periodos;
-        $data['saldos_por_periodo'] = $saldos_por_periodo;
-        $data['saldos_acumulados'] = $saldos_acumulados;
-        $data['patrimonio_neto_por_periodo'] = $patrimonio_neto_por_periodo;
-        
-        log_message('debug', '=== FINALIZANDO GET_EQUITY_EVOLUTION_DATA ===');
-        return $data;
-    }
-
-    public function get_consolidated_equity_evolution($filters = [])
-    {
-        $data = $this->get_equity_evolution_data($filters);
-        
-        // Calcular crecimiento porcentual entre periodos
-        $crecimiento_porcentual = [];
-        $periodos = $data['periodos'];
-        
-        for ($i = 1; $i < count($periodos); $i++) {
-            $periodo_actual = $periodos[$i];
-            $periodo_anterior = $periodos[$i - 1];
-            
-            $patrimonio_actual = $data['patrimonio_neto_por_periodo'][$periodo_actual];
-            $patrimonio_anterior = $data['patrimonio_neto_por_periodo'][$periodo_anterior];
-            
-            if ($patrimonio_anterior != 0) {
-                $crecimiento = (($patrimonio_actual - $patrimonio_anterior) / abs($patrimonio_anterior)) * 100;
-            } else {
-                $crecimiento = $patrimonio_actual != 0 ? 100 : 0;
-            }
-            
-            $crecimiento_porcentual[$periodo_actual] = $crecimiento;
-        }
-        
-        $data['crecimiento_porcentual'] = $crecimiento_porcentual;
+        $data['cuentas_con_saldo'] = $cuentas_con_saldo;
+        $data['total_general'] = $total_general;
         
         return $data;
     }

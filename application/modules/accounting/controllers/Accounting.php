@@ -822,7 +822,7 @@ class Accounting extends Secure_area implements iData_controller {
         
         $this->load->library('pdf');
         
-        if ( $report_type == 'balance_sheet' )
+        if ( $report_type == 'balance_sheet' || $report_type == 'equity_evolution')
         {
             $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
         }
@@ -916,7 +916,7 @@ class Accounting extends Secure_area implements iData_controller {
                 log_message('debug', 'Cash flow data loaded: ' . count($data["accounts"]));
                 break;
             case 'equity_evolution':
-                $data["accounts"] = $this->accounting_model->get_consolidated_equity_evolution($filters);
+                $data["accounts"] = $this->accounting_model->get_equity_evolution_data($filters);
                 break;
             case 'aged_receivables':
                 $data["accounts"] = $this->accounting_model->get_aged_receivables_data($filters);   
