@@ -1052,6 +1052,11 @@ class Accounting_model extends CI_Model
                     case 'equity': $tipo_cuenta = 'PATRIMONIO'; break;
                     case 'income': $tipo_cuenta = 'INGRESO'; break;
                     case 'expenses': $tipo_cuenta = 'EGRESO'; break;
+                    case 'Asset': $tipo_cuenta = 'ACTIVO'; break;
+                    case 'Liability': $tipo_cuenta = 'PASIVO'; break;
+                    case 'Equity': $tipo_cuenta = 'PATRIMONIO'; break;
+                    case 'Income': $tipo_cuenta = 'INGRESO'; break;
+                    case 'Expenses': $tipo_cuenta = 'EGRESO'; break;
                     default: $tipo_cuenta = strtoupper($row->account_type);
                 }
                 
