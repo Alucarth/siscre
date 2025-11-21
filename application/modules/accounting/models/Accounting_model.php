@@ -646,56 +646,439 @@ class Accounting_model extends CI_Model
     
     public function get_cash_flow_data($filters = [])
     {
-        log_message('debug', '=== INICIANDO GET_CASH_FLOW_DATA ===');
+        log_message('debug', '=== INICIANDO GET_CASH_FLOW_DATA CON SALDOS ===');
         
-        $where = '';
-        if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
-            $date_from = date("Y-m-d", $filters["date_from"]);
-            $where .= " AND DATE(at.added_date) >= '$date_from'";
-            log_message('debug', 'Date from SQL: ' . $date_from);
-        }
-        if (isset($filters["date_to"]) && trim($filters["date_to"]) != '') {
-            $date_to = date("Y-m-d", $filters["date_to"]);
-            $where .= " AND DATE(at.added_date) <= '$date_to'";
-            log_message('debug', 'Date to SQL: ' . $date_to);
+        // Validar filtros de fecha
+        if (!isset($filters["date_from"]) || !isset($filters["date_to"])) {
+            log_message('error', 'Filtros de fecha no definidos');
+            return [];
         }
         
-        if(is_plugin_active("branches")) {
-            $where .= " AND at.branch_id = " . $this->session->userdata("branch_id");
-            log_message('debug', 'Branch condition added');
+        $date_from = date("Y-m-d", $filters["date_from"]);
+        $date_to = date("Y-m-d", $filters["date_to"]);
+        
+        log_message('debug', 'Período: ' . $date_from . ' a ' . $date_to);
+        
+        $branch_condition = "";
+        if (is_plugin_active("branches")) {
+            $branch_id = $this->session->userdata("branch_id");
+            $branch_condition = " AND at.branch_id = $branch_id";
+            log_message('debug', 'Filtro branch: ' . $branch_id);
         }
         
-        $sql = "
+        // PASO 1: Obtener saldos iniciales (antes de date_from)
+        log_message('debug', '=== CALCULANDO SALDOS INICIALES ===');
+        $sql_saldos_iniciales = "
             SELECT 
+                aa.id as account_id,
+                aa.code_number,
+                aa.account_name,
+                aa.account_type,
+                SUM(CASE 
+                    WHEN at.movement_type = 'debit' THEN at.amount 
+                    ELSE -at.amount 
+                END) as saldo_inicial
+            FROM c19_accounting_transactions at
+            INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
+            WHERE DATE(at.added_date) < '$date_from'
+            $branch_condition
+            GROUP BY aa.id, aa.code_number, aa.account_name, aa.account_type
+            HAVING ABS(saldo_inicial) > 0.01
+        ";
+        
+        log_message('debug', 'SQL Saldos Iniciales: ' . $sql_saldos_iniciales);
+        $query_inicial = $this->db->query($sql_saldos_iniciales);
+        $saldos_iniciales = [];
+        
+        if ($query_inicial && $query_inicial->num_rows() > 0) {
+            foreach ($query_inicial->result() as $row) {
+                $saldos_iniciales[$row->account_id] = $row->saldo_inicial;
+            }
+            log_message('debug', 'Saldos iniciales encontrados: ' . count($saldos_iniciales));
+        } else {
+            log_message('debug', 'No se encontraron saldos iniciales');
+        }
+        
+        // PASO 2: Obtener transacciones del período con saldos finales
+        log_message('debug', '=== OBTENIENDO TRANSACCIONES DEL PERÍODO ===');
+        $sql_transacciones = "
+            SELECT 
+                aa.id,
                 aa.code_number,
                 aa.account_name,
                 aa.account_type,
                 at.amount,
                 at.movement_type,
                 at.added_date,
-                at.description
+                at.description,
+                at.voucher_id,
+                at.payment_methods,
+                -- Calcular saldo acumulado por cuenta
+                (SELECT SUM(CASE 
+                    WHEN at2.movement_type = 'debit' THEN at2.amount 
+                    ELSE -at2.amount 
+                END)
+                FROM c19_accounting_transactions at2 
+                WHERE at2.account_id = aa.id 
+                AND DATE(at2.added_date) <= '$date_to'
+                $branch_condition) as saldo_final
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE 1=1 $where
+            WHERE DATE(at.added_date) BETWEEN '$date_from' AND '$date_to'
+            $branch_condition
             ORDER BY aa.account_type, aa.code_number, at.added_date
         ";
         
-        log_message('debug', 'SQL: ' . $sql);
+        log_message('debug', 'SQL Transacciones: ' . $sql_transacciones);
+        $query = $this->db->query($sql_transacciones);
         
-        $query = $this->db->query($sql);
-        log_message('debug', 'Query executed, num rows: ' . $query->num_rows());
+        if (!$query) {
+            $error = $this->db->error();
+            log_message('error', 'Error en consulta: ' . $error['message']);
+            return [];
+        }
+        
+        log_message('debug', 'Transacciones encontradas: ' . $query->num_rows());
         
         $cash_flow_data = [];
+        $cuentas_procesadas = [];
+        
         if ($query && $query->num_rows() > 0) {
             foreach ($query->result() as $row) {
-                $cash_flow_data[] = $row;
+                // Determinar tipo de actividad
+                $activity_type = $this->get_activity_type(
+                    $row->code_number, 
+                    $row->account_type, 
+                    $row->movement_type
+                );
+                
+                // Obtener saldo inicial
+                $saldo_inicial = isset($saldos_iniciales[$row->id]) ? $saldos_iniciales[$row->id] : 0;
+                
+                // Calcular variación
+                $monto_variacion = $row->movement_type == 'debit' ? $row->amount : -$row->amount;
+                
+                // Para la primera transacción de cada cuenta, calcular variación total
+                if (!isset($cuentas_procesadas[$row->id])) {
+                    $variacion_total = $row->saldo_final - $saldo_inicial;
+                    $cuentas_procesadas[$row->id] = true;
+                } else {
+                    $variacion_total = 0; // Solo se muestra en la primera fila de cada cuenta
+                }
+                
+                $cash_flow_data[] = (object) array(
+                    'id' => $row->id,
+                    'code_number' => $row->code_number,
+                    'account_name' => $row->account_name,
+                    'account_type' => $row->account_type,
+                    'amount' => $row->amount,
+                    'movement_type' => $row->movement_type,
+                    'added_date' => $row->added_date,
+                    'description' => $row->description,
+                    'voucher_id' => $row->voucher_id,
+                    'payment_methods' => $row->payment_methods,
+                    'activity_type' => $activity_type,
+                    'saldo_inicial' => $saldo_inicial,
+                    'saldo_final' => $row->saldo_final,
+                    'variacion' => $variacion_total,
+                    'monto_variacion' => $monto_variacion,
+                    'es_primera_cuenta' => !isset($cuentas_procesadas[$row->id])
+                );
+                
+                // Marcar cuenta como procesada
+                $cuentas_procesadas[$row->id] = true;
             }
         }
         
-        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_DATA ===');
+        log_message('debug', '=== DATOS PROCESADOS: ' . count($cash_flow_data) . ' registros ===');
+        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_DATA CON SALDOS ===');
+        
         return $cash_flow_data;
     }
 
+    public function get_activity_type($account_code, $account_type, $movement_type)
+    {
+        if (empty($account_code)) {
+            return 'operating';
+        }
+        
+        $code_prefix = substr($account_code, 0, 2);
+        $first_digit = substr($account_code, 0, 1);
+        
+        // ACTIVIDAD OPERATIVA
+        if ($first_digit == '4' || $first_digit == '5' || $first_digit == '6') {
+            return 'operating';
+        }
+        
+        // Activos corrientes (11xx) - Operativa
+        if ($code_prefix == '11') {
+            return 'operating';
+        }
+        
+        // ACTIVIDAD DE INVERSIÓN
+        if ($first_digit == '1' && $code_prefix != '11') {
+            return 'investing';
+        }
+        
+        // ACTIVIDAD DE FINANCIAMIENTO  
+        if ($first_digit == '3') {
+            return 'financing';
+        }
+        
+        // Pasivos - determinar por naturaleza
+        if ($first_digit == '2') {
+            // Pasivos corrientes cortos -> operativa, largos -> financiamiento
+            if (strlen($account_code) >= 4) {
+                $sub_code = substr($account_code, 0, 4);
+                // Préstamos bancarios, deudas largo plazo -> financiamiento
+                if (in_array($sub_code, ['2101', '2102', '2103', '2201', '2202'])) {
+                    return 'financing';
+                }
+            }
+            return 'operating';
+        }
+        
+        // Por defecto
+        return 'operating';
+    }
+
+    public function get_cash_flow_with_totals($filters = [])
+    {
+        log_message('debug', '=== INICIANDO GET_CASH_FLOW_WITH_TOTALS ===');
+        
+        // Obtener datos base
+        $cash_flow_data = $this->get_cash_flow_data($filters);
+        
+        if (empty($cash_flow_data)) {
+            log_message('debug', 'No hay datos de flujo de efectivo');
+            return [
+                'accounts' => [],
+                'totals' => [
+                    'operating' => 0,
+                    'investing' => 0, 
+                    'financing' => 0,
+                    'net_cash_flow' => 0
+                ],
+                'summary' => []
+            ];
+        }
+        
+        log_message('debug', 'Procesando ' . count($cash_flow_data) . ' transacciones');
+        
+        // Estructuras para cálculos
+        $totals_by_activity = [
+            'operating' => 0,
+            'investing' => 0,
+            'financing' => 0
+        ];
+        
+        $accounts_summary = [];
+        $processed_accounts = [];
+        
+        // PASO 1: Procesar cada transacción y calcular totales
+        log_message('debug', '=== CALCULANDO TOTALES POR ACTIVIDAD ===');
+        
+        foreach ($cash_flow_data as $transaction) {
+            $account_id = $transaction->id;
+            
+            // Solo procesar la primera transacción de cada cuenta para el resumen
+            if (!isset($processed_accounts[$account_id]) && $transaction->es_primera_cuenta) {
+                $accounts_summary[$account_id] = [
+                    'code_number' => $transaction->code_number,
+                    'account_name' => $transaction->account_name,
+                    'account_type' => $transaction->account_type,
+                    'activity_type' => $transaction->activity_type,
+                    'saldo_inicial' => $transaction->saldo_inicial,
+                    'saldo_final' => $transaction->saldo_final,
+                    'variacion' => $transaction->variacion,
+                    'clasificacion' => $this->get_variacion_clasificacion($transaction->variacion)
+                ];
+                $processed_accounts[$account_id] = true;
+                
+                log_message('debug', "Cuenta {$transaction->code_number} - Variación: {$transaction->variacion}");
+            }
+            
+            // Acumular por tipo de actividad (usar monto_variacion de cada transacción)
+            $monto_actividad = $transaction->monto_variacion;
+            $totals_by_activity[$transaction->activity_type] += $monto_actividad;
+            
+            log_message('debug', "Actividad {$transaction->activity_type} + {$monto_actividad} = {$totals_by_activity[$transaction->activity_type]}");
+        }
+        
+        // PASO 2: Calcular flujo neto de efectivo
+        $net_cash_flow = $totals_by_activity['operating'] + $totals_by_activity['investing'] + $totals_by_activity['financing'];
+        
+        log_message('debug', '=== TOTALES CALCULADOS ===');
+        log_message('debug', 'Operating: ' . $totals_by_activity['operating']);
+        log_message('debug', 'Investing: ' . $totals_by_activity['investing']);
+        log_message('debug', 'Financing: ' . $totals_by_activity['financing']);
+        log_message('debug', 'Net Cash Flow: ' . $net_cash_flow);
+        
+        // PASO 3: Preparar datos finales
+        $result = [
+            'accounts' => $cash_flow_data,
+            'totals' => [
+                'operating' => $totals_by_activity['operating'],
+                'investing' => $totals_by_activity['investing'],
+                'financing' => $totals_by_activity['financing'],
+                'net_cash_flow' => $net_cash_flow
+            ],
+            'summary' => array_values($accounts_summary),
+            'period' => [
+                'date_from' => isset($filters["date_from"]) ? $filters["date_from"] : null,
+                'date_to' => isset($filters["date_to"]) ? $filters["date_to"] : null
+            ]
+        ];
+        
+        log_message('debug', 'Resumen generado: ' . count($accounts_summary) . ' cuentas');
+        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_WITH_TOTALS ===');
+        
+        return $result;
+    }
+
+    // Función auxiliar para clasificar la variación
+    private function get_variacion_clasificacion($variacion)
+    {
+        if ($variacion > 0) {
+            return 'positivo';
+        } elseif ($variacion < 0) {
+            return 'negativo';
+        } else {
+            return 'neutral';
+        }
+    }
+
+    public function get_cash_flow_consolidated($filters = [])
+    {
+        log_message('debug', '=== INICIANDO GET_CASH_FLOW_CONSOLIDATED ===');
+        
+        $date_from = date("Y-m-d", $filters["date_from"]);
+        $date_to = date("Y-m-d", $filters["date_to"]);
+        
+        log_message('debug', 'Período consolidado: ' . $date_from . ' a ' . $date_to);
+        
+        $branch_condition = "";
+        if (is_plugin_active("branches")) {
+            $branch_id = $this->session->userdata("branch_id");
+            $branch_condition = " AND at.branch_id = $branch_id";
+        }
+        
+        // Consulta consolidada por cuenta
+        $sql = "
+            SELECT 
+                aa.id,
+                aa.code_number,
+                aa.account_name,
+                aa.account_type,
+                -- Saldo inicial (antes del período)
+                (SELECT SUM(CASE 
+                    WHEN at2.movement_type = 'debit' THEN at2.amount 
+                    ELSE -at2.amount 
+                END)
+                FROM c19_accounting_transactions at2 
+                WHERE at2.account_id = aa.id 
+                AND DATE(at2.added_date) < '$date_from'
+                $branch_condition) as saldo_inicial,
+                
+                -- Saldo final (hasta fin del período)
+                (SELECT SUM(CASE 
+                    WHEN at3.movement_type = 'debit' THEN at3.amount 
+                    ELSE -at3.amount 
+                END)
+                FROM c19_accounting_transactions at3 
+                WHERE at3.account_id = aa.id 
+                AND DATE(at3.added_date) <= '$date_to'
+                $branch_condition) as saldo_final,
+                
+                -- Movimientos del período (débitos - créditos)
+                SUM(CASE 
+                    WHEN at.movement_type = 'debit' THEN at.amount 
+                    ELSE -at.amount 
+                END) as variacion_periodo,
+                
+                -- Total débitos del período
+                SUM(CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE 0 END) as total_debitos,
+                
+                -- Total créditos del período  
+                SUM(CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE 0 END) as total_creditos,
+                
+                COUNT(at.id) as num_transacciones
+                
+            FROM c19_accounting_accounts aa
+            LEFT JOIN c19_accounting_transactions at ON aa.id = at.account_id 
+                AND DATE(at.added_date) BETWEEN '$date_from' AND '$date_to'
+                $branch_condition
+            WHERE aa.id IS NOT NULL
+            GROUP BY aa.id, aa.code_number, aa.account_name, aa.account_type
+            HAVING saldo_inicial IS NOT NULL OR saldo_final IS NOT NULL OR variacion_periodo IS NOT NULL
+            ORDER BY aa.code_number
+        ";
+        
+        log_message('debug', 'SQL Consolidado: ' . $sql);
+        $query = $this->db->query($sql);
+        
+        if (!$query) {
+            $error = $this->db->error();
+            log_message('error', 'Error en consulta consolidada: ' . $error['message']);
+            return [];
+        }
+        
+        log_message('debug', 'Cuentas consolidadas encontradas: ' . $query->num_rows());
+        
+        $consolidated_data = [];
+        $total_variacion = 0;
+        
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                // Calcular diferencia
+                $diferencia = $row->saldo_final - $row->saldo_inicial;
+                
+                // Determinar tipo de variación
+                $tipo_variacion = 'SIN DIFERENCIA';
+                if ($diferencia > 0) {
+                    $tipo_variacion = 'AUMENTO';
+                } elseif ($diferencia < 0) {
+                    $tipo_variacion = 'DISMINUCIÓN';
+                }
+                
+                // Determinar clasificación por actividad
+                $clasificacion = $this->get_activity_type($row->code_number, $row->account_type, 'debit');
+                
+                // Determinar tipo de cuenta para mostrar
+                $tipo_cuenta = '';
+                switch($row->account_type) {
+                    case 'asset': $tipo_cuenta = 'ACTIVO'; break;
+                    case 'liability': $tipo_cuenta = 'PASIVO'; break;
+                    case 'equity': $tipo_cuenta = 'PATRIMONIO'; break;
+                    case 'income': $tipo_cuenta = 'INGRESO'; break;
+                    case 'expenses': $tipo_cuenta = 'EGRESO'; break;
+                    default: $tipo_cuenta = strtoupper($row->account_type);
+                }
+                
+                $consolidated_data[] = (object) [
+                    'id' => $row->id,
+                    'code_number' => $row->code_number,
+                    'account_name' => $row->account_name,
+                    'tipo_cuenta' => $tipo_cuenta,
+                    'clasificacion' => $clasificacion,
+                    'saldo_inicial' => $row->saldo_inicial ?: 0,
+                    'saldo_final' => $row->saldo_final ?: 0,
+                    'diferencia' => $diferencia,
+                    'tipo_variacion' => $tipo_variacion,
+                    'total_debitos' => $row->total_debitos ?: 0,
+                    'total_creditos' => $row->total_creditos ?: 0,
+                    'num_transacciones' => $row->num_transacciones ?: 0
+                ];
+                
+                $total_variacion += $diferencia;
+            }
+        }
+        
+        log_message('debug', 'Total variación consolidada: ' . $total_variacion);
+        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_CONSOLIDATED ===');
+        
+        return $consolidated_data;
+    }
     public function get_account_data($account_type = '', $filters = [])
     {
         $where = '';
