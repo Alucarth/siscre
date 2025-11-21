@@ -53,22 +53,31 @@
     }
 </style>
 
-<div class="report-container">
-    <div class="report-header">
-        <div class="report-title">REPORTE DE FLUJO DE EFECTIVO</div>
-        <div class="report-period">
-            Período: <?php echo date('d/m/Y', $date_from); ?> - <?php echo date('d/m/Y', $date_to); ?>
-        </div>
-    </div>
+<div style="position:absolute; top:20px; left:40px;" class="empresa-info">
+    <div class="bold">CREDISURGIR S.R.L.</div>
+    <div>NIT: 485672023</div>
+</div>
+
+<div style="text-align:center; margin-top:40px;">
+    <h2>FLUJO DE EFECTIVO</h2>
+    <h4>Del: <?=date($this->config->item('date_format'), $date_from)?> Al: <?=date($this->config->item('date_format'), $date_to)?></h4>
+    <p>(Expresado en bolivianos)</p>
+    <br/>
+</div>
 
     <table class="cash-flow-table">
         <thead>
             <tr>
-                <th style="width: 15%;">Código</th>
-                <th style="width: 35%;">Cuenta</th>
-                <th style="width: 20%;">Tipo</th>
-                <th style="width: 15%;" class="text-right">Monto</th>
-                <th style="width: 15%;">Fecha</th>
+                <th style="width: 10%;">Código</th>
+                <th style="width: 10%;">Variación</th>
+                <th style="width: 10%;">Cuenta</th>
+                <th style="width: 10%;">Tipo</th>
+                <th style="width: 10%;">Clasificación</th>
+                <th style="width: 10%;">Saldo Inicial</th>
+                <th style="width: 10%;">Saldo Final</th>
+                <th style="width: 10%;">Diferencia</th>
+                <th style="width: 10%;" class="text-right">Monto</th>
+                <th style="width: 10%;">Fecha</th>
             </tr>
         </thead>
         <tbody>
@@ -112,8 +121,13 @@
                     ?>
                     <tr>
                         <td><?php echo $account->code_number; ?></td>
+                        <td></td>
                         <td><?php echo $account->account_name; ?></td>
                         <td><?php echo ucfirst($account->account_type); ?></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
                         <td class="text-right"><?php echo to_currency($amount_display); ?></td>
                         <td><?php echo date('d/m/Y', strtotime($account->added_date)); ?></td>
                     </tr>
@@ -153,6 +167,17 @@
     </table>
 </div>
 
-<?php
-$this->load->view("partial/footer");
-?>
+<!-- FIRMAS -->
+<br><br>
+    <table style="width: 100%; margin-top: 60px; border: none;">
+        <tr>
+            <td style="width: 50%; text-align: center; border: none;">
+                <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
+                <div style="font-size: 11px; font-weight: bold;">CONTADOR</div>
+            </td>
+            <td style="width: 50%; text-align: center; border: none;">
+                <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
+                <div style="font-size: 11px; font-weight: bold;">GERENTE GENERAL</div>
+            </td>
+        </tr>
+    </table>

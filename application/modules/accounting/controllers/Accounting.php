@@ -915,8 +915,8 @@ class Accounting extends Secure_area implements iData_controller {
                 $data["accounts"] = $this->accounting_model->get_cash_flow_data($filters);
                 log_message('debug', 'Cash flow data loaded: ' . count($data["accounts"]));
                 break;
-            case 'statement_of_equity':
-                $data["accounts"] = $this->accounting_model->get_statement_of_equity_data($filters);
+            case 'equity_evolution':
+                $data["accounts"] = $this->accounting_model->get_consolidated_equity_evolution($filters);
                 break;
             case 'aged_receivables':
                 $data["accounts"] = $this->accounting_model->get_aged_receivables_data($filters);   

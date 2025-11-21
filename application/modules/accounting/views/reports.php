@@ -70,7 +70,7 @@
                                                     <option value="income_statement">Estado de Resultados</option>
                                                     <option value="balance_sheet">Balance General</option>
                                                     <option value="cash_flow">Flujo de Efectivo</option>
-                                                    <option value="statement_of_equity">Evolución del Patrimonio</option>
+                                                    <option value="equity_evolution">Evolución del Patrimonio</option>
                                                 </select>
                                             </div>
                                         </div>
