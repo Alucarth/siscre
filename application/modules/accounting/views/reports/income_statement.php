@@ -47,7 +47,7 @@
         <tr>
             <td><?=isset($account->code_number) ? $account->code_number : (isset($account->account_map) ? $account->account_map : '')?></td>
             <td class="left-text"><?=$account->account_name?></td>
-            <td class="right-text"><?=to_currency($account->amount)?></td>
+            <td class="right-text"><?=money($account->amount)?></td>
         </tr>
     <?php 
         endif;
@@ -64,7 +64,7 @@
     <tr class="subtotal-row">
         <td></td>
         <td class="bold right-text">TOTAL INGRESOS</td>
-        <td class="right-text bold border-top"><?=to_currency($total_income)?></td>
+        <td class="right-text bold border-top"><?=money($total_income)?></td>
     </tr>
     
     <!-- ESPACIO -->
@@ -85,7 +85,7 @@
         <tr>
             <td><?=isset($account->code_number) ? $account->code_number : (isset($account->account_map) ? $account->account_map : '')?></td>
             <td class="left-text"><?=$account->account_name?></td>
-            <td class="right-text"><?=to_currency($account->amount)?></td>
+            <td class="right-text"><?=money($account->amount)?></td>
         </tr>
     <?php 
         endif;
@@ -102,7 +102,7 @@
     <tr class="subtotal-row">
         <td></td>
         <td class="bold right-text">TOTAL GASTOS</td>
-        <td class="right-text bold border-top"><?=to_currency($total_expenses)?></td>
+        <td class="right-text bold border-top"><?=money($total_expenses)?></td>
     </tr>
     
     <!-- RESULTADO FINAL -->
@@ -117,15 +117,15 @@
     <table width="100%" style="border-collapse:collapse;">
         <tr>
             <td width="70%" class="bold">Total Ingresos:</td>
-            <td width="30%" class="right-text bold"><?=to_currency($total_income)?></td>
+            <td width="30%" class="right-text bold"><?=money($total_income)?></td>
         </tr>
         <tr>
             <td class="bold">Total Gastos:</td>
-            <td class="right-text bold"><?=to_currency($total_expenses)?></td>
+            <td class="right-text bold"><?=money($total_expenses)?></td>
         </tr>
         <tr style="background-color:<?=$color_fondo?>;">
             <td class="bold">Resultado:</td>
-            <td class="right-text bold" style="color:<?=$color_texto?>;"><?=to_currency($net_income)?></td>
+            <td class="right-text bold" style="color:<?=$color_texto?>;"><?=money($net_income)?></td>
         </tr>
     </table>
 </div>

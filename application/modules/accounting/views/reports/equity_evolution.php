@@ -104,11 +104,11 @@
                         }
                     ?>
                         <td class="text-right">
-                            <?=($valor != 0) ? to_currency($valor) : '-'?>
+                            <?=($valor != 0) ? money($valor) : '-'?>
                         </td>
                     <?php endforeach; ?>
                     
-                    <td class="text-right total-col"><?=to_currency($total_fila)?></td>
+                    <td class="text-right total-col"><?=money($total_fila)?></td>
                 </tr>
             <?php endforeach; ?>
             
@@ -123,10 +123,10 @@
                     $total_columna = $totales_columnas[$cuenta_col->id];
                     $total_general += $total_columna;
                 ?>
-                    <td class="text-right bold"><?=to_currency($total_columna)?></td>
+                    <td class="text-right bold"><?=money($total_columna)?></td>
                 <?php endforeach; ?>
                 
-                <td class="text-right bold"><?=to_currency($total_general)?></td>
+                <td class="text-right bold"><?=money($total_general)?></td>
             </tr>
         </tbody>
     </table>

@@ -47,8 +47,8 @@
                     <td class="text-center"><?= date('d/m/Y', strtotime($transaction->added_date)) ?></td>
                     <td class="text-center">CREDISURGIR S.R.L.</td>
                     <td><?= $transaction->description ?: 'Sin descripción' ?></td>
-                    <td class="text-right"><?= $transaction->movement_type == 'debit' ? number_format($transaction->amount, 2) : '0.00' ?></td>
-                    <td class="text-right"><?= $transaction->movement_type == 'credit' ? number_format($transaction->amount, 2) : '0.00' ?></td>
+                    <td class="text-right"><?= $transaction->movement_type == 'debit' ? money($transaction->amount) : '0.00' ?></td>
+                    <td class="text-right"><?= $transaction->movement_type == 'credit' ? money($transaction->amount) : '0.00' ?></td>
                 </tr>
             <?php 
                     $counter++;
@@ -61,8 +61,8 @@
         <tfoot>
             <tr style="background-color: #f8f9fa; font-weight: bold;">
                 <td colspan="6" class="text-right"><strong>TOTALES:</strong></td>
-                <td class="text-right"><?= number_format($total_debit, 2) ?></td>
-                <td class="text-right"><?= number_format($total_credit, 2) ?></td>
+                <td class="text-right"><?= money($total_debit) ?></td>
+                <td class="text-right"><?= money($total_credit) ?></td>
             </tr>
         </tfoot>
     </table>

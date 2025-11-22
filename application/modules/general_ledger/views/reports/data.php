@@ -122,7 +122,7 @@
                         <td style="width: 120px;"><strong>Fecha:</strong></td>
                         <td style="width: 200px;"><?= date($this->config->item('date_format'), strtotime($voucher_info->voucher_date)) ?></td>
                         <td style="width: 120px;"><strong>Total Debe:</strong></td>
-                        <td><?= to_currency($voucher_info->total_debit) ?></td>
+                        <td><?= money($voucher_info->total_debit) ?></td>
                     </tr>
                     <tr>
                         <td><strong>Descripción:</strong></td>
@@ -130,14 +130,14 @@
                     </tr>
                     <tr>
                         <td><strong>Total Haber:</strong></td>
-                        <td><?= to_currency($voucher_info->total_credit) ?></td>
+                        <td><?= money($voucher_info->total_credit) ?></td>
                         <td><strong>Diferencia:</strong></td>
                         <td>
                             <?php 
                             $diferencia = $voucher_info->total_debit - $voucher_info->total_credit;
                             $color = ($diferencia == 0) ? '#28a745' : '#dc3545';
                             ?>
-                            <span style="color: <?= $color ?>;"><?= to_currency($diferencia) ?></span>
+                            <span style="color: <?= $color ?>;"><?= money($diferencia) ?></span>
                         </td>
                     </tr>
                 </table>
@@ -172,10 +172,10 @@
                                 <?php endif; ?>
                             </td>
                             <td style="text-align: right; font-weight: bold;">
-                                <?= $transaction->debit > 0 ? to_currency($transaction->debit) : '---' ?>
+                                <?= $transaction->debit > 0 ? money($transaction->debit) : '---' ?>
                             </td>
                             <td style="text-align: right; font-weight: bold;">
-                                <?= $transaction->credit > 0 ? to_currency($transaction->credit) : '---' ?>
+                                <?= $transaction->credit > 0 ? money($transaction->credit) : '---' ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -183,8 +183,8 @@
                         <!-- FILA DE TOTALES -->
                         <tr class="voucher-totals">
                             <td colspan="3" style="text-align: right;"><strong>TOTALES DEL VOUCHER:</strong></td>
-                            <td style="text-align: right;"><strong><?= to_currency($voucher_info->total_debit) ?></strong></td>
-                            <td style="text-align: right;"><strong><?= to_currency($voucher_info->total_credit) ?></strong></td>
+                            <td style="text-align: right;"><strong><?= money($voucher_info->total_debit) ?></strong></td>
+                            <td style="text-align: right;"><strong><?= money($voucher_info->total_credit) ?></strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -229,9 +229,9 @@
                         <tr>
                             <td><?= $row->date; ?></td>
                             <td><?= $row->explanation; ?></td>  
-                            <td><?= to_currency($row->debit); ?></td>
-                            <td><?= to_currency($row->credit); ?></td>
-                            <td><?= to_currency($row->balance); ?></td>
+                            <td><?= money($row->debit); ?></td>
+                            <td><?= money($row->credit); ?></td>
+                            <td><?= money($row->balance); ?></td>
                         </tr>
                     </tbody>
                 </table>
@@ -239,4 +239,4 @@
         <?php endforeach; ?>        
     <?php else: ?>
     <?php endif; ?>
-</div>
+</div>  

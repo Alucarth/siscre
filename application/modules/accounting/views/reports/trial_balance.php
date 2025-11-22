@@ -52,20 +52,20 @@
     <tr>
         <td class="left-text"><?=isset($account->code_number) ? $account->code_number : ''?></td>
         <td class="left-text"><?=isset($account->account_name) ? $account->account_name : ''?></td>
-        <td class="right-text"><?=to_currency($debito)?></td>
-        <td class="right-text"><?=to_currency($credito)?></td>
-        <td class="right-text"><?=to_currency($show_saldo_debe)?></td>
-        <td class="right-text"><?=to_currency($show_saldo_haber)?></td>
+        <td class="right-text"><?=money($debito)?></td>
+        <td class="right-text"><?=money($credito)?></td>
+        <td class="right-text"><?=money($show_saldo_debe)?></td>
+        <td class="right-text"><?=money($show_saldo_haber)?></td>
     </tr>
     <?php endforeach; ?>
     
     <!-- TOTALES -->
     <tr style="background-color:#f0f0f0;">
         <td colspan="2" class="right-text"><b>TOTALES</b></td>
-        <td class="right-text"><b><?=to_currency($total_debito)?></b></td>
-        <td class="right-text"><b><?=to_currency($total_credito)?></b></td>
-        <td class="right-text"><b><?=to_currency($total_saldo_debe)?></b></td>
-        <td class="right-text"><b><?=to_currency($total_saldo_haber)?></b></td>
+        <td class="right-text"><b><?=money($total_debito)?></b></td>
+        <td class="right-text"><b><?=money($total_credito)?></b></td>
+        <td class="right-text"><b><?=money($total_saldo_debe)?></b></td>
+        <td class="right-text"><b><?=money($total_saldo_haber)?></b></td>
     </tr>
 </table>
 

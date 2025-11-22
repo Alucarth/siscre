@@ -47,7 +47,7 @@
     <tr>
         <td><?=$activo->account_map?></td>
         <td class="left-text"><?=$activo->account_name?></td>
-        <td class="right-text"><?=to_currency($activo->amount)?></td>
+        <td class="right-text"><?=money($activo->amount)?></td>
     </tr>
     <?php endif; ?>
     <?php endforeach; ?>
@@ -55,7 +55,7 @@
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL ACTIVOS CORRIENTES</td>
-        <td class="right-text bold border-bottom"><?=to_currency($total_activos_corrientes)?></td>
+        <td class="right-text bold border-bottom"><?=money($total_activos_corrientes)?></td>
     </tr>
     
     <!-- ACTIVOS NO CORRIENTES -->
@@ -70,13 +70,13 @@
     <tr>
         <td><?=$activo->account_map?></td>
         <td class="left-text"><?=$activo->account_name?></td>
-        <td class="right-text"><?=to_currency($activo->amount)?></td>
+        <td class="right-text"><?=money($activo->amount)?></td>
     </tr>
     <?php if($activo->depreciation_amount > 0): ?>
     <tr>
         <td></td>
         <td class="left-text" style="padding-left:20px;">(-) Depreciación Acumulada</td>
-        <td class="right-text">(<?=to_currency($activo->depreciation_amount)?>)</td>
+        <td class="right-text">(<?=money($activo->depreciation_amount)?>)</td>
     </tr>
     <?php endif; ?>
     <?php endif; ?>
@@ -85,14 +85,14 @@
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL ACTIVOS NO CORRIENTES</td>
-        <td class="right-text bold border-bottom"><?=to_currency($total_activos_no_corrientes)?></td>
+        <td class="right-text bold border-bottom"><?=money($total_activos_no_corrientes)?></td>
     </tr>
     
     <!-- TOTAL ACTIVOS -->
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL ACTIVOS</td>
-        <td class="right-text bold" style="background-color:#e8f4f8;"><?=to_currency($total_activos)?></td>
+        <td class="right-text bold" style="background-color:#e8f4f8;"><?=money($total_activos)?></td>
     </tr>
     
     <!-- PASIVOS -->
@@ -105,7 +105,7 @@
     <tr>
         <td><?=$pasivo->account_map?></td>
         <td class="left-text"><?=$pasivo->account_name?></td>
-        <td class="right-text"><?=to_currency($pasivo->amount)?></td>
+        <td class="right-text"><?=money($pasivo->amount)?></td>
     </tr>
     <?php endif; ?>
     <?php endforeach; ?>
@@ -113,7 +113,7 @@
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL PASIVOS</td>
-        <td class="right-text bold border-bottom"><?=to_currency($total_pasivos)?></td>
+        <td class="right-text bold border-bottom"><?=money($total_pasivos)?></td>
     </tr>
     <!-- PATRIMONIO -->
     <tr>
@@ -125,7 +125,7 @@
     <tr>
         <td><?=$pat->account_map?></td>
         <td class="left-text"><?=$pat->account_name?></td>
-        <td class="right-text"><?=to_currency($pat->amount)?></td>
+        <td class="right-text"><?=money($pat->amount)?></td>
     </tr>
     <?php endif; ?>
     <?php endforeach; ?>
@@ -133,14 +133,14 @@
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL PATRIMONIO</td>
-        <td class="right-text bold border-bottom"><?=to_currency($total_patrimonio)?></td>
+        <td class="right-text bold border-bottom"><?=money($total_patrimonio)?></td>
     </tr>
     
     <!-- TOTAL PASIVOS + PATRIMONIO -->
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL PASIVOS Y PATRIMONIO</td>
-        <td class="right-text bold" style="background-color:#f8e8e8;"><?=to_currency($total_pasivos_patrimonio)?></td>
+        <td class="right-text bold" style="background-color:#f8e8e8;"><?=money($total_pasivos_patrimonio)?></td>
     </tr>
 </table>
 
@@ -150,19 +150,19 @@
     <table width="100%" style="border-collapse:collapse;">
         <tr>
             <td width="70%" class="bold">TOTAL ACTIVOS:</td>
-            <td width="30%" class="right-text bold"><?=to_currency($total_activos)?></td>
+            <td width="30%" class="right-text bold"><?=money($total_activos)?></td>
         </tr>
         <tr>
             <td class="bold">TOTAL PASIVOS:</td>
-            <td class="right-text bold"><?=to_currency($total_pasivos)?></td>
+            <td class="right-text bold"><?=money($total_pasivos)?></td>
         </tr>
         <tr>
             <td class="bold">TOTAL PATRIMONIO:</td>
-            <td class="right-text bold"><?=to_currency($total_patrimonio)?></td>
+            <td class="right-text bold"><?=money($total_patrimonio)?></td>
         </tr>
         <tr>
             <td class="bold">TOTAL PASIVOS + PATRIMONIO:</td>
-            <td class="right-text bold"><?=to_currency($total_pasivos_patrimonio)?></td>
+            <td class="right-text bold"><?=money($total_pasivos_patrimonio)?></td>
         </tr>
     </table>
 </div>

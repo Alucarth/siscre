@@ -134,10 +134,10 @@ if (!empty($accounts)) {
                     <td><?php echo $account->account_name; ?></td>
                     <td class="text-center"><?php echo $account->tipo_cuenta; ?></td>
                     <td class="text-center"><?php echo $clasificacion_display; ?></td>
-                    <td class="text-right"><?php echo to_currency($account->saldo_inicial); ?></td>
-                    <td class="text-right"><?php echo to_currency($account->saldo_final); ?></td>
+                    <td class="text-right"><?php echo money($account->saldo_inicial); ?></td>
+                    <td class="text-right"><?php echo money($account->saldo_final); ?></td>
                     <td class="text-right <?php echo $variacion_class; ?>">
-                        <?php echo to_currency($account->diferencia); ?>
+                        <?php echo money($account->diferencia); ?>
                     </td>
                 </tr>
                 <?php
@@ -154,7 +154,7 @@ if (!empty($accounts)) {
                     <td colspan="5" class="text-right">Total <?php echo $grupo; ?>:</td>
                     <td colspan="2"></td>
                     <td class="text-right <?php echo $total >= 0 ? 'aumento' : 'disminucion'; ?>">
-                        <?php echo to_currency($total); ?>
+                        <?php echo money($total); ?>
                     </td>
                 </tr>
                 <?php endif; ?>
@@ -165,7 +165,7 @@ if (!empty($accounts)) {
                 <td colspan="5" class="text-right">VARIACIÓN TOTAL DE EFECTIVO:</td>
                 <td colspan="2"></td>
                 <td class="text-right <?php echo $grand_total_diferencia >= 0 ? 'aumento' : 'disminucion'; ?>">
-                    <?php echo to_currency($grand_total_diferencia); ?>
+                    <?php echo money($grand_total_diferencia); ?>
                 </td>
             </tr>
             

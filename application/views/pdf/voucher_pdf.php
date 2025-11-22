@@ -174,18 +174,18 @@
                             <td><?= !empty($transaction->account_name) ? $transaction->account_name : 'Cuenta no especificada' ?></td>
                             <td><?= !empty($transaction->description) ? $transaction->description : '' ?></td>
                             <td class="amount">
-                                <?= $transaction->movement_type == 'debit' ? to_currency($transaction->amount) : '0,00' ?>
+                                <?= $transaction->movement_type == 'debit' ? money($transaction->amount) : '0.00' ?>
                             </td>
                             <td class="amount">
-                                <?= $transaction->movement_type == 'credit' ? to_currency($transaction->amount) : '0,00' ?>
+                                <?= $transaction->movement_type == 'credit' ? money($transaction->amount) : '0.00' ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                     
                     <tr class="totals">
                         <td colspan="3" style="text-align: right;">TOTAL</td>
-                        <td class="amount"><?= to_currency($total_debit) ?></td>
-                        <td class="amount"><?= to_currency($total_credit) ?></td>
+                        <td class="amount"><?= money($total_debit) ?></td>
+                        <td class="amount"><?= money($total_credit) ?></td>
                     </tr>
                 </tbody>
             </table>
