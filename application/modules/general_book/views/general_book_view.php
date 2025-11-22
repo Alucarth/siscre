@@ -81,7 +81,6 @@
                                                     if (method_exists($this->Employee, 'get_logged_in_employee_branch_id')) {
                                                         $current_branch_id = $this->Employee->get_logged_in_employee_branch_id();
                                                     }
-                                                    
                                                     foreach ($branches as $branch): 
                                                     ?>
                                                     <option value="<?php echo $branch->id; ?>" <?php echo ($current_branch_id == $branch->id) ? 'selected' : ''; ?>>

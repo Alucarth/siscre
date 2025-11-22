@@ -58,7 +58,23 @@
                                                 </div>
                                             </div>
                                         </div>
-
+                                        <div class="col-lg-3">
+                                            <div class="form-group">
+                                                <label>Sucursal:</label>
+                                                <select class="form-control" name="branch_id" id="branch_id">
+                                                    <option value="">Todas las sucursales</option>
+                                                    <?php 
+                                                    $current_branch_id = $this->session->userdata('branch_id') ?: 1;
+                                                    
+                                                    foreach ($branches as $branch): 
+                                                    ?>
+                                                    <option value="<?php echo $branch->id; ?>" <?php echo ($current_branch_id == $branch->id) ? 'selected' : ''; ?>>
+                                                        <?php echo $branch->branch_name; ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                        </div>
                                         <div class="col-lg-3">
                                             <div class="form-group">
                                                 <label>&nbsp;</label>
@@ -128,6 +144,7 @@
             softtoken:$("input[name='softtoken']").val(),
             date_from: $("#filter_from_date").val(),
             date_to: $("#filter_to_date").val(),
+             branch_id: $("#branch_id").val()
         };
         blockElement("#div-show-data");
         $.post(url, params, function(html){

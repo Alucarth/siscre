@@ -8,6 +8,16 @@
 
 class General_ledger_model extends CI_Model {
 
+   function get_branches()
+    {
+        $this->db->select('id, branch_name');
+        $this->db->from('c19_branches');
+        $this->db->order_by('branch_name', 'ASC');
+        $query = $this->db->get();
+        
+        return $query->result();
+    }
+
     function get_accounting_transactions($filters = [])
     {
         $where_vouchers = ' WHERE 1=1';
@@ -23,8 +33,11 @@ class General_ledger_model extends CI_Model {
         }
         
         if (is_plugin_active("branches")) {
-            $branch_id = $this->session->userdata("branch_id");
-            $where_vouchers .= " AND v.branch_id = $branch_id";
+            if (isset($filters["branch_id"]) && !empty($filters["branch_id"])) {
+                $branch_id = $filters["branch_id"];
+                $where_vouchers .= " AND v.branch_id = $branch_id";
+            }
+            // Si branch_id está vacío, no aplicar filtro (mostrar todas las sucursales)
         }
         
         $sql_vouchers = "
@@ -122,31 +135,39 @@ class General_ledger_model extends CI_Model {
         $where = '';
         if ( isset($filters["date_from"]) && trim($filters["date_from"]) != '' )
         {
-            $where .= " AND a.trans_date >= '". date("Y-m-d", $filters["date_from"]) ."'";
+            $where .= " AND DATE(a.added_date) >= '". date("Y-m-d", $filters["date_from"]) ."'";
         }
         
         if ( isset($filters["date_to"]) && trim($filters["date_to"]) != '' )
         {
-            $where .= " AND a.trans_date <= '". date("Y-m-d", $filters["date_to"]) ."'";
+            $where .= " AND DATE(a.added_date) <= '". date("Y-m-d", $filters["date_to"]) ."'";
         }
         
         if (is_plugin_active("branches"))
         {
-            $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
+            if (isset($filters["branch_id"]) && !empty($filters["branch_id"])) {
+                $branch_id = $filters["branch_id"];
+                $where .= " AND a.branch_id = " . $branch_id;
+            }
         }
+        
+        // FILTRO CORREGIDO - SOLO TRANSACCIONES SIN VOUCHER
+        $where .= " AND a.voucher_id IS NULL";
         
         $sql = "
                 SELECT  b.account_name,
-                        b.id code_number,
-                        a.trans_type,
+                        b.id as code_number,
+                        a.description,
+                        a.transaction_type,
                         a.amount,
-                        a.trans_date,
-                        a.transaction_order 
-               FROM c19_account_transactions a
-               LEFT JOIN c19_accounts b ON b.id = a.account_id
-               WHERE 1 $where
-               ORDER BY a.transaction_order ASC
-            ";
+                        a.added_date,
+                        a.transaction_order,
+                        a.account_id
+                FROM c19_accounting_transactions a
+                LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
+                WHERE 1 $where
+                ORDER BY a.account_id, a.transaction_order ASC
+                ";
         
         $query = $this->db->query( $sql );
         
@@ -156,19 +177,19 @@ class General_ledger_model extends CI_Model {
             foreach ( $query->result() as $row )
             {
                 $obj = new stdClass();
-                $obj->date = date($this->config->item("date_format"), strtotime($row->trans_date));
-                $obj->explanation = "";
+                $obj->date = date($this->config->item("date_format"), strtotime($row->added_date));
+                $obj->explanation = $row->description;
                 $obj->account_name = $row->account_name;
-                $obj->account_number = $row->code_number;
+                $obj->code_number = $row->code_number;
                 $obj->transaction_order = $row->transaction_order;
                 
-                if ( $row->trans_type == 'withdraw' )
+                if ( $row->transaction_type == 'debit' )
                 {
                     $obj->debit = $row->amount;
                     $obj->credit = 0;
                     $obj->balance = $row->amount;
                 }
-                else
+                else // credit
                 {
                     $obj->debit = 0;
                     $obj->credit = $row->amount;
@@ -197,7 +218,10 @@ class General_ledger_model extends CI_Model {
         
         if (is_plugin_active("branches"))
         {
-            $where .= " AND b.branch_id = " . $this->session->userdata("branch_id");
+            if (isset($filters["branch_id"]) && !empty($filters["branch_id"])) {
+                $branch_id = $filters["branch_id"];
+                $where .= " AND b.branch_id = " . $branch_id;
+            }
         }
         
         $sql = "
@@ -261,7 +285,10 @@ class General_ledger_model extends CI_Model {
         
         if (is_plugin_active("branches"))
         {
-            $where .= " AND b.branch_id = " . $this->session->userdata("branch_id");
+            if (isset($filters["branch_id"]) && !empty($filters["branch_id"])) {
+                $branch_id = $filters["branch_id"];
+                $where .= " AND b.branch_id = " . $branch_id;
+            }
         }
         
         $sql = "

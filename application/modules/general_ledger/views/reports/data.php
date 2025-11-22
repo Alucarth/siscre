@@ -210,8 +210,8 @@
                     <tr>
                         <td><b>Nombre de Cuenta:</b></td>
                         <td><?= $row->account_name; ?></td>
-                        <td><b>Numero de Cuenta:</b></td>
-                        <td><?= $row->account_number; ?></td>
+                        <td><b>Número de Cuenta:</b></td>
+                        <td><?= $row->code_number; ?></td>
                     </tr>
                 </table>
 
@@ -228,7 +228,7 @@
                     <tbody>
                         <tr>
                             <td><?= $row->date; ?></td>
-                            <td><?= $row->explanation; ?></td>
+                            <td><?= $row->explanation; ?></td>  
                             <td><?= to_currency($row->debit); ?></td>
                             <td><?= to_currency($row->credit); ?></td>
                             <td><?= to_currency($row->balance); ?></td>

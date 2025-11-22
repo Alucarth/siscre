@@ -14,7 +14,8 @@ class General_ledger extends Secure_area implements iData_controller {
 
     function index()
     {
-        $this->load->view('general_ledger/reports');
+        $data['branches'] = $this->general_ledger_model->get_branches();
+        $this->load->view('general_ledger/reports', $data);
     }
     
     function generate()
@@ -27,6 +28,8 @@ class General_ledger extends Secure_area implements iData_controller {
         $filters["date_to"] = $this->config->item('date_format') == 'd/m/Y' 
             ? strtotime(uk_to_isodate($this->input->post('date_to'))) 
             : strtotime($this->input->post('date_to'));
+        
+        $filters["branch_id"] = $this->input->post('branch_id');
         
         $data = [];
         
