@@ -832,20 +832,17 @@ class Loans extends Secure_area implements iData_controller
     private function _create_loan_approval_voucher($loan_id, $loan_data, $employee_id = null, $branch_id = null)
     {
         if (!is_plugin_active('accounting')) {
-            log_message('error', 'Accounting plugin not active');
             return null;
         }
         
         try {
             if (empty($loan_id) || empty($loan_data)) {
-                log_message('error', 'Missing loan_id or loan_data in voucher creation');
                 return null;
             }
             
             if ($employee_id === null) {
                 $employee_info = $this->Employee->get_logged_in_employee_info();
                 if (!$employee_info) {
-                    log_message('error', 'No logged in employee found');
                     return null;
                 }
                 $employee_id = $employee_info->person_id;
@@ -905,7 +902,6 @@ class Loans extends Secure_area implements iData_controller
             
             $amount = floatval($loan_data['apply_amount'] ?? 0);
             if ($amount <= 0) {
-                log_message('error', 'Invalid loan amount: ' . $amount);
                 return null;
             }
             
@@ -931,7 +927,6 @@ class Loans extends Secure_area implements iData_controller
             $insert_result = $this->db->insert('c19_accounting_vouchers', $voucher_data);
             if (!$insert_result) {
                 $error = $this->db->error();
-                log_message('error', 'Failed to create voucher: ' . $error['message']);
                 $this->db->trans_rollback();
                 return null;
             }
@@ -939,7 +934,6 @@ class Loans extends Secure_area implements iData_controller
             $voucher_id = $this->db->insert_id();
             
             if (!$voucher_id) {
-                log_message('error', 'Failed to get voucher ID');
                 $this->db->trans_rollback();
                 return null;
             }
@@ -996,20 +990,16 @@ class Loans extends Secure_area implements iData_controller
                 
                 if (!$insert_result) {
                     $error = $this->db->error();
-                    log_message('error', 'Failed to insert transaction entry: ' . $error['message']);
                     $this->db->trans_rollback();
                     return null;
                 }
             }
             
             $this->db->trans_commit();
-            
-            log_message('info', 'Successfully created loan approval voucher: ' . $voucher_id . ' for loan: ' . $loan_id);
             return $voucher_id;
             
         } catch (Exception $e) {
             $this->db->trans_rollback();
-            log_message('error', 'Error creating loan approval voucher: ' . $e->getMessage());
             return null;
         }
     }
