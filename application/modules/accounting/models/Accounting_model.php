@@ -645,29 +645,22 @@ class Accounting_model extends CI_Model
     }
     
     public function get_cash_flow_data($filters = [])
-    {
-        log_message('debug', '=== INICIANDO GET_CASH_FLOW_DATA CON SALDOS ===');
-        
+    {        
         // Validar filtros de fecha
         if (!isset($filters["date_from"]) || !isset($filters["date_to"])) {
-            log_message('error', 'Filtros de fecha no definidos');
             return [];
         }
         
         $date_from = date("Y-m-d", $filters["date_from"]);
         $date_to = date("Y-m-d", $filters["date_to"]);
         
-        log_message('debug', 'Período: ' . $date_from . ' a ' . $date_to);
-        
         $branch_condition = "";
         if (is_plugin_active("branches")) {
             $branch_id = $this->session->userdata("branch_id");
             $branch_condition = " AND at.branch_id = $branch_id";
-            log_message('debug', 'Filtro branch: ' . $branch_id);
         }
         
         // PASO 1: Obtener saldos iniciales (antes de date_from)
-        log_message('debug', '=== CALCULANDO SALDOS INICIALES ===');
         $sql_saldos_iniciales = "
             SELECT 
                 aa.id as account_id,
@@ -686,7 +679,6 @@ class Accounting_model extends CI_Model
             HAVING ABS(saldo_inicial) > 0.01
         ";
         
-        log_message('debug', 'SQL Saldos Iniciales: ' . $sql_saldos_iniciales);
         $query_inicial = $this->db->query($sql_saldos_iniciales);
         $saldos_iniciales = [];
         
@@ -694,13 +686,10 @@ class Accounting_model extends CI_Model
             foreach ($query_inicial->result() as $row) {
                 $saldos_iniciales[$row->account_id] = $row->saldo_inicial;
             }
-            log_message('debug', 'Saldos iniciales encontrados: ' . count($saldos_iniciales));
         } else {
-            log_message('debug', 'No se encontraron saldos iniciales');
         }
         
         // PASO 2: Obtener transacciones del período con saldos finales
-        log_message('debug', '=== OBTENIENDO TRANSACCIONES DEL PERÍODO ===');
         $sql_transacciones = "
             SELECT 
                 aa.id,
@@ -729,16 +718,12 @@ class Accounting_model extends CI_Model
             ORDER BY aa.account_type, aa.code_number, at.added_date
         ";
         
-        log_message('debug', 'SQL Transacciones: ' . $sql_transacciones);
         $query = $this->db->query($sql_transacciones);
         
         if (!$query) {
             $error = $this->db->error();
-            log_message('error', 'Error en consulta: ' . $error['message']);
             return [];
         }
-        
-        log_message('debug', 'Transacciones encontradas: ' . $query->num_rows());
         
         $cash_flow_data = [];
         $cuentas_procesadas = [];
@@ -789,9 +774,6 @@ class Accounting_model extends CI_Model
                 $cuentas_procesadas[$row->id] = true;
             }
         }
-        
-        log_message('debug', '=== DATOS PROCESADOS: ' . count($cash_flow_data) . ' registros ===');
-        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_DATA CON SALDOS ===');
         
         return $cash_flow_data;
     }
@@ -844,13 +826,11 @@ class Accounting_model extends CI_Model
 
     public function get_cash_flow_with_totals($filters = [])
     {
-        log_message('debug', '=== INICIANDO GET_CASH_FLOW_WITH_TOTALS ===');
         
         // Obtener datos base
         $cash_flow_data = $this->get_cash_flow_data($filters);
         
         if (empty($cash_flow_data)) {
-            log_message('debug', 'No hay datos de flujo de efectivo');
             return [
                 'accounts' => [],
                 'totals' => [
@@ -863,8 +843,6 @@ class Accounting_model extends CI_Model
             ];
         }
         
-        log_message('debug', 'Procesando ' . count($cash_flow_data) . ' transacciones');
-        
         // Estructuras para cálculos
         $totals_by_activity = [
             'operating' => 0,
@@ -875,9 +853,7 @@ class Accounting_model extends CI_Model
         $accounts_summary = [];
         $processed_accounts = [];
         
-        // PASO 1: Procesar cada transacción y calcular totales
-        log_message('debug', '=== CALCULANDO TOTALES POR ACTIVIDAD ===');
-        
+        // PASO 1: Procesar cada transacción y calcular totales        
         foreach ($cash_flow_data as $transaction) {
             $account_id = $transaction->id;
             
@@ -894,25 +870,15 @@ class Accounting_model extends CI_Model
                     'clasificacion' => $this->get_variacion_clasificacion($transaction->variacion)
                 ];
                 $processed_accounts[$account_id] = true;
-                
-                log_message('debug', "Cuenta {$transaction->code_number} - Variación: {$transaction->variacion}");
             }
             
             // Acumular por tipo de actividad (usar monto_variacion de cada transacción)
             $monto_actividad = $transaction->monto_variacion;
             $totals_by_activity[$transaction->activity_type] += $monto_actividad;
-            
-            log_message('debug', "Actividad {$transaction->activity_type} + {$monto_actividad} = {$totals_by_activity[$transaction->activity_type]}");
         }
         
         // PASO 2: Calcular flujo neto de efectivo
         $net_cash_flow = $totals_by_activity['operating'] + $totals_by_activity['investing'] + $totals_by_activity['financing'];
-        
-        log_message('debug', '=== TOTALES CALCULADOS ===');
-        log_message('debug', 'Operating: ' . $totals_by_activity['operating']);
-        log_message('debug', 'Investing: ' . $totals_by_activity['investing']);
-        log_message('debug', 'Financing: ' . $totals_by_activity['financing']);
-        log_message('debug', 'Net Cash Flow: ' . $net_cash_flow);
         
         // PASO 3: Preparar datos finales
         $result = [
@@ -930,9 +896,6 @@ class Accounting_model extends CI_Model
             ]
         ];
         
-        log_message('debug', 'Resumen generado: ' . count($accounts_summary) . ' cuentas');
-        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_WITH_TOTALS ===');
-        
         return $result;
     }
 
@@ -949,13 +912,9 @@ class Accounting_model extends CI_Model
     }
 
     public function get_cash_flow_consolidated($filters = [])
-    {
-        log_message('debug', '=== INICIANDO GET_CASH_FLOW_CONSOLIDATED ===');
-        
+    {        
         $date_from = date("Y-m-d", $filters["date_from"]);
         $date_to = date("Y-m-d", $filters["date_to"]);
-        
-        log_message('debug', 'Período consolidado: ' . $date_from . ' a ' . $date_to);
         
         $branch_condition = "";
         if (is_plugin_active("branches")) {
@@ -1014,16 +973,12 @@ class Accounting_model extends CI_Model
             ORDER BY aa.code_number
         ";
         
-        log_message('debug', 'SQL Consolidado: ' . $sql);
         $query = $this->db->query($sql);
         
         if (!$query) {
             $error = $this->db->error();
-            log_message('error', 'Error en consulta consolidada: ' . $error['message']);
             return [];
         }
-        
-        log_message('debug', 'Cuentas consolidadas encontradas: ' . $query->num_rows());
         
         $consolidated_data = [];
         $total_variacion = 0;
@@ -1078,9 +1033,6 @@ class Accounting_model extends CI_Model
                 $total_variacion += $diferencia;
             }
         }
-        
-        log_message('debug', 'Total variación consolidada: ' . $total_variacion);
-        log_message('debug', '=== FINALIZANDO GET_CASH_FLOW_CONSOLIDATED ===');
         
         return $consolidated_data;
     }
@@ -1339,7 +1291,7 @@ class Accounting_model extends CI_Model
 
     function get_all_accounts()
     {
-        $this->db->order_by('account_type, code_number');
+        $this->db->order_by('code_number');
         return $this->db->get('c19_accounting_accounts');
     }
 

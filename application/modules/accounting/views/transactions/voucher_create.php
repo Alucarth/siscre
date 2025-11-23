@@ -14,6 +14,10 @@
         margin-bottom: 15px;
         border-radius: 5px;
     }
+    /* Estilos para selects con búsqueda */
+    .account-select {
+        width: 100%;
+    }
 </style>
 
 <div class="title-block">
@@ -190,6 +194,9 @@ $(document).ready(function() {
         autoclose: true
     });
     
+    // Inicializar el plugin de búsqueda para los selects existentes
+    initializeAccountSelects();
+    
     var rowTemplate = `
     <div class="account-row">
         <div class="debit-credit-box">
@@ -242,12 +249,18 @@ $(document).ready(function() {
     // Agregar nueva fila
     $('#add-row').click(function() {
         $('#account-rows').append(rowTemplate);
-        initRowEvents($('#account-rows .account-row').last());
+        var newRow = $('#account-rows .account-row').last();
+        initRowEvents(newRow);
+        // Inicializar el plugin de búsqueda para el nuevo select
+        initializeAccountSelect(newRow.find('.account-select'));
     });
     
     // Eliminar fila
     $(document).on('click', '.remove-row', function() {
         if ($('.account-row').length > 1) {
+            // Destruir el plugin antes de eliminar (si es necesario)
+            var selectElement = $(this).closest('.account-row').find('.account-select');
+            destroyAccountSelect(selectElement);
             $(this).closest('.account-row').remove();
             calculateTotals();
         } else {
@@ -364,6 +377,78 @@ $(document).ready(function() {
         }
         
         return true;
+    }
+    
+    // FUNCIONES PARA EL PLUGIN DE BÚSQUEDA EN SELECTS
+    function initializeAccountSelects() {
+        $('.account-select').each(function() {
+            initializeAccountSelect($(this));
+        });
+    }
+    
+    function initializeAccountSelect(selectElement) {
+        // Verificar qué plugin está disponible y aplicarlo
+        if ($.fn.select2) {
+            // Usar Select2 si está disponible
+            selectElement.select2({
+                placeholder: "Seleccionar cuenta",
+                allowClear: false,
+                width: '100%',
+                dropdownParent: selectElement.closest('.debit-credit-box')
+            });
+        } else if ($.fn.choices) {
+            // Usar Choices.js si está disponible
+            selectElement.choices({
+                placeholder: true,
+                placeholderValue: "Seleccionar cuenta",
+                removeItemButton: true
+            });
+        } else {
+            // Si no hay plugin específico, usar búsqueda nativa mejorada
+            enhanceNativeSelect(selectElement);
+        }
+    }
+    
+    function destroyAccountSelect(selectElement) {
+        // Destruir el plugin si existe antes de eliminar el elemento
+        if ($.fn.select2 && selectElement.hasClass('select2-hidden-accessible')) {
+            selectElement.select2('destroy');
+        } else if ($.fn.choices) {
+            var choicesInstance = selectElement.data('choices');
+            if (choicesInstance) {
+                choicesInstance.destroy();
+            }
+        }
+    }
+    
+    function enhanceNativeSelect(selectElement) {
+        // Mejorar el select nativo con funcionalidad de búsqueda básica
+        var originalOptions = selectElement.html();
+        
+        selectElement.on('focus', function() {
+            this.size = 6; // Mostrar más opciones al enfocar
+        }).on('blur', function() {
+            this.size = 1; // Volver al tamaño normal al perder foco
+        }).on('keyup', function(e) {
+            // Filtrar opciones mientras se escribe
+            var searchText = $(this).val().toLowerCase();
+            var options = $(this).find('option');
+            
+            options.show();
+            if (searchText) {
+                options.each(function() {
+                    var optionText = $(this).text().toLowerCase();
+                    if (optionText.indexOf(searchText) === -1 && $(this).val() !== '') {
+                        $(this).hide();
+                    }
+                });
+            }
+        });
+        
+        // Restaurar todas las opciones cuando se pierde el foco
+        selectElement.on('blur', function() {
+            $(this).find('option').show();
+        });
     }
 });
 </script>

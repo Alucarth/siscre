@@ -521,8 +521,6 @@ class Payments extends Secure_area implements iData_controller {
             return $voucher_id;
             
         } catch (Exception $e) {
-            // Log the error but don't break the main payment process
-            log_message('error', 'Error creating payment voucher: ' . $e->getMessage());
             return null;
         }
     }

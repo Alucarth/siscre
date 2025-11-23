@@ -772,13 +772,10 @@ class Accounting extends Secure_area implements iData_controller {
     }
     
     public function report_export()
-    {
-        log_message('debug', '=== INICIANDO REPORT_EXPORT - CASH_FLOW ===');
-        
+    {        
         ini_set('memory_limit', '-1');
         
         $report_type = urldecode($this->input->get("report_type"));
-        log_message('debug', 'Report type: ' . $report_type);
         
         $_POST["date_from"] = urldecode($this->input->get("date_from"));
         $_POST["date_to"] = urldecode($this->input->get("date_to"));
@@ -789,8 +786,6 @@ class Accounting extends Secure_area implements iData_controller {
         
         $data["date_from"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_from'))) : strtotime($this->input->post('date_from'));
         $data["date_to"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_to'))) : strtotime($this->input->post('date_to'));
-        
-        log_message('debug', 'Datos cargados, accounts count: ' . (isset($data['accounts']) ? count($data['accounts']) : '0'));
         
         if ($report_type == 'balance_sheet') {
             $income_data = $this->accounting_model->get_consolidated_income_statement([
@@ -803,9 +798,7 @@ class Accounting extends Secure_area implements iData_controller {
             $data["net_income"] = $income_data['net_income'];
         }
         
-        log_message('debug', 'Cargando vista...');
         $html = $this->load->view('accounting/reports/' . $report_type, $data, true);
-        log_message('debug', 'Vista cargada');
         
         $timestamp = date('dmyHis');
         $filename = "{$report_type}_{$timestamp}";
@@ -832,14 +825,10 @@ class Accounting extends Secure_area implements iData_controller {
         }
         
         $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
-        log_message('debug', 'Generando PDF...');
         $pdf->WriteHTML($html);
         $pdf->Output($pdfFilePath, 'F');
-        log_message('debug', 'PDF generado');
 
         redirect(base_url("downloads/reports/{$filename}.pdf"));
-        
-        log_message('debug', '=== FINALIZADO REPORT_EXPORT ===');
     }
     
     public function report_csv()
@@ -868,8 +857,6 @@ class Accounting extends Secure_area implements iData_controller {
     
     private function _load_report_data( $report_type )
     {
-        log_message('debug', 'Cargando datos para: ' . $report_type);
-        
         $filters = [];
         
         if ($this->config->item('date_format') == 'd/m/Y') {

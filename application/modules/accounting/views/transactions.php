@@ -29,7 +29,7 @@
    <!-- Botón para crear un nuevo comprobante -->
     <div style="float:right;">
         <a href="<?= site_url('accounting/voucher_create'); ?>" class="btn btn-primary">
-            <i class="fa fa-file-text-o"></i> Nuevo Comprobante
+            <i class="fa fa-file-text-o"></i> Nuevo Voucher
         </a>
     </div>
 

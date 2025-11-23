@@ -782,12 +782,6 @@ class Loans extends Secure_area implements iData_controller
             if ($is_status_change_to_approved) {
                 $new_loan_id = ($loan_id == -1) ? $loan_data['loan_id'] : $loan_id;
                 $voucher_result = $this->_create_loan_approval_voucher($new_loan_id, $loan_data);
-                
-                if ($voucher_result === null) {
-                    log_message('error', 'No se pudo crear el comprobante contable para el préstamo: ' . $new_loan_id);
-                } else {
-                    log_message('info', 'Comprobante contable creado exitosamente. Voucher ID: ' . $voucher_result . ' para préstamo: ' . $new_loan_id);
-                }
             }
             
             if ( $is_reverted )
