@@ -315,14 +315,12 @@ class Savings_account_reports extends MX_Controller
         $error         = '';
         $accounts_list = [];
 
-        // 1) Si hay búsqueda por cliente pero todavía no se eligió cuenta → listar cuentas
-        if (!empty($person_q) && empty($account_number))
-        {
-            $dbp       = $this->db->dbprefix; // ej: c19_
+        // 1) Buscar cuentas por cliente
+        if (!empty($person_q) && empty($account_number)) {
+            $dbp       = $this->db->dbprefix;
             $table_sa  = $dbp.'savings_accounts';
             $table_sat = $dbp.'savings_account_types';
             $table_p   = $dbp.'people';
-
             $like = '%'.$this->db->escape_like_str($person_q).'%';
 
             $accounts_list = $this->db->query("
@@ -342,7 +340,7 @@ class Savings_account_reports extends MX_Controller
             ", [$like])->result();
         }
 
-        // 2) Si ya tenemos número de cuenta → cargar extracto
+        // 2) Cargar extracto si hay cuenta y rango
         if (!empty($account_number) && !empty($date_from) && !empty($date_to)) {
             list($header, $rows, $opening, $totals) = $this->_statement_data($account_number, $date_from, $date_to);
             if (!$header) {
@@ -350,23 +348,238 @@ class Savings_account_reports extends MX_Controller
             }
         }
 
-                    // --- Catálogo de cuentas, igual que en transacciones ---
+        // --- Normalizar filas con datos faltantes desde la tabla de transacciones ---
+        if (!empty($rows)) {
+            $dbp = $this->db->dbprefix;
+
+            // 1) Reunir IDs de transacción presentes en las filas
+            $tx_ids = [];
+            foreach ($rows as $rr) {
+                if (!empty($rr->transaction_id)) {
+                    $tx_ids[] = (int)$rr->transaction_id;
+                }
+            }
+            $tx_ids = array_values(array_unique(array_filter($tx_ids)));
+
+            // 2) Traer SOLO los campos que nos faltan
+            if (!empty($tx_ids)) {
+                $tx_map = [];
+                $tx_extra = $this->db->select("
+                        tx.transaction_id,
+                        tx.savings_account_id,
+                        tx.counterparty_account_id,
+                        tx.depositor_name,
+                        tx.depositor_document,
+                        tx.trans_type,
+                        tx.description,
+                        tx.transfer_group_id,
+                        tx.transfer_kind
+                    ", FALSE)
+                    ->from($dbp.'savings_account_transactions tx')
+                    ->where_in('tx.transaction_id', $tx_ids)
+                    ->get()->result();
+
+                foreach ($tx_extra as $t) {
+                    $tx_map[(int)$t->transaction_id] = $t;
+                }
+
+                // 3) Fusionar sin pisar lo que ya vino
+                foreach ($rows as &$rr) {
+                    $tid = (int)($rr->transaction_id ?? 0);
+                    if ($tid && isset($tx_map[$tid])) {
+                        $t = $tx_map[$tid];
+                        if (!isset($rr->savings_account_id)      || empty($rr->savings_account_id))      $rr->savings_account_id      = $t->savings_account_id;
+                        if (!isset($rr->counterparty_account_id) || $rr->counterparty_account_id===null) $rr->counterparty_account_id = $t->counterparty_account_id;
+                        if (!isset($rr->transfer_group_id)       || empty($rr->transfer_group_id))       $rr->transfer_group_id       = $t->transfer_group_id;
+                        if (!isset($rr->depositor_name)          || $rr->depositor_name==='')            $rr->depositor_name          = $t->depositor_name;
+                        if (!isset($rr->depositor_document)      || $rr->depositor_document==='')        $rr->depositor_document      = $t->depositor_document;
+                        if (!isset($rr->trans_type)              || $rr->trans_type==='')                $rr->trans_type              = $t->trans_type;
+                        if (!isset($rr->description)             || $rr->description==='')               $rr->description             = $t->description;
+                    }
+                }
+                unset($rr);
+            }
+
+            // 4) Resolver contrapartes y construir ui_description
+            $has_people_document = $this->db->field_exists('document', $dbp.'people');
+
+            // Resolver por grupo cuando falte counterparty_account_id
+            $group_ids = [];
+            foreach ($rows as $r) {
+                if (empty($r->counterparty_account_id) && !empty($r->transfer_group_id)) {
+                    $group_ids[] = (int)$r->transfer_group_id;
+                }
+            }
+            $group_ids = array_values(array_unique(array_filter($group_ids)));
+
+            $group_map = [];
+            if (!empty($group_ids)) {
+                $pairs = $this->db->select("transfer_group_id, transaction_id, savings_account_id")
+                    ->from($dbp.'savings_account_transactions')
+                    ->where_in('transfer_group_id', $group_ids)
+                    ->get()->result();
+                foreach ($pairs as $p) {
+                    $group_map[(int)$p->transfer_group_id][(int)$p->transaction_id] = (int)$p->savings_account_id;
+                }
+            }
+
+            // Cuentas involucradas
+            $acc_ids = [];
+            foreach ($rows as $r) {
+                if (!empty($r->savings_account_id))      $acc_ids[] = (int)$r->savings_account_id;
+                if (!empty($r->counterparty_account_id)) $acc_ids[] = (int)$r->counterparty_account_id;
+                if (empty($r->counterparty_account_id) && !empty($r->transfer_group_id)) {
+                    $grp = $group_map[(int)$r->transfer_group_id] ?? [];
+                    foreach ($grp as $tid => $accid) {
+                        if ($tid != (int)$r->transaction_id) { $acc_ids[] = (int)$accid; break; }
+                    }
+                }
+            }
+            $acc_ids = array_values(array_unique(array_filter($acc_ids)));
+
+            // Mapa cuenta -> (nombre, doc, nro)
+            $by_acc = [];
+            if (!empty($acc_ids)) {
+                $sel_doc = $has_people_document ? 'p.document' : "'' AS document";
+                $acc_people = $this->db->select("
+                        sa.savings_account_id,
+                        sa.account_number AS accno,
+                        CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,'')) AS full_name,
+                        {$sel_doc}", FALSE)
+                    ->from($dbp.'savings_accounts sa')
+                    ->join($dbp.'people p','p.person_id = sa.person_id','left')
+                    ->where_in('sa.savings_account_id', $acc_ids)
+                    ->get()->result();
+
+                foreach ($acc_people as $ap) {
+                    $by_acc[(int)$ap->savings_account_id] = [
+                        'name'  => trim((string)$ap->full_name),
+                        'doc'   => $has_people_document ? trim((string)$ap->document) : '',
+                        'accno' => (string)$ap->accno,
+                    ];
+                }
+            }
+
+            $label_for = ['deposit'=>'Depósito','withdraw'=>'Retiro','transfer'=>'Transferencia'];
+
+            foreach ($rows as &$r) {
+                $tt = strtolower((string)$r->trans_type);
+                $r->type_label = $label_for[$tt] ?? ucfirst($tt);
+
+                // Completar contraparte si sigue faltando y hay grupo
+                if (empty($r->counterparty_account_id) && !empty($r->transfer_group_id)) {
+                    $grp = $group_map[(int)$r->transfer_group_id] ?? [];
+                    foreach ($grp as $tid => $accid) {
+                        if ($tid != (int)$r->transaction_id) {
+                            $r->counterparty_account_id = (int)$accid;
+                            break;
+                        }
+                    }
+                }
+
+                $base = trim((string)($r->description ?? ''));
+                if ($base === '') $base = '—';
+                $extras = [];
+
+                if ($tt === 'deposit') {
+                    $dn = trim((string)($r->depositor_name ?? ''));
+                    $dd = trim((string)($r->depositor_document ?? ''));
+                    if ($dn !== '' || $dd !== '') {
+                        $line = 'Depositante: '.($dn ?: '—');
+                        if ($dd !== '') $line .= "\nCI: ".$dd;
+                        $extras[] = $line;
+                    }
+                } elseif ($tt === 'withdraw') {
+                    // Siempre mostrar propietario de la cuenta (retiro normal)
+                    $own = $by_acc[(int)($r->savings_account_id ?? 0)] ?? ['name'=>'','doc'=>'','accno'=>''];
+                    $label = $own['name'] !== '' ? $own['name'] : ($own['accno'] ?: '—');
+                    $line  = 'Propietario de la cuenta: ' . $label;
+                    if ($own['doc'] !== '') {
+                        $line .= ' — CI: ' . $own['doc'];
+                    }
+                    $extras[] = $line;
+                } elseif ($tt === 'transfer') {
+                    // Transferencias: origen/destino consistentes
+                    static $group_cache = [];
+
+                    $origin_acc_id = null;
+                    $dest_acc_id   = null;
+
+                    if (property_exists($r, 'transfer_group_id') && !empty($r->transfer_group_id)) {
+                        $g = (int)$r->transfer_group_id;
+
+                        if (!isset($group_cache[$g])) {
+                            $pair = $this->db->select('savings_account_id, counterparty_account_id, transaction_id')
+                                ->from($dbp.'savings_account_transactions')
+                                ->where('transfer_group_id', $g)
+                                ->order_by('transaction_id', 'ASC')
+                                ->get()->result();
+
+                            if (count($pair) >= 2) {
+                                $origin_acc_id = (int)$pair[0]->savings_account_id;
+                                $dest_acc_id   = (int)$pair[1]->savings_account_id;
+                            } elseif (count($pair) === 1) {
+                                $origin_acc_id = (int)$pair[0]->savings_account_id;
+                                $dest_acc_id   = (int)$pair[0]->counterparty_account_id;
+                            }
+
+                            if ($origin_acc_id && $dest_acc_id) {
+                                $group_cache[$g] = [
+                                    'origin' => $origin_acc_id,
+                                    'dest'   => $dest_acc_id,
+                                ];
+                            } else {
+                                $group_cache[$g] = [
+                                    'origin' => (int)$r->savings_account_id,
+                                    'dest'   => (int)$r->counterparty_account_id,
+                                ];
+                            }
+                        }
+
+                        $origin_acc_id = $group_cache[$g]['origin'];
+                        $dest_acc_id   = $group_cache[$g]['dest'];
+                    } else {
+                        $origin_acc_id = (int)$r->savings_account_id;
+                        $dest_acc_id   = (int)$r->counterparty_account_id;
+                    }
+
+                    $origin = $by_acc[$origin_acc_id] ?? ['name'=>'','doc'=>'','accno'=>''];
+                    $dest   = $by_acc[$dest_acc_id]   ?? ['name'=>'','doc'=>'','accno'=>''];
+
+                    $origin_label = $origin['name'] !== '' ? $origin['name'] : ($origin['accno'] ?: '—');
+                    $dest_label   = $dest['name']   !== '' ? $dest['name']   : ($dest['accno']   ?: '—');
+
+                    $l1 = 'Cuenta origen: '  . $origin_label;
+                    if ($origin['doc'] !== '') $l1 .= ' — CI: '.$origin['doc'];
+
+                    $l2 = 'Cuenta destino: ' . $dest_label;
+                    if ($dest['doc'] !== '') $l2 .= ' — CI: '.$dest['doc'];
+
+                    $extras[] = $l1;
+                    $extras[] = $l2;
+                }
+
+                $r->ui_description = $base.(empty($extras) ? '' : "\n".implode("\n",$extras));
+            }
+            unset($r);
+        }
+
+        // Catálogo de cuentas
         $accounts = $this->Savings_accounts_model->get_all_with_person_active();
         $account_options = [];
         foreach ($accounts as $a) {
             $accno = $a->account_number ?: ('CA-' . str_pad($a->savings_account_id, 6, '0', STR_PAD_LEFT));
-            $owner = trim($a->person_name) !== '' ? trim($a->person_name) : ('ID ' . $a->person_id);
-            $label = '['.$accno.'] '.$owner.' — '.$a->type_name;
-            $account_options[$a->savings_account_id] = $label;
+            $owner = trim($a->person_name) ?: ('ID ' . $a->person_id);
+            $account_options[$a->savings_account_id] = '['.$accno.'] '.$owner.' — '.$a->type_name;
         }
 
-        $data['filters']       = compact('person_q','account_number','date_from','date_to');
-        $data['header']        = $header;
-        $data['rows']          = $rows;
-        $data['totals']        = $totals;
-        $data['error']         = $error;
-        $data['accounts_list'] = $accounts_list;
-        $data['account_options'] = $account_options;   // ⬅️ nuevo
+        $data['filters']          = compact('person_q','account_number','date_from','date_to');
+        $data['header']           = $header;
+        $data['rows']             = $rows;
+        $data['totals']           = $totals;
+        $data['error']            = $error;
+        $data['accounts_list']    = $accounts_list;
+        $data['account_options']  = $account_options;
 
         $this->load->view('savings_accounts/reports/account_statement', $data);
     }
@@ -390,6 +603,205 @@ class Savings_account_reports extends MX_Controller
             show_error('No se encontró una cuenta con ese número.');
         }
 
+        // ============================
+        // ENRIQUECER FILAS PARA EL PDF
+        // ============================
+        if (!empty($rows)) {
+            $dbp = $this->db->dbprefix;
+
+            // 1) Traer info extra de la tabla de transacciones por transaction_id
+            $tx_ids = [];
+            foreach ($rows as $r) {
+                if (!empty($r->transaction_id)) {
+                    $tx_ids[] = (int)$r->transaction_id;
+                }
+            }
+            $tx_ids = array_values(array_unique(array_filter($tx_ids)));
+
+                    $tx_map   = [];
+                    $group_map = [];     // transfer_group_id => ['withdraw'=>acc_id, 'deposit'=>acc_id]
+                    $acc_ids  = [];      // para luego traer nombre y CI
+
+                    if (!empty($tx_ids)) {
+                        $tx_extra = $this->db->select("
+                                tx.transaction_id,
+                                tx.savings_account_id,
+                                tx.counterparty_account_id,
+                                tx.trans_type,
+                                tx.transfer_group_id,
+                                tx.transfer_kind,
+                                tx.description,
+                                tx.depositor_name,
+                                tx.depositor_document
+                            ", FALSE)
+                            ->from($dbp.'savings_account_transactions tx')
+                            ->where_in('tx.transaction_id', $tx_ids)
+                            ->get()->result();
+
+                        foreach ($tx_extra as $t) {
+                            $tid = (int)$t->transaction_id;
+                            $tx_map[$tid] = $t;
+
+                            // cuentas involucradas
+                            if (!empty($t->savings_account_id)) {
+                                $acc_ids[] = (int)$t->savings_account_id;
+                            }
+                            if (!empty($t->counterparty_account_id)) {
+                                $acc_ids[] = (int)$t->counterparty_account_id;
+                            }
+                        }
+
+                        // ---- NUEVO: resolver origen/destino por grupo usando TODAS las filas del grupo ----
+                        $group_ids = [];
+                        foreach ($tx_extra as $t) {
+                            if (!empty($t->transfer_group_id)) {
+                                $group_ids[] = (int)$t->transfer_group_id;
+                            }
+                        }
+                        $group_ids = array_values(array_unique(array_filter($group_ids)));
+
+                        if (!empty($group_ids)) {
+                            $pairs = $this->db->select('transfer_group_id, savings_account_id, transfer_kind')
+                                ->from($dbp.'savings_account_transactions')
+                                ->where_in('transfer_group_id', $group_ids)
+                                ->where('trans_type', 'transfer')
+                                ->get()->result();
+
+                            foreach ($pairs as $p) {
+                                $g = (string)$p->transfer_group_id;
+                                $k = strtolower((string)$p->transfer_kind); // withdraw / deposit
+
+                                if (!isset($group_map[$g])) {
+                                    $group_map[$g] = ['withdraw' => null, 'deposit' => null];
+                                }
+
+                                if ($k === 'withdraw' || $k === 'deposit') {
+                                    $group_map[$g][$k] = (int)$p->savings_account_id;
+                                }
+                            }
+                        }
+                    }
+
+            $acc_ids = array_values(array_unique(array_filter($acc_ids)));
+
+            // 2) Traer nombres / CI de las cuentas involucradas
+            $by_acc = []; // acc_id => ['name'=>..., 'doc'=>..., 'accno'=>...]
+            $has_people_document = $this->db->field_exists('document', $dbp.'people');
+
+            if (!empty($acc_ids)) {
+                $sel_doc = $has_people_document ? 'p.document' : "'' AS document";
+                $acc_people = $this->db->select("
+                        sa.savings_account_id,
+                        sa.account_number AS accno,
+                        CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,'')) AS full_name,
+                        {$sel_doc}
+                    ", FALSE)
+                    ->from($dbp.'savings_accounts sa')
+                    ->join($dbp.'people p','p.person_id = sa.person_id','left')
+                    ->where_in('sa.savings_account_id', $acc_ids)
+                    ->get()->result();
+
+                foreach ($acc_people as $ap) {
+                    $by_acc[(int)$ap->savings_account_id] = [
+                        'name'  => trim((string)$ap->full_name),
+                        'doc'   => $has_people_document ? trim((string)$ap->document) : '',
+                        'accno' => (string)$ap->accno,
+                    ];
+                }
+            }
+
+            // 3) Etiquetas legibles de tipo
+            $label_for = [
+                'deposit'  => 'Depósito',
+                'withdraw' => 'Retiro',
+                'transfer' => 'Transferencia',
+            ];
+
+            // 4) Preparar type_label y una descripción enriquecida similar a la vista
+            foreach ($rows as $r) {
+                $tid = (int)($r->transaction_id ?? 0);
+                $tx  = $tx_map[$tid] ?? null;
+
+                $tt_raw = $tx ? $tx->trans_type : $r->trans_type;
+                $tt     = strtolower((string)$tt_raw);
+
+                $r->type_label = $label_for[$tt] ?? ucfirst($tt);
+
+                // base = descripción original
+                $base = trim((string)(
+                    $tx->description
+                    ?? $r->description
+                    ?? ''
+                ));
+                if ($base === '') {
+                    $base = '—';
+                }
+
+                $extras = [];
+
+                if ($tt === 'deposit') {
+                    // Depósitos simples: mostrar depositante
+                    $dn = trim((string)($tx->depositor_name ?? ''));
+                    $dd = trim((string)($tx->depositor_document ?? ''));
+                    if ($dn !== '' || $dd !== '') {
+                        $line = 'Depositante: '.($dn !== '' ? $dn : '—');
+                        if ($dd !== '') {
+                            $line .= "\nCI: ".$dd;
+                        }
+                        $extras[] = $line;
+                    }
+                } elseif ($tt === 'transfer') {
+                    // Transferencias: origen/destino usando transfer_group_id + transfer_kind
+                    $origin_acc_id = null;
+                    $dest_acc_id   = null;
+
+                    if ($tx && !empty($tx->transfer_group_id)) {
+                        $g = (string)$tx->transfer_group_id;
+                        if (isset($group_map[$g])) {
+                            $origin_acc_id = $group_map[$g]['withdraw'] ?: null;
+                            $dest_acc_id   = $group_map[$g]['deposit']  ?: null;
+                        }
+                    }
+
+                    // Fallback si faltara algo
+                    if (!$origin_acc_id && $tx && !empty($tx->savings_account_id)) {
+                        $origin_acc_id = (int)$tx->savings_account_id;
+                    }
+                    if (!$dest_acc_id && $tx && !empty($tx->counterparty_account_id)) {
+                        $dest_acc_id = (int)$tx->counterparty_account_id;
+                    }
+
+                    $origin = $by_acc[$origin_acc_id] ?? ['name'=>'','doc'=>'','accno'=>''];
+                    $dest   = $by_acc[$dest_acc_id]   ?? ['name'=>'','doc'=>'','accno'=>''];
+
+                    $origin_label = $origin['name'] !== '' ? $origin['name'] : ($origin['accno'] ?: '—');
+                    $dest_label   = $dest['name']   !== '' ? $dest['name']   : ($dest['accno']   ?: '—');
+
+                    $l1 = 'Cuenta origen: '.$origin_label;
+                    if ($origin['doc'] !== '') {
+                        $l1 .= ' — CI: '.$origin['doc'];
+                    }
+
+                    $l2 = 'Cuenta destino: '.$dest_label;
+                    if ($dest['doc'] !== '') {
+                        $l2 .= ' — CI: '.$dest['doc'];
+                    }
+
+                    if ($origin_label !== '—' || $dest_label !== '—') {
+                        $extras[] = $l1;
+                        $extras[] = $l2;
+                    }
+                }
+
+                // Guardamos una descripción enriquecida para el PDF
+                $r->ui_description = $base.(empty($extras) ? '' : "\n".implode("\n", $extras));
+            }
+            unset($r);
+        }
+
+        // ======================
+        // GENERACIÓN DEL PDF
+        // ======================
         $old_level = error_reporting();
         error_reporting($old_level & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED & ~E_USER_WARNING & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
         if (function_exists('ob_get_length') && ob_get_length()) { @ob_end_clean(); }
@@ -406,35 +818,44 @@ class Savings_account_reports extends MX_Controller
 
         $html .= '<table width="100%" cellpadding="2" cellspacing="0">';
         $html .= '<tr><td><strong>Titular:</strong> '.htmlspecialchars($header->owner).'</td>'
-              .  '<td align="right"><strong>Cuenta:</strong> '.htmlspecialchars($header->account_number).'</td></tr>';
+            .  '<td align="right"><strong>Cuenta:</strong> '.htmlspecialchars($header->account_number).'</td></tr>';
         $html .= '<tr><td><strong>Producto:</strong> '.htmlspecialchars($header->product).'</td>'
-              .  '<td align="right"><strong>Saldo inicial:</strong> '.number_format((float)$totals['opening'], 2).'</td></tr>';
+            .  '<td align="right"><strong>Saldo inicial:</strong> '.number_format((float)$totals['opening'], 2).'</td></tr>';
         $html .= '<tr><td colspan="2"><strong>Estado:</strong> '.htmlspecialchars($header->status).'</td></tr>';
         $html .= '</table><br>';
 
+        // Cabecera de la tabla: ahora con columna "Tipo"
         $html .= '<table border="1" cellpadding="6" cellspacing="0" width="100%">';
         $html .= '<thead><tr>
                     <th>Fecha y hora</th>
-                    <th>Descripción</th>
+                    <th>Tipo</th>
+                    <th>Descripción de la transacción</th>
                     <th>Monto</th>
                     <th>Saldo</th>
-                  </tr></thead><tbody>';
+                </tr></thead><tbody>';
 
         foreach ($rows as $r) {
             $amt = (float)$r->amount;
+
+            $type_label = isset($r->type_label) ? $r->type_label : $r->trans_type;
+            $desc = trim((string)($r->ui_description ?? $r->description ?? ''));
+            if ($desc === '') { $desc = '—'; }
+
             $html .= '<tr>'
-                  .  '<td>'.date('d/m/Y H:i', strtotime($r->trans_date)).'</td>'
-                  .  '<td>'.htmlspecialchars($r->description).'</td>'
-                  .  '<td align="right">'.(($amt >= 0 ? '+' : '').number_format($amt, 2)).'</td>'
-                  .  '<td align="right">'.number_format((float)$r->balance, 2).'</td>'
-                  .  '</tr>';
+                .  '<td>'.date('d/m/Y H:i', strtotime($r->trans_date)).'</td>'
+                .  '<td>'.htmlspecialchars($type_label).'</td>'
+                .  '<td>'.nl2br(htmlspecialchars($desc)).'</td>'
+                .  '<td align="right">'.(($amt >= 0 ? '+' : '').number_format($amt, 2)).'</td>'
+                .  '<td align="right">'.number_format((float)$r->balance, 2).'</td>'
+                .  '</tr>';
         }
 
+        // Pie de tabla (5 columnas: 3 de texto + 2 numéricas)
         $html .= '</tbody><tfoot><tr>'
-              .  '<th colspan="2" align="right">Totales</th>'
-              .  '<th align="right">'.number_format((float)$totals['credit'] - (float)$totals['debit'], 2).'</th>'
-              .  '<th align="right">'.number_format((float)$totals['closing'], 2).'</th>'
-              .  '</tr></tfoot>';
+            .  '<th colspan="3" align="right">Totales</th>'
+            .  '<th align="right">'.number_format((float)$totals['credit'] - (float)$totals['debit'], 2).'</th>'
+            .  '<th align="right">'.number_format((float)$totals['closing'], 2).'</th>'
+            .  '</tr></tfoot>';
         $html .= '</table></body></html>';
 
         $mpdf->WriteHTML($html, 2);
@@ -902,7 +1323,7 @@ class Savings_account_reports extends MX_Controller
         // Consulta de datos de cabecera + movimientos para el extracto
     private function _statement_data($account_number, $date_from, $date_to)
     {
-        $dbp = $this->db->dbprefix;
+        $dbp       = $this->db->dbprefix;
         $table_trx = $dbp.'savings_account_transactions';
 
         if (empty($account_number) || empty($date_from) || empty($date_to)) {
@@ -911,20 +1332,20 @@ class Savings_account_reports extends MX_Controller
 
         // 1) Buscar la cuenta por número
         $acc = $this->db->select('
-            sa.savings_account_id,
-            sa.account_number,
-            sa.status,
-            sat.name AS type_name,
-            sat.interest_rate_apy,
-            p.first_name,
-            p.last_name
-        ')
-        ->from($dbp.'savings_accounts sa')
-        ->join($dbp.'savings_account_types sat','sat.savings_account_type_id = sa.savings_account_type_id','left')
-        ->join($dbp.'people p','p.person_id = sa.person_id','left')
-        ->where('sa.account_number', $account_number)
-        ->get()
-        ->row();
+                sa.savings_account_id,
+                sa.account_number,
+                sa.status,
+                sat.name AS type_name,
+                sat.interest_rate_apy,
+                p.first_name,
+                p.last_name
+            ')
+            ->from($dbp.'savings_accounts sa')
+            ->join($dbp.'savings_account_types sat','sat.savings_account_type_id = sa.savings_account_type_id','left')
+            ->join($dbp.'people p','p.person_id = sa.person_id','left')
+            ->where('sa.account_number', $account_number)
+            ->get()
+            ->row();
 
         if (!$acc) {
             return [null, [], 0.0, ['debit'=>0.0, 'credit'=>0.0, 'opening'=>0.0, 'closing'=>0.0]];
@@ -933,53 +1354,57 @@ class Savings_account_reports extends MX_Controller
         $from_dt = $date_from.' 00:00:00';
         $to_dt   = $date_to.' 23:59:59';
 
-        // 2) Saldo de apertura (misma lógica que usas para intereses)
+        // 2) Saldo de apertura
         $this->load->model('Savings_accounts_model');
         $acc_model   = $this->Savings_accounts_model->get((int)$acc->savings_account_id);
         $now_balance = (float)($acc_model->current_balance ?? 0);
 
         $sum_newer_row = $this->db->query("
-            SELECT COALESCE(SUM(
-                        CASE
-                            WHEN trans_type='withdraw' THEN -amount
-                            WHEN trans_type='deposit'  THEN  amount
-                            ELSE 0
-                        END
-                    ),0) AS s
-            FROM {$table_trx}
-            WHERE savings_account_id = ?
-            AND trans_date > ?
-        ", [$acc->savings_account_id, $from_dt])->row();
+                SELECT COALESCE(SUM(
+                            CASE
+                                WHEN trans_type='withdraw' THEN -amount
+                                WHEN trans_type='deposit'  THEN  amount
+                                WHEN trans_type='fee'      THEN -amount
+                                ELSE 0
+                            END
+                        ),0) AS s
+                FROM {$table_trx}
+                WHERE savings_account_id = ?
+                AND trans_date > ?
+            ", [$acc->savings_account_id, $from_dt])->row();
 
         $sum_newer = (float)($sum_newer_row->s ?? 0.0);
-
-        $opening = $now_balance - $sum_newer;
+        $opening   = $now_balance - $sum_newer;
 
         // 3) Movimientos del período
         $rows_db = $this->db->query("
                 SELECT
-                    transaction_id,
-                    trans_date,
-                    trans_type,
-                    /* OJO: si tu tabla no tiene 'description', reemplaza por la columna de glosa/comentario */
-                    description,
-                    amount
-                FROM {$dbp}savings_account_transactions
-                WHERE savings_account_id = ?
-                  AND trans_date BETWEEN ? AND ?
-                ORDER BY trans_date ASC, transaction_id ASC
+                    tx.transaction_id,
+                    tx.savings_account_id,
+                    tx.counterparty_account_id,
+                    tx.transfer_group_id,
+                    tx.depositor_name,
+                    tx.depositor_document,
+                    tx.trans_date,
+                    tx.trans_type,
+                    tx.description,
+                    tx.amount
+                FROM {$table_trx} tx
+                WHERE tx.savings_account_id = ?
+                AND tx.trans_date BETWEEN ? AND ?
+                ORDER BY tx.trans_date ASC, tx.transaction_id ASC
             ", [$acc->savings_account_id, $from_dt, $to_dt])->result();
 
-        $balance       = $opening;
-        $rows          = [];
-        $total_debit   = 0.0;
-        $total_credit  = 0.0;
+        $balance      = $opening;
+        $rows         = [];
+        $total_debit  = 0.0;
+        $total_credit = 0.0;
 
         foreach ($rows_db as $r) {
-            $type  = strtolower($r->trans_type);
-            // Todo lo que sea retiro/cargo lo tratamos como débito
-            $sign  = in_array($type, ['withdraw','fee','debit']) ? -1 : 1;
-            $amt   = (float)$r->amount;
+            $type = strtolower($r->trans_type);
+            // retiros/cargos como débito
+            $sign = in_array($type, ['withdraw','fee','debit']) ? -1 : 1;
+            $amt  = (float)$r->amount;
 
             if ($sign < 0) {
                 $total_debit  += $amt;
@@ -989,12 +1414,20 @@ class Savings_account_reports extends MX_Controller
 
             $balance += $sign * $amt;
 
-            $row = new stdClass();
-            $row->trans_date  = $r->trans_date;
-            $row->description = $r->description; // ajustar si tu columna se llama distinto
-            $row->trans_type  = $r->trans_type;
-            $row->amount      = $sign * $amt;   // monto ya con signo
-            $row->balance     = $balance;
+            $row                          = new stdClass();
+            $row->transaction_id          = (int)$r->transaction_id;
+            $row->savings_account_id      = (int)$r->savings_account_id;
+            $row->counterparty_account_id = $r->counterparty_account_id !== null
+                                            ? (int)$r->counterparty_account_id
+                                            : null;
+            $row->transfer_group_id       = $r->transfer_group_id;
+            $row->depositor_name          = $r->depositor_name;
+            $row->depositor_document      = $r->depositor_document;
+            $row->trans_date              = $r->trans_date;
+            $row->trans_type              = $r->trans_type;
+            $row->description             = $r->description;
+            $row->amount                  = $sign * $amt;  // ya con signo
+            $row->balance                 = $balance;
 
             $rows[] = $row;
         }

@@ -65,8 +65,19 @@
                     <?php $sub_menus = json_decode($module->sub_menus, true); ?>
 
                     <?php if (is_array($sub_menus) && count($sub_menus) > 0): ?>
-                        <?php $parent_active = ( stristr($module->module_id, $this->router->fetch_class()) ? 'active open' : '' ); ?>
-                        <li class="nav-parent <?= $parent_active ?>">       
+
+                        <?php
+                            // Consideramos activo el módulo si:
+                            // - El controlador coincide con module_id (lo que ya hacía antes), O
+                            // - El primer segmento de la URL es exactamente el module_id
+                            $is_current_module =
+                                (bool) stristr($module->module_id, $this->router->fetch_class()) ||
+                                ($this->uri->segment(1) === $module->module_id);
+
+                            $parent_active = $is_current_module ? 'active open' : '';
+                        ?>
+
+                        <li class="nav-parent <?= $parent_active ?>">
 
                             <a href="<?php echo site_url("$module->module_id"); ?>" title="<?php echo $this->lang->line('module_' . $module->module_id . '_desc'); ?>">
                                 <?= $module->icons ?>

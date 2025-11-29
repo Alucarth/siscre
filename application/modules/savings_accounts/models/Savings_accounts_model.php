@@ -219,4 +219,77 @@ class Savings_accounts_model extends CI_Model
         return "{$alias}-{$ident}-{$seq}";
     }
 
+        /**
+     * Búsqueda con paginación de cuentas de ahorro.
+     *
+     * @param array $filters  ['q' => texto_buscado]
+     * @param int   $limit
+     * @param int   $offset
+     * @param bool  $only_active  true = solo activas, false = solo inactivas
+     * @return array
+     */
+    public function search_accounts(array $filters = [], $limit = 20, $offset = 0, $only_active = true)
+    {
+        $q = isset($filters['q']) ? trim($filters['q']) : '';
+
+        $this->db
+            ->select('sa.*, sat.name AS type_name, p.first_name, p.last_name')
+            ->from($this->table . ' sa')
+            ->join('savings_account_types sat', 'sat.savings_account_type_id = sa.savings_account_type_id')
+            ->join('people p', 'p.person_id = sa.person_id');
+
+        // Estado (activas / inactivas)
+        if ($only_active) {
+            $this->db->where('sa.status', 1);
+        } else {
+            $this->db->where('sa.status', 0);
+        }
+
+        // Filtro de búsqueda (nro cuenta o nombre de persona)
+        if ($q !== '') {
+            $this->db->group_start();
+            $this->db->like('sa.account_number', $q);
+            $this->db->or_like("CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))", $q, 'both', false);
+            $this->db->group_end();
+        }
+
+        return $this->db
+            ->order_by('sa.opening_date', 'DESC')
+            ->limit($limit, $offset)
+            ->get()
+            ->result();
+    }
+
+    /**
+     * Cuenta cuántas cuentas hay para una búsqueda dada (para paginación).
+     *
+     * @param array $filters
+     * @param bool  $only_active
+     * @return int
+     */
+    public function count_accounts(array $filters = [], $only_active = true)
+    {
+        $q = isset($filters['q']) ? trim($filters['q']) : '';
+
+        $this->db
+            ->from($this->table . ' sa')
+            ->join('savings_account_types sat', 'sat.savings_account_type_id = sa.savings_account_type_id')
+            ->join('people p', 'p.person_id = sa.person_id');
+
+        if ($only_active) {
+            $this->db->where('sa.status', 1);
+        } else {
+            $this->db->where('sa.status', 0);
+        }
+
+        if ($q !== '') {
+            $this->db->group_start();
+            $this->db->like('sa.account_number', $q);
+            $this->db->or_like("CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))", $q, 'both', false);
+            $this->db->group_end();
+        }
+
+        return (int) $this->db->count_all_results();
+    }
+
 }

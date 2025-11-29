@@ -23,15 +23,41 @@ class Savings_accounts extends MX_Controller
         $this->load->model('savings_accounts/Savings_accounts_model');
     }
 
-    public function index()
+        public function index()
     {
-        /*$path = APPPATH.'modules/savings_accounts/views/savings_accounts/index.php';
-        if (! is_file($path)) {
-            show_error("¡No encuentro la vista! Busqué: $path");
+        // Parámetros de búsqueda y paginación
+        $q        = trim((string)$this->input->get('q'));
+        $page     = (int)$this->input->get('page');
+        $page     = $page > 0 ? $page : 1;
+        $per_page = 20;
+
+        $filters = ['q' => $q];
+
+        // Total de cuentas activas que cumplen el filtro
+        $total   = $this->Savings_accounts_model->count_accounts($filters, true);
+        $total_pages = max(1, (int)ceil($total / $per_page));
+        if ($page > $total_pages) {
+            $page = $total_pages;
         }
-        $data['accounts'] = $this->Savings_accounts_model->get_all();
-        $this->load->view('savings_accounts/index', $data);*/
-        $data['accounts'] = $this->Savings_accounts_model->get_all();
+
+        $offset  = ($page - 1) * $per_page;
+
+        // Listado paginado
+        $data['accounts'] = $this->Savings_accounts_model->search_accounts(
+            $filters,
+            $per_page,
+            $offset,
+            true // solo activas
+        );
+
+        // Datos auxiliares para la vista
+        $data['q']           = $q;
+        $data['page']        = $page;
+        $data['per_page']    = $per_page;
+        $data['total']       = $total;
+        $data['total_pages'] = $total_pages;
+        $data['show_inactive'] = false;
+
         $this->load->view('savings_accounts/savings_accounts/index', $data);
     }
 
@@ -93,14 +119,43 @@ class Savings_accounts extends MX_Controller
         redirect('savings_accounts/savings_accounts');
     }
 
-    /**
+        /**
      * Listado de cuentas inactivas (soft‐deleted).
      */
     public function inactive()
     {
-        $data['accounts'] = $this->Savings_accounts_model->get_all(false);
-        // Reutilizamos la misma vista, pero podemos pasar una bandera
+        // Parámetros de búsqueda y paginación
+        $q        = trim((string)$this->input->get('q'));
+        $page     = (int)$this->input->get('page');
+        $page     = $page > 0 ? $page : 1;
+        $per_page = 20;
+
+        $filters = ['q' => $q];
+
+        // Total de cuentas inactivas para el filtro
+        $total   = $this->Savings_accounts_model->count_accounts($filters, false);
+        $total_pages = max(1, (int)ceil($total / $per_page));
+        if ($page > $total_pages) {
+            $page = $total_pages;
+        }
+
+        $offset  = ($page - 1) * $per_page;
+
+        // Listado paginado solo inactivas
+        $data['accounts'] = $this->Savings_accounts_model->search_accounts(
+            $filters,
+            $per_page,
+            $offset,
+            false // solo inactivas
+        );
+
+        $data['q']             = $q;
+        $data['page']          = $page;
+        $data['per_page']      = $per_page;
+        $data['total']         = $total;
+        $data['total_pages']   = $total_pages;
         $data['show_inactive'] = true;
+
         $this->load->view('savings_accounts/savings_accounts/index', $data);
     }
 

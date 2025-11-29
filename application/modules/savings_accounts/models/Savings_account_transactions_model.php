@@ -250,7 +250,13 @@ class Savings_account_transactions_model extends CI_Model
         if ($acc_id <= 0 || $amount <= 0) return FALSE;
 
         $acc = $this->get_account($acc_id);
-        if (!$acc || !$acc->status) return FALSE;
+        if (!$acc) return FALSE;
+
+        // ⚠ Antes: if (!$acc || !$acc->status) return FALSE;
+        // Ahora: solo bloqueamos RETIROS si la cuenta está inactiva
+        if ($type === 'withdraw' && !$acc->status) {
+            return FALSE;
+        }
 
         // Validaciones
         if ($type === 'withdraw') {
@@ -315,8 +321,8 @@ class Savings_account_transactions_model extends CI_Model
         $delta = $sign * $amount;
 
         $this->db->set('current_balance', 'current_balance + '.$delta, FALSE)
-                 ->where('savings_account_id', $acc_id)
-                 ->update($this->db->dbprefix('savings_accounts'));
+                ->where('savings_account_id', $acc_id)
+                ->update($this->db->dbprefix('savings_accounts'));
         $new_balance = (float)$acc->current_balance + (float)$delta;
 
         // Si existe la columna, persistimos el saldo resultante
@@ -356,7 +362,26 @@ class Savings_account_transactions_model extends CI_Model
             [$dst_account_id]
         )->row();
 
-        if (!$src || !$dst || !$src->status || !$dst->status) {
+                $src = $this->db->query(
+            "SELECT * FROM {$this->db->dbprefix('savings_accounts')} WHERE savings_account_id = ? FOR UPDATE",
+            [$src_account_id]
+        )->row();
+
+        $dst = $this->db->query(
+            "SELECT * FROM {$this->db->dbprefix('savings_accounts')} WHERE savings_account_id = ? FOR UPDATE",
+            [$dst_account_id]
+        )->row();
+
+        // Antes se exigía que ambas tuvieran status "true"
+        // if (!$src || !$dst || !$src->status || !$dst->status) { ... }
+
+        // Ahora: origen debe existir y estar activa; destino sólo debe existir
+        if (!$src || !$dst) {
+            $this->db->trans_complete();
+            return FALSE;
+        }
+
+        if (!$src->status) {
             $this->db->trans_complete();
             return FALSE;
         }

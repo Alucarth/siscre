@@ -23,31 +23,33 @@
         </li>
     </ul>
 </div>
-
+<br>
 <div class="title-block">
   <h3 class="title">Intereses por cuenta (período)</h3>
 </div>
 
 <div class="section">
-  <?= form_open(current_url(), ['method'=>'get','class'=>'form-horizontal']) ?>
-    <div class="form-group">
-      <?= form_label('Desde','date_from',['class'=>'col-sm-2 control-label']) ?>
-      <div class="col-sm-2"><input type="date" name="date_from" value="<?= html_escape($filters['date_from'] ?? '') ?>" class="form-control"></div>
+  <div class="card card-block">
+    <?= form_open(current_url(), ['method'=>'get','class'=>'form-horizontal']) ?>
+      <div class="form-group">
+        <?= form_label('Desde','date_from',['class'=>'col-sm-2 control-label']) ?>
+        <div class="col-sm-2"><input type="date" name="date_from" value="<?= html_escape($filters['date_from'] ?? '') ?>" class="form-control"></div>
 
-      <?= form_label('Hasta','date_to',['class'=>'col-sm-1 control-label']) ?>
-      <div class="col-sm-2"><input type="date" name="date_to" value="<?= html_escape($filters['date_to'] ?? '') ?>" class="form-control"></div>
+        <?= form_label('Hasta','date_to',['class'=>'col-sm-1 control-label']) ?>
+        <div class="col-sm-2"><input type="date" name="date_to" value="<?= html_escape($filters['date_to'] ?? '') ?>" class="form-control"></div>
 
-      <?= form_label('Sucursal','branch_id',['class'=>'col-sm-2 control-label']) ?>
-      <div class="col-sm-3"><?= form_dropdown('branch_id', $branch_options, $filters['branch_id'] ?? '', 'class="form-control"') ?></div>
-    </div>
-
-    <div class="form-group">
-      <div class="col-sm-offset-2 col-sm-10">
-        <button class="btn btn-primary"><span class="glyphicon glyphicon-search"></span> Filtrar</button>
-        <a class="btn btn-default" href="<?= site_url('savings_accounts/savings_account_reports/interest_summary') ?>">Limpiar</a>
+        <?= form_label('Sucursal','branch_id',['class'=>'col-sm-2 control-label']) ?>
+        <div class="col-sm-3"><?= form_dropdown('branch_id', $branch_options, $filters['branch_id'] ?? '', 'class="form-control"') ?></div>
       </div>
-    </div>
-  <?= form_close(); ?>
+
+      <div class="form-group">
+        <div class="col-sm-offset-2 col-sm-10">
+          <button class="btn btn-primary"><span class="glyphicon glyphicon-search"></span> Filtrar</button>
+          <a class="btn btn-default" href="<?= site_url('savings_accounts/savings_account_reports/interest_summary') ?>">Limpiar</a>
+        </div>
+      </div>
+    <?= form_close(); ?>
+  </div>
 
   <div class="inqbox-content table-responsive">
     <?php

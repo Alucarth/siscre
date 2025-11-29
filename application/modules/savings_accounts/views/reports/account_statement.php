@@ -22,7 +22,7 @@
         </li>
     </ul>
 </div>
-
+<br>
 <div class="title-block">
   <h3 class="title">Extracto de Caja de Ahorros (Estado de cuenta)</h3>
 </div>
@@ -173,10 +173,11 @@
       <table class="table table-striped table-bordered">
         <thead>
           <tr>
-            <th>Fecha y hora</th>
+            <th style="width:140px">Fecha y hora</th>
+            <th style="width:120px">Tipo</th>   <!-- NUEVO -->
             <th>Descripción de la transacción</th>
-            <th class="text-right">Monto</th>
-            <th class="text-right">Saldo</th>
+            <th style="width:150px" class="text-right">Monto</th>
+            <th style="width:150px" class="text-right">Saldo</th>
           </tr>
         </thead>
         <tbody>
@@ -189,7 +190,14 @@
               <?php $amt = (float)$r->amount; ?>
               <tr>
                 <td><?= date('d/m/Y H:i', strtotime($r->trans_date)) ?></td>
-                <td><?= html_escape($r->description) ?></td>
+                <td><?= html_escape($r->type_label ?? $r->trans_type) ?></td>  <!-- NUEVO -->
+                <td>
+                  <?php
+                    $desc = trim((string)($r->ui_description ?? ''));
+                    if ($desc === '') { $desc = (string)($r->description ?? ''); }
+                    echo nl2br(html_escape($desc));
+                  ?>
+                </td>
                 <td class="text-right"><?= ($amt >= 0 ? '+' : '').number_format($amt, 2) ?></td>
                 <td class="text-right"><?= number_format((float)$r->balance, 2) ?></td>
               </tr>

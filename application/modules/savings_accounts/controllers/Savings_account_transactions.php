@@ -539,6 +539,12 @@ class Savings_account_transactions extends MX_Controller
         $sql = "
             SELECT 
                 sa.savings_account_id,
+                sa.account_number,
+                sa.current_balance,
+                " . ( $this->db->field_exists('status', $this->db->dbprefix('savings_accounts'))
+                        ? "sa.status"
+                        : "NULL AS status"
+                ) . ",
                 p.person_id,
                 TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))) AS full_name,
                 p.photo_url,
@@ -551,7 +557,7 @@ class Savings_account_transactions extends MX_Controller
                 ) AS id_no
             FROM {$this->db->dbprefix('savings_accounts')} sa
             JOIN {$this->db->dbprefix('people')} p
-            ON p.person_id = sa.person_id
+                ON p.person_id = sa.person_id
             WHERE sa.savings_account_id = ?
             LIMIT 1
         ";
@@ -573,11 +579,14 @@ class Savings_account_transactions extends MX_Controller
         $photo_full = $this->_photo_url((int)$row->person_id, (string)($row->photo_url ?? ''));
 
         $out = [
-            'ok'        => true,
-            'person_id' => (int)$row->person_id,
-            'full_name' => (string)$row->full_name,
-            'id_no'     => $id_no_digits,
-            'photo_url' => $photo_full,
+            'ok'             => true,
+            'person_id'      => (int)$row->person_id,
+            'full_name'      => (string)$row->full_name,
+            'id_no'          => $id_no_digits,
+            'photo_url'      => $photo_full,
+            'account_number' => (string)($row->account_number ?? ''),
+            'current_balance'=> isset($row->current_balance) ? (float)$row->current_balance : null,
+            'status'         => isset($row->status) ? (int)$row->status : null,
         ];
 
         // Cache por request
@@ -609,48 +618,41 @@ class Savings_account_transactions extends MX_Controller
         }
 
         $data = [];
-        // === Opciones de cuenta, a prueba de columnas faltantes ===
-        $activeWhere = '';
+        // === Opciones de cuenta, mostrando también inactivas ===
+        $selectActiveLabel = '1 AS is_active';
         if ($colmap['has_is_active']) {
-            $activeWhere = 'COALESCE(sa.is_active,1) = 1';
+            $selectActiveLabel = 'COALESCE(sa.is_active,1) AS is_active';
         } elseif ($colmap['has_status']) {
-            $activeWhere = 'COALESCE(sa.status,1) = 1';
+            $selectActiveLabel = 'COALESCE(sa.status,1) AS is_active';
         } elseif ($colmap['has_disabled']) {
-            $activeWhere = 'COALESCE(sa.disabled,0) = 0';
+            $selectActiveLabel = 'CASE WHEN COALESCE(sa.disabled,0)=0 THEN 1 ELSE 0 END AS is_active';
         }
 
-        $this->db->select('sa.savings_account_id AS id, sa.account_number, COALESCE(CONCAT(TRIM(p.first_name), " ", TRIM(p.last_name)), "") AS owner_name', false);
+        $this->db->select('
+                sa.savings_account_id AS id,
+                sa.account_number,
+                COALESCE(CONCAT(TRIM(p.first_name), " ", TRIM(p.last_name)), "") AS owner_name,
+                '.$selectActiveLabel.'
+            ', false);
         $this->db->from($this->db->dbprefix('savings_accounts') . ' sa');
         $this->db->join($this->db->dbprefix('people') . ' p', 'p.person_id = sa.person_id', 'left');
-        if ($activeWhere !== '') { $this->db->where($activeWhere); }
+        // ⚠️ Ya no filtramos por "solo activas"
         $this->db->order_by('sa.account_number', 'ASC');
         $rows = $this->db->get()->result();
 
         $account_options = ['' => '— Seleccione —'];
         foreach ($rows as $r) {
             $label = $r->account_number;
-            if (!empty($r->owner_name)) $label .= ' · ' . $r->owner_name;
+            if (!empty($r->owner_name)) {
+                $label .= ' · ' . $r->owner_name;
+            }
+            if ((int)$r->is_active !== 1) {
+                $label .= ' (inactiva)';
+            }
             $account_options[$r->id] = $label;
         }
         $data['account_options'] = $account_options;
        
-        // 2) Si estoy editando y la cuenta de esa transacción está inactiva hoy,
-        //    aseguro que aparezca en el combo (rotulada “inactiva”)
-        if (!empty($data['tx']) && !isset($data['account_options'][(int)$data['tx']->savings_account_id])) {
-            $r = $this->db->query("
-                SELECT sa.savings_account_id AS id, sa.account_number,
-                    COALESCE(CONCAT(TRIM(p.first_name),' ',TRIM(p.last_name)),'') AS owner_name
-                FROM {$this->db->dbprefix('savings_accounts')} sa
-                LEFT JOIN {$this->db->dbprefix('people')} p ON p.person_id = sa.person_id
-                WHERE sa.savings_account_id = ?
-                LIMIT 1
-            ", [(int)$data['tx']->savings_account_id])->row();
-            if ($r) {
-                $label = trim(($r->account_number ? $r->account_number : 'CTA-'.$r->id).' - '.$r->owner_name).' (inactiva)';
-                $data['account_options'][(int)$r->id] = $label;
-            }
-        }
-
         if ($id) {
             $data['tx'] = $this->Savings_account_transactions_model->find((int)$id);
             if (!$data['tx']) {
@@ -713,8 +715,14 @@ class Savings_account_transactions extends MX_Controller
                 redirect(current_url()); return;
             }
             // 🔒 Validación de cuenta ORIGEN inactiva
-            if ((int)$src->is_active !== 1) {
-                $this->session->set_flashdata('error', 'La cuenta de origen está inactiva. No se puede realizar ninguna transacción.');
+            // Regla nueva:
+            // - Depósito: se permite aunque la cuenta esté inactiva (puede recibir dinero).
+            // - Retiro / Transferencia: siguen bloqueados si la cuenta está inactiva.
+            if ($trans_type !== 'deposit' && (int)$src->is_active !== 1) {
+                $this->session->set_flashdata(
+                    'error',
+                    'La cuenta de origen está inactiva. No se pueden realizar retiros ni transferencias.'
+                );
                 redirect(current_url());
                 return;
             }
@@ -1009,9 +1017,13 @@ class Savings_account_transactions extends MX_Controller
         }
 
         // 2) Activas
+        // Regla: la cuenta ORIGEN debe estar activa.
+        // La cuenta DESTINO puede estar inactiva (puede recibir dinero).
         if ($hasIsActive) {
-            if ((int)$src->is_active !== 1) return ['ok'=>false,'msg'=>'La cuenta de origen está inactiva.'];
-            if ((int)$dst->is_active !== 1) return ['ok'=>false,'msg'=>'La cuenta de destino está inactiva.'];
+            if ((int)$src->is_active !== 1) {
+                return ['ok'=>false,'msg'=>'La cuenta de origen está inactiva.'];
+            }
+            // Ya no bloqueamos si la cuenta de destino está inactiva.
         }
 
         // 3) Origen: plazo fijo → debe estar vencido
@@ -1464,11 +1476,34 @@ class Savings_account_transactions extends MX_Controller
         $account_id = (int)$this->input->get_post('account_id');
         $date_from  = $this->input->get_post('date_from'); // Y-m-d
         $date_to    = $this->input->get_post('date_to');   // Y-m-d
-        $preview    = (int)$this->input->get_post('preview' , TRUE) ?: (int)$this->input->get('preview' , TRUE);
+
+        // preview puede venir por POST o GET
+        $preview = (int)$this->input->get_post('preview', TRUE)
+                ?: (int)$this->input->get('preview', TRUE);
+
+        $result = $this->_interest_calc_core($account_id, $date_from, $date_to, $preview);
+
+        return $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode($result));
+    }
+
+    /**
+     * Lógica central de cálculo y abono de intereses.
+     *
+     * Devuelve SIEMPRE un array PHP:
+     *  - ['ok' => true,  'transaction_id' => ..., 'interest' => ..., ...]
+     *  - ['ok' => false, 'error' => '...']
+     */
+    private function _interest_calc_core($account_id, $date_from, $date_to, $preview = false)
+    {
+        $account_id = (int)$account_id;
+        $date_from  = trim((string)$date_from);
+        $date_to    = trim((string)$date_to);
+        $preview    = $preview ? 1 : 0;
 
         if ($account_id <= 0 || !$date_from || !$date_to) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false,'error'=>'Parámetros incompletos']));
+            return ['ok' => false, 'error' => 'Parámetros incompletos'];
         }
 
         // Normalizamos a límites del día
@@ -1478,19 +1513,22 @@ class Savings_account_transactions extends MX_Controller
         // Traemos cuenta y tipo con tasa
         $acc = $this->db->select('sa.*, sat.interest_rate_apy')
             ->from($this->db->dbprefix('savings_accounts').' sa')
-            ->join($this->db->dbprefix('savings_account_types').' sat','sat.savings_account_type_id=sa.savings_account_type_id','left')
+            ->join(
+                $this->db->dbprefix('savings_account_types').' sat',
+                'sat.savings_account_type_id = sa.savings_account_type_id',
+                'left'
+            )
             ->where('sa.savings_account_id', $account_id)
-            ->get()->row();
+            ->get()
+            ->row();
 
         if (!$acc) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false,'error'=>'Cuenta no encontrada']));
+            return ['ok' => false, 'error' => 'Cuenta no encontrada'];
         }
 
         $apy = (float)($acc->interest_rate_apy ?? 0);
         if ($apy <= 0) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false,'error'=>'La cuenta no tiene tasa configurada']));
+            return ['ok' => false, 'error' => 'La cuenta no tiene tasa configurada'];
         }
 
         // 1) Saldo al inicio y movimientos del período
@@ -1498,24 +1536,28 @@ class Savings_account_transactions extends MX_Controller
         $txs     = $this->_tx_in_period_asc($account_id, $start_dt, $end_dt);
 
         // 2) Construir segmentos por cambio de saldo
-        $segments = [];
+        $segments     = [];
         $curr_balance = (float)$opening;
         $curr_from    = $start_dt;
 
         foreach ($txs as $t) {
             $ts = $t->trans_date; // Y-m-d H:i:s
             // segmento desde curr_from hasta la fecha de esta transacción
-            $segments[] = ['from'=>$curr_from, 'to'=>$ts, 'balance'=>$curr_balance];
+            $segments[] = [
+                'from'    => $curr_from,
+                'to'      => $ts,
+                'balance' => $curr_balance,
+            ];
 
             // aplicar la transacción
-            $sign = (strtolower($t->trans_type) === 'withdraw') ? -1 : 1;
+            $sign          = (strtolower($t->trans_type) === 'withdraw') ? -1 : 1;
             $curr_balance += $sign * (float)$t->amount;
 
             // siguiente segmento arranca desde este timestamp
             $curr_from = $ts;
         }
         // último segmento hasta fin del período
-        $segments[] = ['from'=>$curr_from, 'to'=>$end_dt, 'balance'=>$curr_balance];
+        $segments[] = ['from' => $curr_from, 'to' => $end_dt, 'balance' => $curr_balance];
 
         // 3) Promedio diario (ADB) y días
         $total_days = 0.0;
@@ -1527,40 +1569,33 @@ class Savings_account_transactions extends MX_Controller
                 $weighted   += $s['balance'] * $d;
             }
         }
-        // En períodos cortos sin movimientos, total_days podría ser 0 si from>=to (validamos)
+
         if ($total_days <= 0) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false,'error'=>'Período sin días efectivos']));
+            return ['ok' => false, 'error' => 'Período sin días efectivos'];
         }
 
-        $adb = $weighted / $total_days;
-
-        // 4) Interés simple por día: APY/365, sin capitalización intra-período
+        $adb      = $weighted / $total_days;
         $interest = $adb * ($apy / 365.0) * $total_days;
-
-        // Redondeo a 2 decimales (ajústalo si usas más precisión)
         $interest = round($interest, 2);
 
-        // PREVIEW
+        // PREVIEW: solo cálculo, sin registrar transacción
         if ($preview) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode([
-                    'ok'          => true,
-                    'account_id'  => $account_id,
-                    'date_from'   => $date_from,
-                    'date_to'     => $date_to,
-                    'days'        => $total_days,
-                    'apy'         => $apy,
-                    'opening'     => round($opening,2),
-                    'adb'         => round($adb,2),
-                    'interest'    => $interest,
-                ]));
+            return [
+                'ok'         => true,
+                'account_id' => $account_id,
+                'date_from'  => $date_from,
+                'date_to'    => $date_to,
+                'days'       => $total_days,
+                'apy'        => $apy,
+                'opening'    => round($opening, 2),
+                'adb'        => round($adb, 2),
+                'interest'   => $interest,
+            ];
         }
 
         // 5) Registrar el abono como transacción (depósito)
         if ($interest <= 0) {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false,'error'=>'Interés calculado no positivo']));
+            return ['ok' => false, 'error' => 'Interés calculado no positivo'];
         }
 
         // branch_id y actor desde sesión (igual que en form())
@@ -1573,13 +1608,59 @@ class Savings_account_transactions extends MX_Controller
         }
         $actor = (int)($this->session->userdata('person_id') ?: 0);
 
+            // ---- Formateo "bonito" de la descripción ----
+        // Mes y año en texto
+        $from_ts    = strtotime($date_from);
+        $month_num  = (int)date('n', $from_ts);
+        $year_str   = date('Y', $from_ts);
+
+        $meses_es = [
+            1 => 'enero',
+            2 => 'febrero',
+            3 => 'marzo',
+            4 => 'abril',
+            5 => 'mayo',
+            6 => 'junio',
+            7 => 'julio',
+            8 => 'agosto',
+            9 => 'septiembre',
+            10 => 'octubre',
+            11 => 'noviembre',
+            12 => 'diciembre',
+        ];
+
+        $month_name = isset($meses_es[$month_num]) ? $meses_es[$month_num] : date('m', $from_ts);
+        // Capitalizamos la primera letra
+        $month_name = ucfirst($month_name);
+
+        // Días redondeados para mostrar
+        $days_display = (int)round($total_days);
+
+        // APY en porcentaje con dos decimales (0.021 -> 2.10)
+        $apy_pct = $apy * 100;
+
+        // Descripción base para cualquier cuenta
+        $description = sprintf(
+            'Intereses generados en %s %s (%d días; ADB Bs. %.2f; Tasa anual %.2f%%)',
+            $month_name,
+            $year_str,
+            $days_display,
+            $adb,
+            $apy_pct
+        );
+
+        // Si la cuenta está inactiva al cierre del período, aclararlo
+        if (isset($acc->status) && (int)$acc->status === 0) {
+            $description .= ' [Cuenta inactiva al cierre del período; el saldo sigue generando intereses]';
+        }
+
+        // ---- Payload de la transacción de interés ----
         $payload = [
             'savings_account_id' => $account_id,
             'trans_type'         => 'deposit', // abono por interés
             'amount'             => $interest,
             'trans_date'         => $end_dt,   // abonamos al cierre del período
-            'description'        => sprintf('Interés del %s al %s (ADB %.2f; %s días; APY %.4f)',
-                                            $date_from, $date_to, $adb, $total_days, $apy),
+            'description'        => $description,
             'branch_id'          => $branch_id,
             'depositor_name'     => 'Sistema de Intereses',
             'depositor_document' => 'N/A',
@@ -1590,74 +1671,120 @@ class Savings_account_transactions extends MX_Controller
         if ($ok_id) {
             // Actualiza last_interest_calc si corresponde (opcional)
             $this->db->where('savings_account_id', $account_id)
-                    ->update($this->db->dbprefix('savings_accounts'), ['last_interest_calc' => $date_to]);
+                    ->update(
+                        $this->db->dbprefix('savings_accounts'),
+                        ['last_interest_calc' => $date_to]
+                    );
 
-            // Ponemos flash para abrir voucher automáticamente desde el index (ya lo tienes)
+            // Para la UI: abre voucher automáticamente desde el index
             $this->session->set_flashdata('print_tx_id', $ok_id);
 
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>true,'transaction_id'=>$ok_id,'interest'=>$interest]));
-        } else {
-            return $this->output->set_content_type('application/json')
-                ->set_output(json_encode(['ok'=>false,'error'=>'No se pudo registrar el abono de interés']));
+            return [
+                'ok'             => true,
+                'transaction_id' => $ok_id,
+                'interest'       => $interest,
+                'account_id'     => $account_id,
+                'date_from'      => $date_from,
+                'date_to'        => $date_to,
+                'days'           => $total_days,
+                'apy'            => $apy,
+                'opening'        => round($opening, 2),
+                'adb'            => round($adb, 2),
+            ];
         }
+
+        return ['ok' => false, 'error' => 'No se pudo registrar el abono de interés'];
     }
 
     public function monthly_interest_batch($yyyymm = null)
     {
-        // Mes objetivo: por defecto el mes anterior (en hora del servidor)
+        // 1) Mes objetivo: por defecto el mes anterior
         if (!$yyyymm) {
             $yyyymm = date('Ym', strtotime('first day of last month'));
         }
-        $year = (int)substr($yyyymm, 0, 4);
+
+        $year  = (int)substr($yyyymm, 0, 4);
         $month = (int)substr($yyyymm, 4, 2);
 
-        // Rango: 1er día 00:00:00 al último día 23:59:59
-        $date_from = date('Y-m-01', strtotime("$year-$month-01"));
-        $date_to   = date('Y-m-t',  strtotime("$year-$month-01"));
+        // Rango del período
+        $date_from = date('Y-m-01', strtotime("$year-$month-01")); // primer día
+        $date_to   = date('Y-m-t',  strtotime("$year-$month-01")); // último día
 
-        // Cuentas con tasa > 0 (y que quieras considerar activas)
+        // 2) Seleccionar TODAS las cuentas con tasa > 0 (sin importar status)
         $accs = $this->db->select('sa.savings_account_id, sat.interest_rate_apy')
             ->from($this->db->dbprefix('savings_accounts').' sa')
-            ->join($this->db->dbprefix('savings_account_types').' sat','sat.savings_account_type_id=sa.savings_account_type_id','left')
+            ->join(
+                $this->db->dbprefix('savings_account_types').' sat',
+                'sat.savings_account_type_id = sa.savings_account_type_id',
+                'left'
+            )
             ->where('IFNULL(sat.interest_rate_apy,0) >', 0)
-            ->where('sa.deleted', 0)  // ajusta si tienes flag de inactividad
-            ->get()->result();
+            ->get()
+            ->result();
 
-        $ok = 0; $fail = 0; $log = [];
+        $processed = 0;
+        $ok        = 0;
+        $fail      = 0;
+        $skipped   = 0;
+        $log       = [];
 
         foreach ($accs as $a) {
-            // Reusamos la misma acción vía método interno para evitar HTTP:
-            $_POST = [
-                'account_id' => $a->savings_account_id,
-                'date_from'  => $date_from,
-                'date_to'    => $date_to,
-                'preview'    => 0
-            ];
+            $processed++;
+            $acc_id = (int)$a->savings_account_id;
 
-            ob_start(); // capturamos la salida JSON
-            $this->interest_accrue();
-            $json = ob_get_clean();
-            $res = json_decode($json, true);
+            // 3) Protección contra duplicados:
+            $exists = $this->db
+                ->from($this->db->dbprefix('savings_account_transactions'))
+                ->where('savings_account_id', $acc_id)
+                ->where('trans_type', 'deposit')
+                ->where('trans_date >=', $date_from.' 00:00:00')
+                ->where('trans_date <=', $date_to.' 23:59:59')
+                ->like(
+                    'description',
+                    sprintf('Interés del %s al %s', $date_from, $date_to),
+                    'after'
+                )
+                ->count_all_results();
 
-            if (is_array($res) && !empty($res['ok'])) {
+            if ($exists > 0) {
+                $skipped++;
+                $log[] = [
+                    'account_id' => $acc_id,
+                    'error'      => 'skip: interés ya registrado para este período'
+                ];
+                continue;
+            }
+
+            // 4) Llamamos la lógica interna directamente (SIN output/ob_start)
+            $res = $this->_interest_calc_core($acc_id, $date_from, $date_to, false);
+
+            if (!empty($res['ok'])) {
                 $ok++;
             } else {
                 $fail++;
-                $log[] = ['account_id'=>$a->savings_account_id, 'error'=>$res['error'] ?? 'unknown'];
+                $log[] = [
+                    'account_id' => $acc_id,
+                    'error'      => $res['error'] ?? 'unknown',
+                ];
             }
         }
 
-        // Salida para cron/log
-        header('Content-Type: application/json');
-        echo json_encode([
-            'period' => $yyyymm,
-            'processed' => count($accs),
-            'ok' => $ok,
-            'fail' => $fail,
-            'errors' => $log
-        ]);
-        exit;
+        // 5) Salida para cron/log
+        $out = [
+            'period'    => $yyyymm,
+            'date_from' => $date_from,
+            'date_to'   => $date_to,
+            'accounts'  => count($accs),
+            'processed' => $processed,
+            'ok'        => $ok,
+            'fail'      => $fail,
+            'skipped'   => $skipped,
+            'errors'    => $log,
+        ];
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode($out));
     }
 
     /**

@@ -22,7 +22,7 @@
         </li>
     </ul>
 </div>
-
+<br>
 <div class="title-block">
   <h3 class="title">Resumen diario de movimientos</h3>
 </div>
@@ -36,43 +36,47 @@
     // $branch_options llega como [id => branch_name]
     $branch_options = $branch_options ?? [];
   ?>
+  <div class="section">
+    <div class="card card-block">
+      <?= form_open(current_url(), ['method'=>'get','class'=>'form-horizontal']) ?>
+        <div class="form-group">
+          <?= form_label('Fecha','date',['class'=>'col-sm-2 control-label']) ?>
+          <div class="col-sm-2">
+            <input type="date" name="date" value="<?= html_escape($filters['date'] ?? ($date ?? '')) ?>" class="form-control">
+          </div>
 
-  <form method="get" class="form-inline" style="margin-bottom:10px">
-    <label>Fecha:&nbsp;</label>
-    <input type="date" name="date" value="<?= html_escape($date) ?>" class="form-control input-sm">
-
-    &nbsp;&nbsp;
-    <label>Sucursal:&nbsp;</label>
-    <select name="branch_id" class="form-control input-sm">
-      <option value="">Todas</option>
-      <?php foreach ($branch_options as $id => $name): ?>
-        <option value="<?= html_escape($id) ?>" <?= ((string)$branch_id === (string)$id) ? 'selected' : '' ?>>
-          <?= html_escape($name) ?>
-        </option>
-      <?php endforeach; ?>
-    </select>
-
-    &nbsp;&nbsp;
-    <button class="btn btn-primary btn-sm">Aplicar</button>
-    <?php // Mantén aquí tus botones de Exportar CSV/PDF si ya los tienes ?>
-  </form>
-
-  <div class="inqbox-content table-responsive">
-    <?php
-      // Construir QS preservando filtros; si usas PHP < 7.4 y la arrow fn no te gusta, reemplázala por un foreach
-      $qs = $this->input->get(NULL, TRUE);
-      if (!is_array($qs)) { $qs = []; }
-      $qs = array_filter($qs, function($v){ return $v !== '' && $v !== null; });
-      $qs_str = http_build_query($qs);
-
-      // Corregir path del controlador a savings_account_reports (singular)
-      $csv_url = site_url('savings_accounts/savings_account_reports/daily_summary_export_csv') . ($qs_str ? '?'.$qs_str : '');
-      $pdf_url = site_url('savings_accounts/savings_account_reports/daily_summary_export_pdf') . ($qs_str ? '?'.$qs_str : '');
-    ?>
-    <div class="text-right" style="margin:10px 0;">
-        <a class="btn btn-default" href="<?= $csv_url ?>"><span class="glyphicon glyphicon-download"></span> Exportar CSV</a>
-        <a class="btn btn-default" href="<?= $pdf_url ?>" target="_blank"><span class="glyphicon glyphicon-print"></span> Exportar PDF</a>
+          <?= form_label('Sucursal','branch_id',['class'=>'col-sm-2 control-label']) ?>
+          <div class="col-sm-3">
+            <?= form_dropdown('branch_id', $branch_options, $filters['branch_id'] ?? ($branch_id ?? ''), 'class="form-control"') ?>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="col-sm-offset-2 col-sm-10">
+            <button class="btn btn-primary"><span class="glyphicon glyphicon-search"></span>Filtrar</button>
+            <a class="btn btn-default" href="<?= site_url('savings_accounts/savings_account_reports/daily_summary') ?>">Limpiar</a>
+          </div>
+        </div>
+      </div>
+      <?= form_close(); ?>
     </div>
+  </div>
+
+    <div class="inqbox-content table-responsive">
+      <?php
+        // Construir QS preservando filtros; si usas PHP < 7.4 y la arrow fn no te gusta, reemplázala por un foreach
+        $qs = $this->input->get(NULL, TRUE);
+        if (!is_array($qs)) { $qs = []; }
+        $qs = array_filter($qs, function($v){ return $v !== '' && $v !== null; });
+        $qs_str = http_build_query($qs);
+
+        // Corregir path del controlador a savings_account_reports (singular)
+        $csv_url = site_url('savings_accounts/savings_account_reports/daily_summary_export_csv') . ($qs_str ? '?'.$qs_str : '');
+        $pdf_url = site_url('savings_accounts/savings_account_reports/daily_summary_export_pdf') . ($qs_str ? '?'.$qs_str : '');
+      ?>
+      <div class="text-right" style="margin:10px 0;">
+          <a class="btn btn-default" href="<?= $csv_url ?>"><span class="glyphicon glyphicon-download"></span> Exportar CSV</a>
+          <a class="btn btn-default" href="<?= $pdf_url ?>" target="_blank"><span class="glyphicon glyphicon-print"></span> Exportar PDF</a>
+      </div>
 
     <table class="table table-striped table-bordered">
       <thead>
