@@ -46,12 +46,33 @@
         background-color: #e8e8e8;
         font-weight: bold;
     }
+    .aumento {
+        color: #008000;
+        font-weight: bold;
+    }
+    .disminucion {
+        color: #FF0000;
+        font-weight: bold;
+    }
+    .sin-diferencia {
+        color: #666;
+    }
+    .total-section {
+        background-color: #e8f4f8 !important;
+    }
+    .grand-total {
+        background-color: #d0e0ff !important;
+        font-weight: bold;
+    }
     @media print {
         .no-print {
             display: none;
         }
         .cash-flow-table {
             font-size: 10px;
+        }
+        .aumento, .disminucion {
+            color: #000 !important;
         }
     }
 </style>
@@ -72,11 +93,23 @@
 if (!empty($accounts)) {
     // Agrupar por tipo de cuenta para los headers
     $current_group = '';
-    $group_totals = [
-        'ACTIVO' => 0,
-        'PASIVO' => 0, 
-        'PATRIMONIO' => 0
+    
+    // Array para totales por clasificación
+    $clasificacion_totals = [
+        'OPERACIÓN' => 0,
+        'INVERSIÓN' => 0, 
+        'FINANCIACIÓN' => 0
     ];
+    
+    // Variables para efectivo inicial y final
+    $efectivo_inicial_total = 0;
+    $efectivo_final_total = 0;
+    
+    // Primero, calcular efectivo inicial y final
+    foreach ($accounts as $account) {
+        $efectivo_inicial_total += $account->saldo_inicial;
+        $efectivo_final_total += $account->saldo_final;
+    }
     ?>
     
     <table class="cash-flow-table">
@@ -120,10 +153,17 @@ if (!empty($accounts)) {
                 // Traducir clasificación
                 $clasificacion_display = '';
                 switch($account->clasificacion) {
-                    case 'operating': $clasificacion_display = 'OPERACIÓN'; break;
-                    case 'investing': $clasificacion_display = 'INVERSIÓN'; break;
-                    case 'financing': $clasificacion_display = 'FINANCIACIÓN'; break;
-                    default: $clasificacion_display = strtoupper($account->clasificacion);
+                    case 'operating': 
+                        $clasificacion_display = 'OPERACIÓN'; 
+                        break;
+                    case 'investing': 
+                        $clasificacion_display = 'INVERSIÓN'; 
+                        break;
+                    case 'financing': 
+                        $clasificacion_display = 'FINANCIACIÓN'; 
+                        break;
+                    default: 
+                        $clasificacion_display = strtoupper($account->clasificacion);
                 }
                 ?>
                 <tr>
@@ -142,25 +182,52 @@ if (!empty($accounts)) {
                 </tr>
                 <?php
                 
+                // Acumular totales
                 $grand_total_diferencia += $account->diferencia;
-                $group_totals[$account->tipo_cuenta] += $account->diferencia;
+                
+                // Acumular por clasificación
+                if (isset($clasificacion_totals[$clasificacion_display])) {
+                    $clasificacion_totals[$clasificacion_display] += $account->diferencia;
+                }
             }
             ?>
             
-            <!-- Totales por grupo -->
-            <?php foreach ($group_totals as $grupo => $total): ?>
-                <?php if ($total != 0): ?>
+            <!-- Línea separadora -->
+            <tr>
+                <td colspan="8" style="border-top: 2px solid #000;"></td>
+            </tr>
+            
+            <!-- SECCIÓN: Totales por clasificación -->
+            <tr style="background-color: #f5f5f5;">
+                <td colspan="8" style="padding: 10px; text-align: center; font-weight: bold; font-size: 12px;">
+                    RESUMEN POR CLASIFICACIÓN
+                </td>
+            </tr>
+            
+            <?php 
+            $clasificacion_orden = ['OPERACIÓN', 'INVERSIÓN', 'FINANCIACIÓN'];
+            foreach ($clasificacion_orden as $clasificacion): 
+                if (isset($clasificacion_totals[$clasificacion])): 
+                    $total = $clasificacion_totals[$clasificacion];
+            ?>
                 <tr style="background-color: #f0f0f0; font-weight: bold;">
-                    <td colspan="5" class="text-right">Total <?php echo $grupo; ?>:</td>
+                    <td colspan="5" class="text-right">FLUJO DE EFECTIVO DE <?php echo $clasificacion; ?>:</td>
                     <td colspan="2"></td>
                     <td class="text-right <?php echo $total >= 0 ? 'aumento' : 'disminucion'; ?>">
                         <?php echo money($total); ?>
                     </td>
                 </tr>
-                <?php endif; ?>
-            <?php endforeach; ?>
+            <?php 
+                endif;
+            endforeach; 
+            ?>
             
-            <!-- Total General -->
+            <!-- Línea separadora -->
+            <tr>
+                <td colspan="8" style="border-top: 2px solid #000;"></td>
+            </tr>
+            
+            <!-- VARIACIÓN TOTAL DE EFECTIVO -->
             <tr style="background-color: #d0d0d0; font-weight: bold; font-size: 12px;">
                 <td colspan="5" class="text-right">VARIACIÓN TOTAL DE EFECTIVO:</td>
                 <td colspan="2"></td>
@@ -169,6 +236,30 @@ if (!empty($accounts)) {
                 </td>
             </tr>
             
+            <!-- NUEVA SECCIÓN: EFECTIVO INICIAL Y FINAL -->
+            <tr class="total-section">
+                <td colspan="8" style="padding: 10px; text-align: center; font-weight: bold; font-size: 12px;">
+                    RECONCILIACIÓN DE EFECTIVO
+                </td>
+            </tr>
+            
+            <!-- Efectivo Inicial -->
+            <tr class="total-section">
+                <td colspan="5" class="text-right" style="font-weight: bold;">EFECTIVO AL INICIO DEL PERÍODO:</td>
+                <td colspan="2"></td>
+                <td class="text-right" style="font-weight: bold;">
+                    <?php echo money($efectivo_inicial_total); ?>
+                </td>
+            </tr>
+            
+            <!-- Efectivo Final -->
+            <tr class="total-section">
+                <td colspan="5" class="text-right" style="font-weight: bold;">EFECTIVO AL FINAL DEL PERÍODO:</td>
+                <td colspan="2"></td>
+                <td class="text-right" style="font-weight: bold; border-top: 2px solid #000;">
+                    <?php echo money($efectivo_final_total); ?>
+                </td>
+            </tr>            
         </tbody>
     </table>
 
@@ -183,8 +274,8 @@ if (!empty($accounts)) {
 ?>
 
 <!-- FIRMAS -->
-<br><br>
-<table style="width: 100%; margin-top: 60px; border: none;">
+<br><br><br>
+<table style="width: 100%; margin-top: 80px; border: none;">
     <tr>
         <td style="width: 50%; text-align: center; border: none;">
             <div style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 0px; margin: 0 auto 15px auto;">________________________</div>
