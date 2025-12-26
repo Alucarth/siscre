@@ -111,8 +111,6 @@
     ?>
 </table>
 
-<br/><br/><br/>
-
 <div style="margin-top:30px; padding:15px; border:1px solid #ccc; background-color:#f9f9f9;">
     <table width="100%" style="border-collapse:collapse;">
         <tr>
@@ -127,6 +125,14 @@
             <td class="bold">Resultado:</td>
             <td class="right-text bold" style="color:<?=$color_texto?>;"><?=money($net_income)?></td>
         </tr>
+        <tr style="background-color: <?=$color_fondo?>;">
+            <td class="bold">IUE:</td>
+            <td class="right-text bold" style="color:<?=$color_texto?>;"><?=money($iue)?></td>
+        </td>
+        <tr style="background-color: <?=$color_fondo?>;">
+            <td class="bold">Utilidad:</td>
+            <td class="right-text bold" style="color:<?=$color_texto?>;"><?=money($utilidad)?></td>
+        </td>
     </table>
 </div>
 

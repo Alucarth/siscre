@@ -95,11 +95,11 @@ class Accounting_model extends CI_Model
         $sorter = array(
             "", // 0 - actions
             "aa.account_name", // 1 - account_name
-            "at.added_date", // 2 - added_date (NUEVO)
-            "at.amount", // 3 - amount (NUEVO)
-            "at.purchased_date", // 4 - purchased_date (NUEVO)
-            "at.purchased_amount", // 5 - purchased_amount (NUEVO)
-            "at.depreciate_amount", // 6 - depreciate_amount (NUEVO)
+            "at.added_date", // 2 - added_date
+            "at.amount", // 3 - amount
+            "at.purchased_date", // 4 - purchased_date
+            "at.purchased_amount", // 5 - purchased_amount
+            "at.depreciate_amount", // 6 - depreciate_amount
             "at.description", // 7 - description
         );
         
@@ -352,12 +352,16 @@ class Accounting_model extends CI_Model
         }
         
         $net_income = $income_total - $expenses_total;
+        $iue = 0.25 * $net_income;
+        $utilidad = $net_income - $iue;
         
         return [
             'accounts' => $consolidated_data,
             'total_income' => $income_total,
             'total_expenses' => $expenses_total,
-            'net_income' => $net_income
+            'net_income' => $net_income,
+            'iue' => $iue,
+            'utilidad' => $utilidad
         ];
     }
     

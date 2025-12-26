@@ -12,6 +12,344 @@ class Accounting extends Secure_area implements iData_controller {
         $this->load->model("accounting_model");
     }
     
+    function get_next_account_code()
+    {
+        $account_type = $this->input->post("account_type");
+        $account_subtype = $this->input->post("account_subtype");
+        
+        if (!$account_type || !$account_subtype) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "Faltan parámetros requeridos";
+            send($return);
+            return;
+        }
+        
+        // El código base es el subtipo (ej: "11" o "12")
+        $base_code = $account_subtype;
+        
+        // Buscar el último código existente con este subtipo
+        $this->db->like("code_number", $base_code, "after");
+        $this->db->where("account_type", $account_type);
+        $this->db->order_by("code_number", "DESC");
+        $this->db->limit(1);
+        
+        $query = $this->db->get("accounting_accounts");
+        
+        $next_number = 1; // Empezar desde 01
+        
+        if ($query && $query->num_rows() > 0) {
+            $last_code = $query->row()->code_number;
+            
+            // Extraer los últimos 2 dígitos del código existente
+            $last_digits = substr($last_code, -2);
+            
+            // Convertir a número y sumar 1
+            $next_number = intval($last_digits) + 1;
+            
+            // Si es menor que 10, agregar cero a la izquierda
+            if ($next_number < 10) {
+                $next_number = "0" . $next_number;
+            }
+            
+            // Asegurarse de que no supere 99
+            if ($next_number > 99) {
+                $return["status"] = "ERROR";
+                $return["msg"] = "No hay más números disponibles para este subtipo";
+                send($return);
+                return;
+            }
+        } else {
+            // Si no hay códigos existentes, usar "01"
+            $next_number = ($next_number < 10) ? "0" . $next_number : $next_number;
+        }
+        
+        // Si el subtipo tiene menos de 4 dígitos, completar con ceros
+        $padded_subtype = str_pad($account_subtype, 4, "0", STR_PAD_RIGHT);
+        
+        $full_code = $padded_subtype . $next_number;
+        
+        // Verificar que el código no exista ya
+        $this->db->where("code_number", $full_code);
+        $this->db->where("account_type", $account_type);
+        $check_query = $this->db->get("accounting_accounts");
+        
+        if ($check_query && $check_query->num_rows() > 0) {
+            // Si por alguna razón el código ya existe, buscar el siguiente disponible
+            for ($i = $next_number + 1; $i <= 99; $i++) {
+                $test_number = ($i < 10) ? "0" . $i : $i;
+                $test_code = $padded_subtype . $test_number;
+                
+                $this->db->where("code_number", $test_code);
+                $this->db->where("account_type", $account_type);
+                $test_query = $this->db->get("accounting_accounts");
+                
+                if (!$test_query || $test_query->num_rows() == 0) {
+                    $full_code = $test_code;
+                    break;
+                }
+            }
+        }
+        
+        $return["status"] = "OK";
+        $return["code_number"] = $full_code;
+        send($return);
+    }
+
+    // Función para obtener cuentas padre filtradas por longitud requerida
+    function get_parent_accounts_by_level()
+    {
+        $account_type = $this->input->post("account_type");
+        $required_length = $this->input->post("required_length");
+        
+        if (!$account_type || !$required_length) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "Parámetros incompletos";
+            send($return);
+            return;
+        }
+        
+        // Validar que la longitud sea válida (2, 4, 6 dígitos)
+        if (!in_array($required_length, [2, 4, 6])) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "Longitud de código padre no válida";
+            send($return);
+            return;
+        }
+        
+        // Obtener cuentas del tipo especificado con la longitud exacta requerida
+        $this->db->where("account_type", $account_type);
+        $this->db->where("LENGTH(code_number)", $required_length);
+        $this->db->order_by("code_number", "ASC");
+        $query = $this->db->get("accounting_accounts");
+        
+        $accounts = [];
+        if ($query && $query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $accounts[] = [
+                    'code_number' => $row->code_number,
+                    'account_name' => $row->account_name
+                ];
+            }
+        }
+        
+        // Si no hay cuentas y estamos buscando de 2 dígitos para activos,
+        // incluir la cuenta raíz "1" convertida a "10", "11", etc.
+        if (empty($accounts) && $required_length == 2 && $account_type == 'asset') {
+            // Buscar cuentas de nivel 1 existentes para determinar el siguiente código
+            $this->db->where("account_type", 'asset');
+            $this->db->where("LENGTH(code_number)", 2);
+            $this->db->order_by("code_number", "DESC");
+            $level1_query = $this->db->get("accounting_accounts");
+            
+            $base_digit = '1';
+            $next_number = 1;
+            
+            if ($level1_query && $level1_query->num_rows() > 0) {
+                $last_code = $level1_query->row()->code_number;
+                $last_number = intval(substr($last_code, -1));
+                $next_number = $last_number + 1;
+                
+                // Solo incluir si hay espacio (1-9)
+                if ($next_number <= 9) {
+                    $accounts[] = [
+                        'code_number' => $base_digit . $next_number,
+                        'account_name' => 'Nueva cuenta de Nivel 1'
+                    ];
+                }
+            } else {
+                // Si no hay cuentas de nivel 1, sugerir "11"
+                $accounts[] = [
+                    'code_number' => '11',
+                    'account_name' => 'Nueva cuenta de Nivel 1'
+                ];
+            }
+        }
+        
+        if (empty($accounts)) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "No hay cuentas padre disponibles con " . $required_length . " dígitos";
+            send($return);
+            return;
+        }
+        
+        $return["status"] = "OK";
+        $return["accounts"] = $accounts;
+        send($return);
+    }
+    
+    // Función para generar código jerárquico
+    function generate_hierarchical_code()
+    {
+        $account_type = $this->input->post("account_type");
+        $parent_code = $this->input->post("parent_code");
+        $account_level = $this->input->post("account_level");
+        
+        if (!$account_type || !$account_level) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "Faltan parámetros requeridos";
+            send($return);
+            return;
+        }
+        
+        // NIVEL 1: Siempre 2 dígitos
+        if ($account_level == 1) {
+            $base_digit = '';
+            switch($account_type) {
+                case 'asset': $base_digit = '1'; break;
+                case 'liability': $base_digit = '2'; break;
+                case 'equity': $base_digit = '3'; break;
+                case 'income': $base_digit = '4'; break;
+                case 'expenses': $base_digit = '5'; break;
+            }
+            
+            // Buscar el siguiente código disponible para nivel 1
+            $this->db->where("account_type", $account_type);
+            $this->db->where("LENGTH(code_number)", 2);
+            $this->db->like("code_number", $base_digit, "after");
+            $this->db->order_by("code_number", "DESC");
+            $this->db->limit(1);
+            
+            $query = $this->db->get("accounting_accounts");
+            
+            if ($query && $query->num_rows() > 0) {
+                $last_code = $query->row()->code_number;
+                $last_number = intval(substr($last_code, -1));
+                $next_number = $last_number + 1;
+                
+                // Verificar que no supere 9
+                if ($next_number > 9) {
+                    $return["status"] = "ERROR";
+                    $return["msg"] = "No hay más números disponibles para nivel 1 (máximo 9 cuentas)";
+                    send($return);
+                    return;
+                }
+                
+                $full_code = $base_digit . $next_number;
+            } else {
+                // Si no hay cuentas de nivel 1, empezar con "11", "21", "31", etc.
+                $full_code = $base_digit . '1';
+            }
+            
+            $return["status"] = "OK";
+            $return["code_number"] = $full_code;
+            send($return);
+            return;
+        }
+        
+        // Para niveles 2, 3 y 4: validar cuenta padre
+        if (empty($parent_code)) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "Debe seleccionar una cuenta padre para el nivel " . $account_level;
+            send($return);
+            return;
+        }
+        
+        // Validar longitud del código padre según nivel
+        $parent_length = strlen($parent_code);
+        $expected_parent_length = 0;
+        
+        switch($account_level) {
+            case 2: $expected_parent_length = 2; break;  // Nivel 2 requiere padre de 2 dígitos
+            case 3: $expected_parent_length = 4; break;  // Nivel 3 requiere padre de 4 dígitos
+            case 4: $expected_parent_length = 6; break;  // Nivel 4 requiere padre de 6 dígitos
+        }
+        
+        if ($parent_length != $expected_parent_length) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "La cuenta padre seleccionada debe tener " . $expected_parent_length . " dígitos para el nivel " . $account_level;
+            send($return);
+            return;
+        }
+        
+        // Verificar que la cuenta padre exista y sea del tipo correcto
+        $this->db->where("code_number", $parent_code);
+        $this->db->where("account_type", $account_type);
+        $parent_query = $this->db->get("accounting_accounts");
+        
+        if (!$parent_query || $parent_query->num_rows() == 0) {
+            $return["status"] = "ERROR";
+            $return["msg"] = "La cuenta padre seleccionada no existe";
+            send($return);
+            return;
+        }
+        
+        // Usar el código padre como base
+        $code_prefix = $parent_code;
+        
+        // Determinar longitud objetivo
+        $target_length = $expected_parent_length + 2;
+        
+        // Buscar el siguiente número disponible
+        $this->db->like("code_number", $code_prefix, "after");
+        $this->db->where("account_type", $account_type);
+        $this->db->where("LENGTH(code_number)", $target_length);
+        $this->db->order_by("code_number", "DESC");
+        $this->db->limit(1);
+        
+        $query = $this->db->get("accounting_accounts");
+        
+        $next_suffix = '01'; // Empezar desde 01
+        
+        if ($query && $query->num_rows() > 0) {
+            $last_code = $query->row()->code_number;
+            $last_suffix = substr($last_code, -2);
+            $next_number = intval($last_suffix) + 1;
+            
+            if ($next_number > 99) {
+                $return["status"] = "ERROR";
+                $return["msg"] = "No hay más números disponibles para este nivel (máximo 99 subcuentas)";
+                send($return);
+                return;
+            }
+            
+            $next_suffix = str_pad($next_number, 2, "0", STR_PAD_LEFT);
+        }
+        
+        // Construir código completo
+        $full_code = $code_prefix . $next_suffix;
+        
+        // Verificar unicidad
+        $this->db->where("code_number", $full_code);
+        $this->db->where("account_type", $account_type);
+        $check_query = $this->db->get("accounting_accounts");
+        
+        if ($check_query && $check_query->num_rows() > 0) {
+            // Buscar siguiente disponible
+            for ($i = intval($next_suffix) + 1; $i <= 99; $i++) {
+                $test_suffix = str_pad($i, 2, "0", STR_PAD_LEFT);
+                $test_code = $code_prefix . $test_suffix;
+                
+                $this->db->where("code_number", $test_code);
+                $this->db->where("account_type", $account_type);
+                $test_query = $this->db->get("accounting_accounts");
+                
+                if (!$test_query || $test_query->num_rows() == 0) {
+                    $full_code = $test_code;
+                    break;
+                }
+            }
+        }
+        
+        $return["status"] = "OK";
+        $return["code_number"] = $full_code;
+        send($return);
+    }
+    
+    function getIndentLevel(string $code): int {
+        $len = strlen(trim($code));
+        
+        // Niveles basados en longitud de código
+        if ($len <= 2) {
+            return 0; // Nivel 1: 2 dígitos
+        } elseif ($len <= 4) {
+            return 1; // Nivel 2: 4 dígitos
+        } elseif ($len <= 6) {
+            return 2; // Nivel 3: 6 dígitos
+        } else {
+            return 3; // Nivel 4+: 8+ dígitos
+        }
+    }
+
     function ajax()
     {
         $type = $this->input->post("type");
@@ -44,8 +382,6 @@ class Accounting extends Secure_area implements iData_controller {
             case 9:
                 $this->expenses();
                 break;
-            
-            
             case 10:
                 $this->_dt_transactions();
                 break;
@@ -77,17 +413,17 @@ class Accounting extends Secure_area implements iData_controller {
         }
     }
     
-    function getIndentLevel(string $code): int {
-        $len = strlen(trim($code));
-        $digits = preg_replace('/[^0-9]/', '', $code); // Solo contar dígitos
+    // function getIndentLevel(string $code): int {
+    //     $len = strlen(trim($code));
+    //     $digits = preg_replace('/[^0-9]/', '', $code); // Solo contar dígitos
         
-        if (strlen($digits) <= 2) {
-            return 0; // grupo grande (activo, pasivo, etc.)
-        }
+    //     if (strlen($digits) <= 2) {
+    //         return 0; // grupo grande (activo, pasivo, etc.)
+    //     }
 
-        // cada 2 dígitos extra después de los primeros 2 aumenta el nivel
-        return intdiv((strlen($digits) - 2), 2);
-    }
+    //     cada 2 dígitos extra después de los primeros 2 aumenta el nivel
+    //     return intdiv((strlen($digits) - 2), 2);
+    // }
     
     private function _load_account()
     {
@@ -130,25 +466,81 @@ class Accounting extends Secure_area implements iData_controller {
         $description = $this->input->post("description");
         $account_type = $this->input->post("account_type");
         $account_map = $this->input->post("account_map");
+        $parent_code = $this->input->post("parent_code");
+        $account_level = $this->input->post("account_level");
         
         $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
         
+        // Validaciones básicas
         if ( $id == '' && trim($code_number) == '' )
         {
-            $return["msg"] = 'El numero de codigo es un campo requerido!';
+            $return["msg"] = 'El número de código es un campo requerido!';
+            $return["status"] = "ERROR";
             send($return);
         }
         
         if ( trim($account_name) == '' )
         {
             $return["msg"] = 'El nombre de la cuenta es un campo requerido!';
+            $return["status"] = "ERROR";
             send($return);
         }
         
-        if ( $id == '' && $this->code_exists($code_number, 'asset') )
+        // Validar formato del código (debe ser número y longitud válida)
+                if ( $id == '' )
         {
-            $return['msg'] = "El numero de codigo ya existe, Por favor ingrese otro";
-            send($return);
+            if (!is_numeric($code_number)) {
+                $return["msg"] = 'El código debe contener solo números!';
+                $return["status"] = "ERROR";
+                send($return);
+            }
+            
+            $code_length = strlen($code_number);
+            // Validar que la longitud sea 2, 4, 6 u 8 dígitos (siempre par)
+            if (!in_array($code_length, [2, 4, 6, 8])) {
+                $return["msg"] = 'El código debe tener 2, 4, 6 u 8 dígitos exactos!';
+                $return["status"] = "ERROR";
+                send($return);
+            }
+            
+            // Validar que el primer dígito coincida con el tipo de cuenta
+            $first_digit = substr($code_number, 0, 1);
+            $expected_digit = '';
+            switch($account_type) {
+                case 'asset': $expected_digit = '1'; break;
+                case 'liability': $expected_digit = '2'; break;
+                case 'equity': $expected_digit = '3'; break;
+                case 'income': $expected_digit = '4'; break;
+                case 'expenses': $expected_digit = '5'; break;
+            }
+            
+            if ($first_digit != $expected_digit) {
+                $return["msg"] = 'El primer dígito del código no coincide con el tipo de cuenta seleccionado!';
+                $return["status"] = "ERROR";
+                send($return);
+            }
+            
+            // Para nivel 1 (2 dígitos), validar que el segundo dígito no sea 0
+            if ($code_length == 2) {
+                $second_digit = substr($code_number, 1, 1);
+                if ($second_digit == '0') {
+                    $return["msg"] = 'Para nivel 1, el segundo dígito no puede ser 0!';
+                    $return["status"] = "ERROR";
+                    send($return);
+                }
+            }
+            
+            // Verificar que el código no exista ya
+            $this->db->where("code_number", $code_number);
+            $this->db->where("account_type", $account_type);
+            $query = $this->db->get("accounting_accounts");
+            
+            if ( $query && $query->num_rows() > 0 )
+            {
+                $return['msg'] = "El número de código ya existe. Por favor ingrese otro";
+                $return["status"] = "ERROR";
+                send($return);
+            }
         }
         
         $data = [];
@@ -157,9 +549,11 @@ class Accounting extends Secure_area implements iData_controller {
         $data["description"] = $description;
         $data["account_type"] = $account_type;
         
-        if ( $account_map != '' )
-        {
-            $this->_clear_account_map( $account_map );
+        // Si se proporcionó un código padre, usarlo como account_map
+        if ($parent_code) {
+            $data["account_map"] = $parent_code;
+        } else if ($account_map != '') {
+            $this->_clear_account_map($account_map);
             $data["account_map"] = $account_map;
         }
         
@@ -796,6 +1190,8 @@ class Accounting extends Secure_area implements iData_controller {
             $data["total_income"] = $income_data['total_income'];
             $data["total_expenses"] = $income_data['total_expenses'];
             $data["net_income"] = $income_data['net_income'];
+            $data["iue"] = $income_data['iue'];
+            $data["utilidad"] = $income_data['utilidad'];
         }
         
         $html = $this->load->view('accounting/reports/' . $report_type, $data, true);
@@ -887,6 +1283,8 @@ class Accounting extends Secure_area implements iData_controller {
                 $data["total_income"] = $income_data['total_income'];
                 $data["total_expenses"] = $income_data['total_expenses'];
                 $data["net_income"] = $income_data['net_income'];
+                $data["iue"] = $income_data['iue'];
+                $data["utilidad"] = $income_data['utilidad'];
                 break; 
             case 'balance_sheet':
                 $data = $this->accounting_model->get_balance_sheet_data($filters);
