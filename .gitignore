@@ -1,3 +1,7 @@
 /uploads/
 /downloads/
 /demo/
+
+# Ignorar logs de CodeIgniter
+application/logs/*
+!application/logs/index.html
