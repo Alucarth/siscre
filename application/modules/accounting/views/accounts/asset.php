@@ -70,10 +70,10 @@
                         <div class="form-group">
                             <label>Nivel de la Cuenta:</label>
                             <select class="form-control" name="account_level" id="account_level" required>
-                                <option value="">-- Seleccionar nivel --</option>
+                                <option value="">Seleccionar nivel</option>
                                 <option value="1">Nivel 1 - Clase Principal (2 dígitos)</option>
                                 <option value="2">Nivel 2 - Subclase (4 dígitos)</option>
-                                <option value="3">Nivel 3 - Grupo específico (6 dígitos)</option>
+                                <option value="3">Nivel 3 - Cuenta específica (6 dígitos)</option>
                                 <option value="4">Nivel 4 - Cuenta detallada (8 dígitos)</option>
                             </select>
                             <small class="form-text text-muted">Seleccione el nivel jerárquico primero</small>
@@ -83,14 +83,14 @@
                         <div class="form-group" id="parent-group" style="display: none;">
                             <label>Cuenta Padre:</label>
                             <select class="form-control" name="parent_code" id="parent_code">
-                                <option value="">-- Seleccionar cuenta padre --</option>
+                                <option value="">Seleccionar cuenta padre</option>
                             </select>
                             <small class="form-text text-muted" id="parent-help"></small>
                         </div>
                         
                         <!-- TERCERO: Mostrar código generado -->
                         <div class="form-group">
-                            <label>Código de Cuenta (Generado automáticamente):</label>
+                            <label>Código de Cuenta:</label>
                             <input type="text" class="form-control" name="code_number" id="code_number" readonly />
                             <small class="form-text text-muted">El código se generará después de completar los campos anteriores</small>
                         </div>
@@ -137,11 +137,9 @@
         var parentHelp = $("#parent-help");
         var hierarchyHelp = $("#hierarchy-help");
         
-        // Mostrar/ocultar grupo de padre según nivel
         if (selectedLevel > 1) {
             parentGroup.show();
             
-            // Determinar la longitud requerida del código padre
             var requiredParentLength = 0;
             var helpText = "";
             
@@ -162,17 +160,13 @@
             
             parentHelp.text(helpText);
             parentSelect.prop('required', true);
-            
-            // Limpiar opciones anteriores
             parentSelect.empty();
             parentSelect.append('<option value="">-- Seleccionar cuenta padre --</option>');
             
-            // Actualizar texto de ayuda jerárquica
             hierarchyHelp.html('<strong>Validación jerárquica:</strong><br>' +
                 '<small>• <span class="text-success">✓ Nivel seleccionado: ' + selectedLevel + '</span><br>' +
                 '• <span class="text-warning">→ Requiere cuenta padre de ' + requiredParentLength + ' dígitos</span></small>');
             
-            // Cargar cuentas padre del nivel anterior
             $.ajax({
                 url: '<?= site_url("accounting/get_parent_accounts_by_level"); ?>',
                 type: 'POST',
@@ -189,7 +183,6 @@
                                                account.code_number + ' - ' + account.account_name + '</option>');
                         });
                         
-                        // Si solo hay una opción, seleccionarla automáticamente
                         if (response.accounts.length === 1) {
                             parentSelect.val(response.accounts[0].code_number);
                             generateHierarchicalCode();
@@ -204,17 +197,14 @@
             });
             
         } else {
-            // Para nivel 1, ocultar selector de padre
             parentGroup.hide();
             parentSelect.prop('required', false);
             parentSelect.val('');
             
-            // Actualizar ayuda jerárquica
             hierarchyHelp.html('<strong>Validación jerárquica:</strong><br>' +
                 '<small>• <span class="text-success">✓ Nivel seleccionado: ' + selectedLevel + '</span><br>' +
                 '• <span class="text-success">✓ No requiere cuenta padre (nivel raíz)</span></small>');
             
-            // Generar código automáticamente para nivel 1
             generateHierarchicalCode();
         }
     }
@@ -230,7 +220,6 @@
             return;
         }
         
-        // Validar que para niveles 2-4 haya una cuenta padre seleccionada
         if (accountLevel > 1 && !parentCode) {
             $("#code_number").val("");
             $("#hierarchy-help").html('<strong class="text-danger">¡Atención!</strong><br>' +
@@ -252,7 +241,6 @@
                 if (response.status == "OK") {
                     $("#code_number").val(response.code_number);
                     
-                    // Actualizar ayuda con éxito
                     var currentHelp = $("#hierarchy-help").html();
                     $("#hierarchy-help").html(currentHelp + 
                         '<br><span class="text-success">✓ Código generado: ' + response.code_number + '</span>');
@@ -274,7 +262,6 @@
             var accountNameCell = row.find('td:eq(2)');
             var codeNumber = codeCell.text().trim();
             
-            // Calcular nivel de sangría basado en la longitud del código
             var codeLength = codeNumber.length;
             var indentLevel = 0;
             
@@ -308,11 +295,9 @@
             applyAssetIndentation();
         }, 1000);
         
-        // Evento cuando cambia el nivel
         $("#account_level").change(function() {
             var selectedLevel = $(this).val();
             
-            // Limpiar campos dependientes
             $("#parent_code").val("");
             $("#code_number").val("");
             
@@ -328,7 +313,6 @@
             }
         });
         
-        // Evento cuando cambia la cuenta padre
         $("#parent_code").change(function() {
             if ($("#account_level").val() > 1) {
                 generateHierarchicalCode();
@@ -336,7 +320,6 @@
         });
         
         $("#btn-save-asset").click(function(){
-            // Validar campos requeridos
             if (!$("#account_level").val()) {
                 alertify.alert("Debe seleccionar el nivel de la cuenta");
                 return;
@@ -367,14 +350,12 @@
         });
         
         $(document).on("click", "#btn-new-asset", function(){            
-            // Limpiar formulario
             $("#md-asset .modal-body input[type='text'], #md-asset .modal-body input[type='hidden'], #md-asset .modal-body textarea").val("");
             $("#md-asset #account_level").val("");
             $("#md-asset #parent_code").val("");
             $("#md-asset #code_number").val("");
             $("#parent-group").hide();
             
-            // Restablecer ayuda
             $("#hierarchy-help").html('<strong>Guía de niveles:</strong><br>' +
                 '<small>• <strong>Nivel 1</strong>: Cuentas principales (2 dígitos) - No requiere padre<br>' +
                 '• <strong>Nivel 2</strong>: Subclases (4 dígitos) - Requiere padre de Nivel 1<br>' +
@@ -394,10 +375,8 @@
             
             $.post(url, params, function(data){
                 if (data.status == "OK") {
-                    // Limpiar formulario primero
                     $("#md-asset .modal-body input[type='text'], #md-asset .modal-body input[type='hidden'], #md-asset .modal-body textarea").val("");
                     
-                    // Determinar nivel y padre basado en el código
                     var codeStr = data.row.code_number.toString();
                     var codeLength = codeStr.length;
                     
@@ -407,37 +386,30 @@
                     else if (codeLength <= 6) level = 3;
                     else level = 4;
                     
-                    // Determinar código padre
                     var parentCode = "";
                     if (codeLength > 2) {
                         parentCode = codeStr.substring(0, codeLength - 2);
                     }
                     
-                    // Establecer valores
                     $("#account_level").val(level);
                     $("#id").val(data.row.id);
                     $("#account_name").val(data.row.account_name);
                     $("#description").val(data.row.description);
                     $("#code_number").val(data.row.code_number);
                     
-                    // Manejar la lógica según el nivel
                     if (level > 1) {
-                        // Cargar cuentas padre apropiadas
                         loadParentAccountsByLevel(level);
                         
-                        // Una vez cargadas, seleccionar el padre correcto
                         setTimeout(function() {
                             $("#parent_code").val(parentCode);
                         }, 500);
                     } else {
-                        // Para nivel 1, ocultar selector de padre
                         $("#parent-group").hide();
                         $("#hierarchy-help").html('<strong>Validación jerárquica:</strong><br>' +
                             '<small>• <span class="text-success">✓ Nivel seleccionado: ' + level + '</span><br>' +
                             '• <span class="text-success">✓ No requiere cuenta padre (nivel raíz)</span></small>');
                     }
                     
-                    // Deshabilitar campos en modo edición
                     $("#code_number").prop("readonly", true);
                     $("#account_level").prop("disabled", true);
                     $("#parent_code").prop("disabled", true);

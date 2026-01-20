@@ -1,87 +1,74 @@
 <style>
-    td:nth-child(1) {
-        white-space: nowrap;
-    }
-
-    td:nth-child(4),
-    td:nth-child(5),
-    td:nth-child(6), 
-    td:nth-child(7) {
-        text-align: center;
-    }
-    .dataTables_info {
-        float:left;
-    }
-    
-    /* ESTILOS NUEVOS PARA SANGRÍAS */
-    .indent-0 { padding-left: 8px !important; }
-    .indent-1 { padding-left: 30px !important; }
-    .indent-2 { padding-left: 60px !important; }
-    .indent-3 { padding-left: 70px !important; }
+    td:nth-child(1) { white-space: nowrap; }
+    td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) { text-align: center; }
+    .dataTables_info { float:left; }
+    .indent-0 { padding-left: 8px !important; font-weight: bold; }
+    .indent-1 { padding-left: 30px !important; font-weight: 600; }
+    .indent-2 { padding-left: 50px !important; }
+    .indent-3 { padding-left: 70px !important; font-style: italic; }
     .indent-4 { padding-left: 90px !important; }
+    #tbl_income td:nth-child(2) { font-family: 'Courier New', monospace; }
+    #tbl_income tr td.indent-0 { background-color: #f8f9fa !important; }
 </style>
 
-<script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
-<script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.3/js/dataTables.fixedHeader.min.js"></script>
-
 <div class="section">
-    <div class="row sameheight-container">
-
-        <div class="col-lg-12">
-            <div class="card" style="width:100%">
-
-                <div class="card-block">
-
-                    <div class="inqbox-content table-responsive">
-
-                        <table class="table table-hover table-bordered" id="tbl_income">
-                            <thead>
-                                <tr>
-                                    <th style="text-align: center; width: 1%"></th>                            
-                                    <th style="text-align: center">Codigo numero</th>
-                                    <th style="text-align: center">Nombre de cuenta</th>
-                                    <th style="text-align: center">Descripcion</th>                                    
-                                </tr>
-                            </thead>
-                        </table>
-
-                        <?= $tbl_income; ?>
-
-                    </div>
-
-
-                </div>
+    <div class="card" style="width:100%">
+        <div class="card-block">
+            <div class="inqbox-content table-responsive">
+                <table class="table table-hover table-bordered" id="tbl_income">
+                    <thead>
+                        <tr>
+                            <th style="width: 1%"></th>                            
+                            <th>Código</th>
+                            <th>Nombre de cuenta</th>
+                            <th>Descripción</th>                                    
+                        </tr>
+                    </thead>
+                </table>
+                <?= $tbl_income; ?>
             </div>
         </div>
     </div>
 </div>
 
-<div class="extra-filters" style="display: none;">
-    &nbsp;<button class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> Imprimir</button>
-</div>
-<div id="dt-extra-params"></div>
-
-<!-- Modal -->
 <div class="modal fade" id="md-income" role="dialog">
-    <div class="modal-dialog">
-        <div class="modal-content" style="width:600px">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
             <div class="modal-header">
-                 Ingresos
-                <input type="hidden" name="account_type" id="account_type" value="income" />
+                <h5 class="modal-title">Cuenta de Ingresos</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
-                <input type="hidden" name="id" id="id" value="" />
-                <div class="form-group">
-                    <label>Codigo Numero:</label>
-                    <input type="text" class="form-control" name="code_number" id="code_number" />
-                </div>
-                <div class="form-group">
-                    <label>Numero de Cuenta:</label>
-                    <input type="text" class="form-control" name="account_name" id="account_name" />
-                </div>
-                <div class="form-group">
-                    <label>Descripcion:</label>
-                    <textarea class="form-control" id="description" name="description"></textarea>
+                <input type="hidden" id="income_id" name="id" value="" />
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Nivel:</label>
+                            <select class="form-control" id="income_account_level" name="account_level">
+                                <option value="">Seleccionar nivel</option>
+                                <option value="1">Nivel 1</option><option value="2">Nivel 2</option>
+                                <option value="3">Nivel 3</option><option value="4">Nivel 4</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="income_parent_group" style="display:none;">
+                            <label>Cuenta Padre:</label>
+                            <select class="form-control" id="income_parent_code" name="parent_code"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Código:</label>
+                            <input type="text" class="form-control" id="income_code_number" name="code_number" readonly />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Nombre:</label>
+                            <input type="text" class="form-control" id="income_account_name" name="account_name" />
+                        </div>
+                        <div class="form-group">
+                            <label>Descripción:</label>
+                            <textarea class="form-control" id="income_description" name="description"></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -89,124 +76,179 @@
                 <button type="button" class="btn btn-primary" id="btn-save-income">Guardar</button>
             </div>
         </div>
-        <!-- /.modal-content -->
     </div>
-    <!-- /.modal-dialog -->
 </div>
-<!-- /.modal -->
-
-<?php echo form_open('accounting/ajax', 'id="frmAssetDelete"', ["type" => 2]); ?>
-<?php echo form_close(); ?>
 
 <script>
-    // Función para aplicar sangrías basada en el código
-    function applyIndentation(tableId) {
-        $('#' + tableId + ' tbody tr').each(function() {
-            var row = $(this);
-            var codeCell = row.find('td:eq(1)'); // Segunda columna (Código)
-            var accountNameCell = row.find('td:eq(2)'); // Tercera columna (Nombre de cuenta)
-            
-            var codeNumber = codeCell.text().trim();
-            var digitCount = codeNumber.replace(/[^0-9]/g, '').length;
-            
-            // Calcular nivel de sangría basado en dígitos
-            var indentLevel = 0;
-            if (digitCount <= 2) {
-                indentLevel = 0; // 1-2 dígitos
-            } else if (digitCount <= 4) {
-                indentLevel = 1; // 4 dígitos
-            } else if (digitCount <= 6) {
-                indentLevel = 2; // 6 dígitos
-            } else {
-                indentLevel = 3; // más de 6 dígitos
+    function loadIncomeParents(level) {
+        if (level > 1) {
+            $("#income_parent_group").show();
+            var reqLen = (level == 2) ? 2 : (level == 3 ? 4 : 6);
+            $.post('<?= site_url("accounting/get_parent_accounts_by_level"); ?>', {
+                softtoken: $("input[name='softtoken']").val(), 
+                account_type: 'income', 
+                required_length: reqLen
+            }, function(res) {
+                if(res.status == "OK") {
+                    $("#income_parent_code").empty().append('<option value="">Seleccionar</option>');
+                    $.each(res.accounts, function(i, a) {
+                        $("#income_parent_code").append('<option value="'+a.code_number+'">'+a.code_number+' - '+a.account_name+'</option>');
+                    });
+                }
+            }, "json");
+        } else {
+            $("#income_parent_group").hide();
+            generateIncomeCode();
+        }
+    }
+
+    function generateIncomeCode() {
+        $.post('<?= site_url("accounting/generate_hierarchical_code"); ?>', {
+            softtoken: $("input[name='softtoken']").val(), 
+            account_type: 'income',
+            parent_code: $("#income_parent_code").val(), 
+            account_level: $("#income_account_level").val()
+        }, function(res) { 
+            if(res.status == "OK") {
+                $("#income_code_number").val(res.code_number); 
             }
+        }, "json");
+    }
+
+    function applyIncomeIndentation() {
+        $('#tbl_income tbody tr').each(function() {
+            var row = $(this);
+            var codeNumber = row.find('td:eq(1)').text().trim();
+            var accountNameCell = row.find('td:eq(2)');
+            var codeCell = row.find('td:eq(1)');
             
-            // Aplicar clase de sangría
-            accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4');
-            accountNameCell.addClass('indent-' + indentLevel);
+            // Calcular nivel basado en longitud
+            var level = 0;
+            if (codeNumber.length <= 2) level = 0;
+            else if (codeNumber.length <= 4) level = 1;
+            else if (codeNumber.length <= 6) level = 2;
+            else level = 3;
+            
+            // Aplicar sangría a nombre Y código
+            accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4')
+                           .addClass('indent-' + level);
+            codeCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4')
+                    .addClass('indent-' + level);
         });
     }
-    
-    $(document).ready(function () {
-        $("#tbl_income_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-income'>Nueva cuenta de ingreso</a>");
-        $("#tbl_income_filter input[type='search']").attr("placeholder", "Escriba su busqueda");
-        $("#tbl_income_filter input[type='search']").removeClass("input-sm");
-        
-        // Aplicar sangrías cuando se cargue o recargue la tabla
-        $('#tbl_income').on('draw.dt', function () {
-            setTimeout(function() {
-                applyIndentation('tbl_income');
-            }, 100);
-        });
-        
-        // Aplicar sangrías inicialmente
-        setTimeout(function() {
-            applyIndentation('tbl_income');
-        }, 1000);
 
-        $("#btn-save-income").click(function(){
-            var url = '<?=site_url('accounting/ajax');?>';
-            var params = $("#md-income input, #md-income textarea").serialize();
-            params += '&softtoken=' + $("input[name='softtoken']").val() + '&type=3';
-            
-            $.post(url, params, function(data){
-                if ( data.status == "OK" )
-                {
-                    $("#md-income").modal("hide");
-                    $("#tbl_income").DataTable().ajax.reload();
-                }
-                else
-                {
-                    alertify.alert(data.msg)
-                }
-            }, "json");
+    function validateIncomeForm() {
+        var level = $("#income_account_level").val();
+        var parentCode = $("#income_parent_code").val();
+        var accountName = $("#income_account_name").val().trim();
+        
+        if (!level) {
+            alert("Por favor seleccione un nivel de cuenta");
+            return false;
+        }
+        
+        if (level > 1 && !parentCode) {
+            alert("Por favor seleccione una cuenta padre");
+            return false;
+        }
+        
+        if (!accountName) {
+            alert("Por favor ingrese el nombre de la cuenta");
+            return false;
+        }
+        
+        return true;
+    }
+
+    function resetIncomeForm() {
+        $("#md-income input[type='text'], #md-income textarea").val("");
+        $("#income_id").val("");
+        $("#income_account_level").val("").prop("disabled", false);
+        $("#income_parent_group").hide();
+        $("#income_parent_code").empty().append('<option value="">Seleccionar</option>');
+    }
+
+    $(document).ready(function () {
+        // Ordenar por código (columna 1) ascendente por defecto
+        var table = $('#tbl_income').DataTable();
+        table.order([1, 'asc']).draw();
+        
+        // Aplicar indentación después de cada draw
+        $('#tbl_income').on('draw.dt', function () { 
+            applyIncomeIndentation(); 
         });
         
-        $(document).on("click", "#btn-new-income", function(){            
-            $("#md-income .modal-body input, #md-income .modal-body textarea").val("");
-            $("#md-income #code_number").prop("disabled", false);
+        // Aplicar indentación inicial
+        applyIncomeIndentation();
+        
+        // Botón para nueva cuenta
+        $("#tbl_income_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-income'>Nueva cuenta de ingreso</a>");
+        
+        // Eventos
+        $(document).on("change", "#income_account_level", function() { 
+            loadIncomeParents($(this).val()); 
+        });
+        
+        $(document).on("change", "#income_parent_code", function() { 
+            generateIncomeCode(); 
+        });
+
+        $(document).on("click", "#btn-new-income", function(){ 
+            resetIncomeForm();
             $("#md-income").modal("show");
         });
-        
-        $(document).on("click", ".btn-edit-income", function(){
-            var url = '<?=site_url('accounting/ajax');?>';
-            var params = {
-                softtoken: $("input[name='softtoken']").val(),
-                type:4,
-                id: $(this).data("id")
-            };
+
+        $(document).on("click", "#btn-save-income", function(){
+            if (!validateIncomeForm()) return;
             
-            $.post(url, params, function(data){
-                if ( data.status == "OK" )
-                {
-                    $.each(data.row, function(key, value){                        
-                        $("#md-income #" + key).val(value);
-                    });
-                    
-//                    $("#md-income #code_number").prop("disabled", true);
-                    $("#md-income").modal("show");
-                }
-                else
-                {
-                    alertify.alert(data.msg)
+            var params = $("#md-income input, #md-income select, #md-income textarea").serialize() + 
+                         '&account_type=income&type=3&softtoken=' + $("input[name='softtoken']").val();
+            
+            $.post('<?=site_url('accounting/ajax');?>', params, function(data){
+                if (data.status == "OK") { 
+                    $("#md-income").modal("hide"); 
+                    $("#tbl_income").DataTable().ajax.reload(function() {
+                        // Re-aplicar orden después de recargar
+                        $('#tbl_income').DataTable().order([1, 'asc']).draw();
+                        applyIncomeIndentation();
+                    }, false);
+                } else {
+                    alert("Error: " + (data.message || "No se pudo guardar la cuenta"));
                 }
             }, "json");
-            
         });
 
-        $(document).on("click", ".btn-delete", function () {
-            var $this = $(this);
-            alertify.confirm("Esta seguro que desea eliminar esta cuenta de ingreso?", function () {
-                var url = $("#frmAssetDelete").attr("action");
-                var params = $("#frmAssetDelete").serialize();
-                params += '&id=' + $this.attr("data-id");
-                $.post(url, params, function (data) {
-                    if (data.status == "OK")
-                    {
-                        $("#tbl_income").DataTable().ajax.reload();
+        $(document).on("click", ".btn-edit-income", function(){
+            var id = $(this).data("id");
+            $.post('<?=site_url('accounting/ajax');?>', {
+                softtoken: $("input[name='softtoken']").val(), 
+                type: 4, 
+                id: id,
+                account_type: 'income'
+            }, function(data){
+                if (data.status == "OK") {
+                    $("#income_id").val(data.row.id);
+                    $("#income_account_name").val(data.row.account_name);
+                    $("#income_description").val(data.row.description);
+                    $("#income_code_number").val(data.row.code_number);
+                    
+                    var level = data.row.code_number.length / 2;
+                    $("#income_account_level").val(level).prop("disabled", true);
+                    
+                    // Cargar cuenta padre si es nivel > 1
+                    if (level > 1) {
+                        loadIncomeParents(level);
+                        setTimeout(function() {
+                            var parentCode = data.row.code_number.substring(0, (level-1)*2);
+                            $("#income_parent_code").val(parentCode);
+                        }, 500);
+                    } else {
+                        $("#income_parent_group").hide();
                     }
-                }, "json");
-            });
+                    
+                    $("#md-income").modal("show");
+                }
+            }, "json");
         });
     });
 </script>

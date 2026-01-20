@@ -8,66 +8,29 @@
 
 class Accounting_model extends CI_Model
 {
-    function get_accounts($limit = 10000, $offset = 0, $search = "", $order = [], $filters = [], &$count_all = 0)
+    function get_accounts($limit, $offset, $keywords, $order, $filters, &$count_all)
     {
-        $sorter = array(
-            "",
-            "code_number",
-            "account_name",
-            "description",
-        );  
+        $this->db->select('*');
+        $this->db->from('c19_accounting_accounts');
         
-        $str_where = "WHERE account_type = '{$filters["account_type"]}' ";
-        $this->db->from('accounting_accounts aa');
-        $this->db->where("account_type", $filters["account_type"]);
+        if (!empty($filters["account_type"])) {
+            $this->db->where('account_type', $filters["account_type"]);
+        }
         
-            // if(is_plugin_active("branches"))
-            // {
-            //     $this->db->where("aa.branch_id", $this->session->userdata("branch_id"));
-            // }
+        // Ordenar por código de forma jerárquica
+        // Primero por los primeros 2 dígitos, luego por los siguientes 2, etc.
+        $this->db->order_by('LENGTH(code_number)', 'ASC');
+        $this->db->order_by('code_number', 'ASC');
         
-        if ($search !== "")
-        {
-            $this->db->where("(
-                aa.code_number LIKE '%" . $search . "%' OR
-                aa.account_name LIKE '%" . $search . "%' OR
-                aa.description LIKE '%" . $search . "%'
-                )");
-            
-            $str_where .= " AND (
-                aa.code_number LIKE '%" . $search . "%' OR
-                aa.account_name LIKE '%" . $search . "%' OR
-                aa.description LIKE '%" . $search . "%'
-                )";
+        // Contar total
+        $count_all = $this->db->count_all_results('', FALSE);
+        
+        // Aplicar límites para paginación
+        if ($limit > 0) {
+            $this->db->limit($limit, $offset);
         }
-
-        if ( isset($order['index']) && count($order) > 0 && $order['index'] < count($sorter))
-        {
-            $this->db->order_by($sorter[$order['index']], $order['direction']);
-        }
-        else
-        {
-            $this->db->order_by("id", "desc");
-        }
-
-        $this->db->limit($limit);
-        $this->db->offset($offset);
         
         $query = $this->db->get();
-        
-        $sql = "SELECT COUNT(*) cnt FROM c19_accounting_accounts aa $str_where";
-        $q = $this->db->query($sql);
-        if ( $q && $q->num_rows() > 0 )
-        {
-            $count_all = $q->row()->cnt;
-        }
-        
-        if (is_plugin_active('activity_log'))
-        {
-            $user_id = $this->Employee->get_logged_in_employee_info()->person_id;
-            track_action($user_id, "assets", "Viewed assets list");
-        }
-        
         return $query;
     }
     
