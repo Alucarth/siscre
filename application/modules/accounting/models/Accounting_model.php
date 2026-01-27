@@ -17,15 +17,11 @@ class Accounting_model extends CI_Model
             $this->db->where('account_type', $filters["account_type"]);
         }
         
-        // Ordenar por código de forma jerárquica
-        // Primero por los primeros 2 dígitos, luego por los siguientes 2, etc.
         $this->db->order_by('LENGTH(code_number)', 'ASC');
         $this->db->order_by('code_number', 'ASC');
         
-        // Contar total
         $count_all = $this->db->count_all_results('', FALSE);
         
-        // Aplicar límites para paginación
         if ($limit > 0) {
             $this->db->limit($limit, $offset);
         }

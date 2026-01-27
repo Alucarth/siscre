@@ -1,439 +1,347 @@
 <style>
-    td:nth-child(1) {
-        white-space: nowrap;
-    }
-
-    td:nth-child(4),
-    td:nth-child(5),
-    td:nth-child(6), 
-    td:nth-child(7) {
-        text-align: center;
-    }
-    .dataTables_info {
-        float:left;
-    }
-    
-    /* ESTILOS NUEVOS PARA SANGRÍAS */
+    td:nth-child(1) { white-space: nowrap; }
+    td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) { text-align: center; }
+    .dataTables_info { float:left; }
     .indent-0 { padding-left: 8px !important; }
     .indent-1 { padding-left: 30px !important; }
     .indent-2 { padding-left: 60px !important; }
     .indent-3 { padding-left: 70px !important; }
-    .indent-4 { padding-left: 90px !important; }
 </style>
 
-<script type="text/javascript" src="https://cdn.datatables.net/fixedcolumns/3.2.3/js/dataTables.fixedColumns.min.js"></script>
-<script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.3/js/dataTables.fixedHeader.min.js"></script>
-
 <div class="section">
-    <div class="row sameheight-container">
-        <div class="col-lg-12">
-            <div class="card" style="width:100%">
-                <div class="card-block">
-                    <div class="inqbox-content table-responsive">
-                        <table class="table table-hover table-bordered" id="tbl_asset">
-                            <thead>
-                                <tr>
-                                    <th style="text-align: center; width: 1%"></th>                            
-                                    <th style="text-align: center">Código</th>
-                                    <th style="text-align: center">Nombre de cuenta</th>
-                                    <th style="text-align: center">Descripción</th>                                    
-                                </tr>
-                            </thead>
-                        </table>
-                        <?= $tbl_assets; ?>
-                    </div>
-                </div>
+    <div class="card" style="width:100%">
+        <div class="card-block">
+            <div class="inqbox-content table-responsive">
+                <table class="table table-hover table-bordered" id="tbl_asset">
+                    <thead>
+                        <tr>
+                            <th style="width: 1%"></th>                            
+                            <th>Código</th>
+                            <th>Nombre de cuenta</th>
+                            <th>Descripción</th>                                    
+                        </tr>
+                    </thead>
+                </table>
+                <?= $tbl_assets; ?>
             </div>
         </div>
     </div>
 </div>
 
-<div class="extra-filters" style="display: none;">
-    &nbsp;<button class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> Imprimir</button>
-</div>
-
-<div id="dt-extra-params"></div>
 <div class="modal fade" id="md-asset" role="dialog">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content" style="width:800px">
+        <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Activo</h5>
+                <h5 class="modal-title">Cuenta de Activo</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <input type="hidden" name="account_type" id="account_type" value="asset" />
             </div>
             <div class="modal-body">
-                <input type="hidden" name="id" id="id" value="" />
-                
+                <input type="hidden" id="asset_id" name="id" />
                 <div class="row">
                     <div class="col-md-6">
-                        <!-- PRIMERO: Seleccionar nivel -->
                         <div class="form-group">
                             <label>Nivel de la Cuenta:</label>
-                            <select class="form-control" name="account_level" id="account_level" required>
+                            <select class="form-control" id="asset_account_level" name="account_level">
                                 <option value="">Seleccionar nivel</option>
                                 <option value="1">Nivel 1 - Clase Principal (2 dígitos)</option>
                                 <option value="2">Nivel 2 - Subclase (4 dígitos)</option>
                                 <option value="3">Nivel 3 - Cuenta específica (6 dígitos)</option>
                                 <option value="4">Nivel 4 - Cuenta detallada (8 dígitos)</option>
                             </select>
-                            <small class="form-text text-muted">Seleccione el nivel jerárquico primero</small>
                         </div>
-                        
-                        <!-- SEGUNDO: Seleccionar cuenta padre (solo para niveles 2-4) -->
-                        <div class="form-group" id="parent-group" style="display: none;">
+                        <div class="form-group" id="asset_parent_group" style="display:none;">
                             <label>Cuenta Padre:</label>
-                            <select class="form-control" name="parent_code" id="parent_code">
-                                <option value="">Seleccionar cuenta padre</option>
-                            </select>
-                            <small class="form-text text-muted" id="parent-help"></small>
+                            <select class="form-control" id="asset_parent_code" name="parent_code"></select>
+                            <small class="text-info" id="asset_parent_hint"></small>
                         </div>
-                        
-                        <!-- TERCERO: Mostrar código generado -->
                         <div class="form-group">
-                            <label>Código de Cuenta:</label>
-                            <input type="text" class="form-control" name="code_number" id="code_number" readonly />
-                            <small class="form-text text-muted">El código se generará después de completar los campos anteriores</small>
+                            <label>Código Generado:</label>
+                            <input type="text" class="form-control" id="asset_code_number" name="code_number" readonly />
                         </div>
                     </div>
-                    
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Nombre de Cuenta:</label>
-                            <input type="text" class="form-control" name="account_name" id="account_name" required />
+                            <label>Nombre:</label>
+                            <input type="text" class="form-control" id="asset_account_name" name="account_name" />
                         </div>
-                        
                         <div class="form-group">
                             <label>Descripción:</label>
-                            <textarea class="form-control" id="description" name="description" rows="4"></textarea>
+                            <textarea class="form-control" id="asset_description" name="description" rows="4"></textarea>
                         </div>
-                        
-                        <!-- Panel de ayuda jerárquico -->
-                        <!-- <div class="alert alert-info" id="hierarchy-help">
-                            <strong>Guía de niveles:</strong><br>
-                            <small>• <strong>Nivel 1</strong>: Cuentas principales (2 dígitos) - No requiere padre<br>
-                            • <strong>Nivel 2</strong>: Subclases (4 dígitos) - Requiere padre de Nivel 1<br>
-                            • <strong>Nivel 3</strong>: Grupos (6 dígitos) - Requiere padre de Nivel 2<br>
-                            • <strong>Nivel 4</strong>: Subcuentas (8 dígitos) - Requiere padre de Nivel 3</small>
-                        </div> -->
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-primary" id="btn-save-asset">Guardar</button>
+                <button type="button" class="btn btn-primary" id="btn-save-asset">Guardar Cuenta</button>
             </div>
         </div>
     </div>
 </div>
 
-<?php echo form_open('accounting/ajax', 'id="frmAssetDelete"', ["type" => 2]); ?>
-<?php echo form_close(); ?>
-
 <script>
-    // Función para cargar cuentas padre según el nivel seleccionado
-    function loadParentAccountsByLevel(selectedLevel) {
-        var parentGroup = $("#parent-group");
-        var parentSelect = $("#parent_code");
-        var parentHelp = $("#parent-help");
-        var hierarchyHelp = $("#hierarchy-help");
+var isAdmin = <?php echo ($this->Employee->get_logged_in_employee_info()->role_id == 13 || 17) ? 'true' : 'false'; ?>;
+function loadAssetParents(level) {
+var select = $("#asset_parent_code");
+    select.empty().append('<option value="">Cargando...</option>');
+    
+    // SI ES NIVEL 1: Ocultar padre y generar código directamente
+    if (level == 1) {
+        $("#asset_parent_group").hide();
+        $("#asset_parent_code").val(""); 
+        generateAssetCode(); // <--- Esto genera el código 11, 12, etc. al instante
+        return;
+    }
+    
+    if (!level || level === "") {
+        $("#asset_parent_group").hide();
+        return;
+    }
+    
+    $("#asset_parent_group").show();
+    
+    var lengths = [];
+    if (level == 2) lengths = [2];
+    else if (level == 3) {
+        lengths = [2, 4];
+    } 
+    else if (level == 4) lengths = [2, 4, 6];
+
+    var requests = lengths.map(function(len) {
+        return $.post('<?=site_url("accounting/get_parent_accounts_by_level");?>', {
+            softtoken: $("input[name='softtoken']").val(),
+            account_type: 'asset',
+            required_length: len
+        }, null, "json");
+    });
+
+    $.when.apply($, requests).done(function() {
+        select.empty().append('<option value="">Seleccionar cuenta padre</option>');
+        var args = (lengths.length === 1) ? [arguments] : arguments;
         
-        if (selectedLevel > 1) {
-            parentGroup.show();
-            
-            var requiredParentLength = 0;
-            var helpText = "";
-            
-            switch(parseInt(selectedLevel)) {
-                case 2:
-                    requiredParentLength = 2; // Nivel 2 requiere padre de 2 dígitos
-                    helpText = "Seleccione una cuenta de Nivel 1 (2 dígitos)";
-                    break;
-                case 3:
-                    requiredParentLength = 4; // Nivel 3 requiere padre de 4 dígitos
-                    helpText = "Seleccione una cuenta de Nivel 2 (4 dígitos)";
-                    break;
-                case 4:
-                    requiredParentLength = 6; // Nivel 4 requiere padre de 6 dígitos
-                    helpText = "Seleccione una cuenta de Nivel 3 (6 dígitos)";
-                    break;
+        $.each(args, function(i, response) {
+            var data = response[0];
+            if(data && data.status == "OK") {
+                $.each(data.accounts, function(j, a) {
+                    var label = (a.code_number.length == 2) ? " " : " ";
+                    if(a.code_number.length == 6) label = " ";
+                    select.append('<option value="'+a.code_number+'">'+label + a.code_number+' - '+a.account_name+'</option>');
+                });
             }
-            
-            parentHelp.text(helpText);
-            parentSelect.prop('required', true);
-            parentSelect.empty();
-            parentSelect.append('<option value="">-- Seleccionar cuenta padre --</option>');
-            
-            hierarchyHelp.html('<strong>Validación jerárquica:</strong><br>' +
-                '<small>• <span class="text-success">✓ Nivel seleccionado: ' + selectedLevel + '</span><br>' +
-                '• <span class="text-warning">→ Requiere cuenta padre de ' + requiredParentLength + ' dígitos</span></small>');
+        });
+    });
+}
+
+function generateAssetCode() {
+    var parentCode = $("#asset_parent_code").val();
+    var targetLevel = $("#asset_account_level").val();
+
+    $.post('<?=site_url("accounting/generate_hierarchical_code");?>', {
+        softtoken: $("input[name='softtoken']").val(),
+        account_type: 'asset',
+        parent_code: parentCode,
+        account_level: targetLevel
+    }, function(res) {
+        if(res.status == "OK") {
+            $("#asset_code_number").val(res.code_number);
+        }
+    }, "json");
+}
+
+function applyAssetIndentation() {
+    $('#tbl_asset tbody tr').each(function() {
+        var row = $(this);
+        var codeNumber = row.find('td:eq(1)').text().trim();
+        var accountNameCell = row.find('td:eq(2)');
+        var level = (codeNumber.length <= 2) ? 0 : (codeNumber.length <= 4 ? 1 : (codeNumber.length <= 6 ? 2 : 3));
+        accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4').addClass('indent-' + level);
+    });
+}
+
+function resetAssetForm() {
+    $("#asset_id").val("");
+    $("#asset_account_name").val("");
+    $("#asset_description").val("");
+    $("#asset_code_number").val("");
+    $("#asset_account_level").val("").prop("disabled", false);
+    $("#asset_parent_code").val("").prop("disabled", false);
+    $("#asset-parent-group").hide();
+    $("#asset-hierarchy-help").hide();
+    
+    $("#md-asset input, #md-asset select, #md-asset textarea").prop("disabled", false).prop("readonly", function() {
+        return $(this).attr('id') === 'asset_code_number';
+    });
+}
+
+function validateAssetForm() {
+    var accountLevel = $("#asset_account_level").val();
+    var parentCode = $("#asset_parent_code").val();
+    var codeNumber = $("#asset_code_number").val();
+    var accountName = $("#asset_account_name").val();
+    
+    if (!accountLevel) {
+        alertify.alert("Debe seleccionar el nivel de la cuenta");
+        return false;
+    }
+    
+    if (!accountName.trim()) {
+        alertify.alert("Debe ingresar el nombre de la cuenta");
+        $("#asset_account_name").focus();
+        return false;
+    }
+    
+    if (!codeNumber) {
+        alertify.alert("Debe generar un código primero. Seleccione el nivel y cuenta padre si aplica.");
+        return false;
+    }
+    
+    if (accountLevel > 1 && !parentCode) {
+        alertify.alert("Para nivel " + accountLevel + " debe seleccionar una cuenta padre");
+        $("#asset_parent_code").focus();
+        return false;
+    }
+    
+    return true;
+}
+
+$(document).ready(function() {
+    $('#tbl_asset').on('draw.dt', function () {
+        $('#tbl_asset tbody tr').each(function() {
+            var code = $(this).find('td:eq(1)').text().trim();
+            var indent = (code.length <= 2) ? 0 : (code.length <= 4 ? 1 : (code.length <= 6 ? 2 : 3));
+            $(this).find('td:eq(2)').addClass('indent-' + indent);
+        });
+    });
+
+    $("#tbl_asset_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-asset' style='margin-right:10px'>Nueva cuenta</a>");
+    
+    $(document).on("change", "#asset_account_level", function() { loadAssetParents($(this).val()); });
+    $(document).on("change", "#asset_parent_code", function() { generateAssetCode(); });
+    
+    $(document).on("click", "#btn-new-asset", function() {
+        $("#md-asset input, #md-asset textarea").val("");
+        $("#asset_account_level").val("").prop("disabled", false);
+        $("#asset_parent_group").hide();
+        $("#asset_parent_hint").text("");
+        $("#md-asset").modal("show");
+    });
+
+    // Localiza el evento click del botón #btn-save-asset y actualízalo:
+    $(document).on("click", "#btn-save-asset", function () {
+        var id = $("#asset_id").val();
+        var code_number = $("#asset_code_number").val();
+        var account_name = $("#asset_account_name").val();
+        var description = $("#asset_description").val();
+        var account_level = $("#asset_account_level").val();
+        var parent_code = $("#asset_parent_code").val();
+        var $btn = $(this); // Capturamos el botón
+        
+        if ($btn.prop('disabled')) return; // 1. EVITA EJECUCIÓN MÚLTIPLE
+        $btn.prop('disabled', true);
+
+        if (account_name == "" || code_number == "") {
+            alertify.alert("Por favor complete los campos obligatorios (Nombre y Código)");
+            return;
+        }
+
+        var $btn = $(this);
+        var originalHtml = $btn.html();
+        $btn.html('<i class="fa fa-spinner fa-spin"></i> Guardando...').prop('disabled', true);
+
+        $.ajax({
+            url: '<?=site_url('accounting/ajax');?>',
+            type: 'POST',
+            data: {
+                softtoken: $("input[name='softtoken']").val(),
+                type: 3, // Tipo 3 es _save_account
+                id: id,
+                code_number: code_number,
+                account_name: account_name,
+                description: description,
+                account_type: 'asset',
+                account_level: account_level,
+                parent_code: parent_code,
+                account_map: code_number // Añadimos el campo account_map igual al código
+            },
+            dataType: 'json',
+            success: function (data) {
+                if (data.status == "OK") {
+                    alertify.success("Cuenta de activo guardada correctamente");
+                    $("#md-asset").modal('hide');
+                    $("#tbl_asset").DataTable().ajax.reload(null, false);
+                    
+                    // Limpiar campos y resetear el modal
+                    $("#asset_id").val("");
+                    $("#asset_account_name").val("");
+                    $("#asset_description").val("");
+                    $("#asset_account_level").val("").trigger('change');
+                } else {
+                    alertify.alert("Error: " + (data.msg || "No se pudo guardar la cuenta"));
+                }
+            },
+            error: function() {
+                alertify.alert("Error de conexión con el servidor");
+            },
+            complete: function() {
+                $btn.html(originalHtml).prop('disabled', false);
+            }
+        });
+    });
+
+    $(document).on("click", ".btn-edit-asset", function() {
+        var id = $(this).data("id");
+        $.post('<?=site_url('accounting/ajax');?>', {
+            softtoken: $("input[name='softtoken']").val(), 
+            type: 4, 
+            id: id
+        }, function(data) {
+            if (data.status == "OK") {
+                $("#asset_id").val(data.row.id);
+                $("#asset_account_name").val(data.row.account_name);
+                $("#asset_description").val(data.row.description);
+                $("#asset_code_number").val(data.row.code_number);
+                $("#asset_account_level").val(data.row.code_number.length / 2); //.prop("disabled", true)
+                $("#asset_parent_code").val(data.row.parent_code); //.prop("disabled", true)
+                $("#asset_parent_group").hide(); 
+                $("#md-asset").modal("show");
+            }
+        }, "json");
+        if (isAdmin) { $("#asset_code_number").prop("readonly", false); }
+    });
+
+    $(document).on("click", ".btn-delete", function () {
+        var accountId = $(this).data("id");
+        var $deleteBtn = $(this);
+        
+        alertify.confirm("¿Está seguro que desea eliminar esta cuenta de activos?", function () {
+            var originalHtml = $deleteBtn.html();
+            $deleteBtn.html('<i class="fa fa-spinner fa-spin"></i>').prop('disabled', true);
             
             $.ajax({
-                url: '<?= site_url("accounting/get_parent_accounts_by_level"); ?>',
+                url: '<?=site_url('accounting/ajax');?>',
                 type: 'POST',
                 data: {
                     softtoken: $("input[name='softtoken']").val(),
-                    account_type: 'asset',
-                    required_length: requiredParentLength
+                    type: 2,
+                    id: accountId,
+                    account_type: 'asset'
                 },
                 dataType: 'json',
-                success: function(response) {
-                    if (response.status == "OK") {
-                        $.each(response.accounts, function(index, account) {
-                            parentSelect.append('<option value="' + account.code_number + '">' + 
-                                               account.code_number + ' - ' + account.account_name + '</option>');
-                        });
-                        
-                        if (response.accounts.length === 1) {
-                            parentSelect.val(response.accounts[0].code_number);
-                            generateHierarchicalCode();
-                        }
+                success: function (data) {
+                    if (data.status == "OK") {
+                        alertify.success("Cuenta eliminada correctamente");
+                        $("#tbl_asset").DataTable().ajax.reload(null, false);
                     } else {
-                        alertify.alert("Error: " + (response.msg || "No se pudieron cargar las cuentas padre"));
+                        alertify.alert("Error: " + (data.msg || "No se pudo eliminar la cuenta"));
                     }
                 },
                 error: function() {
                     alertify.alert("Error al conectar con el servidor");
+                },
+                complete: function() {
+                    $deleteBtn.html(originalHtml).prop('disabled', false);
                 }
-            });
-            
-        } else {
-            parentGroup.hide();
-            parentSelect.prop('required', false);
-            parentSelect.val('');
-            
-            hierarchyHelp.html('<strong>Validación jerárquica:</strong><br>' +
-                '<small>• <span class="text-success">✓ Nivel seleccionado: ' + selectedLevel + '</span><br>' +
-                '• <span class="text-success">✓ No requiere cuenta padre (nivel raíz)</span></small>');
-            
-            generateHierarchicalCode();
-        }
-    }
-    
-    // Función para generar el código según jerarquía
-    function generateHierarchicalCode() {
-        var parentCode = $("#parent_code").val();
-        var accountLevel = $("#account_level").val();
-        var accountType = 'asset';
-        
-        if (!accountLevel) {
-            $("#code_number").val("");
-            return;
-        }
-        
-        if (accountLevel > 1 && !parentCode) {
-            $("#code_number").val("");
-            $("#hierarchy-help").html('<strong class="text-danger">¡Atención!</strong><br>' +
-                '<small>• Debe seleccionar una cuenta padre para el nivel ' + accountLevel + '</small>');
-            return;
-        }
-        
-        $.ajax({
-            url: '<?= site_url("accounting/generate_hierarchical_code"); ?>',
-            type: 'POST',
-            data: {
-                softtoken: $("input[name='softtoken']").val(),
-                account_type: accountType,
-                parent_code: parentCode,
-                account_level: accountLevel
-            },
-            dataType: 'json',
-            success: function(response) {
-                if (response.status == "OK") {
-                    $("#code_number").val(response.code_number);
-                    
-                    var currentHelp = $("#hierarchy-help").html();
-                    $("#hierarchy-help").html(currentHelp + 
-                        '<br><span class="text-success">✓ Código generado: ' + response.code_number + '</span>');
-                } else {
-                    alertify.alert("Error al generar código: " + (response.msg || "Error desconocido"));
-                    $("#code_number").val("");
-                }
-            },
-            error: function() {
-                alertify.alert("Error al conectar con el servidor");
-            }
-        });
-    }
-
-    function applyAssetIndentation() {
-        $('#tbl_asset tbody tr').each(function() {
-            var row = $(this);
-            var codeCell = row.find('td:eq(1)');
-            var accountNameCell = row.find('td:eq(2)');
-            var codeNumber = codeCell.text().trim();
-            
-            var codeLength = codeNumber.length;
-            var indentLevel = 0;
-            
-            if (codeLength <= 2) {
-                indentLevel = 0; // Nivel 1: 2 dígitos
-            } else if (codeLength <= 4) {
-                indentLevel = 1; // Nivel 2: 4 dígitos
-            } else if (codeLength <= 6) {
-                indentLevel = 2; // Nivel 3: 6 dígitos
-            } else {
-                indentLevel = 3; // Nivel 4+: 8+ dígitos
-            }
-            
-            accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4');
-            accountNameCell.addClass('indent-' + indentLevel);
-        });
-    }
-
-    $(document).ready(function () {
-        $("#tbl_asset_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-asset'>Nueva cuenta de activo</a>");
-        $("#tbl_asset_filter input[type='search']").attr("placeholder", "Escriba su búsqueda");
-        $("#tbl_asset_filter input[type='search']").removeClass("input-sm");
-        
-        $('#tbl_asset').on('draw.dt', function () {
-            setTimeout(function() {
-                applyAssetIndentation();
-            }, 100);
-        });
-        
-        setTimeout(function() {
-            applyAssetIndentation();
-        }, 1000);
-        
-        $("#account_level").change(function() {
-            var selectedLevel = $(this).val();
-            
-            $("#parent_code").val("");
-            $("#code_number").val("");
-            
-            if (selectedLevel) {
-                loadParentAccountsByLevel(selectedLevel);
-            } else {
-                $("#parent-group").hide();
-                $("#hierarchy-help").html('<strong>Guía de niveles:</strong><br>' +
-                    '<small>• <strong>Nivel 1</strong>: Cuentas principales (2 dígitos) - No requiere padre<br>' +
-                    '• <strong>Nivel 2</strong>: Subclases (4 dígitos) - Requiere padre de Nivel 1<br>' +
-                    '• <strong>Nivel 3</strong>: Grupos (6 dígitos) - Requiere padre de Nivel 2<br>' +
-                    '• <strong>Nivel 4</strong>: Subcuentas (8 dígitos) - Requiere padre de Nivel 3</small>');
-            }
-        });
-        
-        $("#parent_code").change(function() {
-            if ($("#account_level").val() > 1) {
-                generateHierarchicalCode();
-            }
-        });
-        
-        $("#btn-save-asset").click(function(){
-            if (!$("#account_level").val()) {
-                alertify.alert("Debe seleccionar el nivel de la cuenta");
-                return;
-            }
-            
-            if (!$("#account_name").val()) {
-                alertify.alert("Debe ingresar el nombre de la cuenta");
-                return;
-            }
-            
-            if (!$("#code_number").val()) {
-                alertify.alert("Debe generar un código primero");
-                return;
-            }
-            
-            var url = '<?=site_url('accounting/ajax');?>';
-            var params = $("#md-asset input, #md-asset select, #md-asset textarea").serialize();
-            params += '&softtoken=' + $("input[name='softtoken']").val() + '&type=3';
-            
-            $.post(url, params, function(data){
-                if (data.status == "OK") {
-                    $("#md-asset").modal("hide");
-                    $("#tbl_asset").DataTable().ajax.reload();
-                } else {
-                    alertify.alert(data.msg || "Error al guardar");
-                }
-            }, "json");
-        });
-        
-        $(document).on("click", "#btn-new-asset", function(){            
-            $("#md-asset .modal-body input[type='text'], #md-asset .modal-body input[type='hidden'], #md-asset .modal-body textarea").val("");
-            $("#md-asset #account_level").val("");
-            $("#md-asset #parent_code").val("");
-            $("#md-asset #code_number").val("");
-            $("#parent-group").hide();
-            
-            $("#hierarchy-help").html('<strong>Guía de niveles:</strong><br>' +
-                '<small>• <strong>Nivel 1</strong>: Cuentas principales (2 dígitos) - No requiere padre<br>' +
-                '• <strong>Nivel 2</strong>: Subclases (4 dígitos) - Requiere padre de Nivel 1<br>' +
-                '• <strong>Nivel 3</strong>: Grupos (6 dígitos) - Requiere padre de Nivel 2<br>' +
-                '• <strong>Nivel 4</strong>: Subcuentas (8 dígitos) - Requiere padre de Nivel 3</small>');
-            
-            $("#md-asset").modal("show");
-        });
-        
-        $(document).on("click", ".btn-edit-asset", function(){
-            var url = '<?=site_url('accounting/ajax');?>';
-            var params = {
-                softtoken: $("input[name='softtoken']").val(),
-                type: 4,
-                id: $(this).data("id")
-            };
-            
-            $.post(url, params, function(data){
-                if (data.status == "OK") {
-                    $("#md-asset .modal-body input[type='text'], #md-asset .modal-body input[type='hidden'], #md-asset .modal-body textarea").val("");
-                    
-                    var codeStr = data.row.code_number.toString();
-                    var codeLength = codeStr.length;
-                    
-                    var level = 1;
-                    if (codeLength <= 2) level = 1;
-                    else if (codeLength <= 4) level = 2;
-                    else if (codeLength <= 6) level = 3;
-                    else level = 4;
-                    
-                    var parentCode = "";
-                    if (codeLength > 2) {
-                        parentCode = codeStr.substring(0, codeLength - 2);
-                    }
-                    
-                    $("#account_level").val(level);
-                    $("#id").val(data.row.id);
-                    $("#account_name").val(data.row.account_name);
-                    $("#description").val(data.row.description);
-                    $("#code_number").val(data.row.code_number);
-                    
-                    if (level > 1) {
-                        loadParentAccountsByLevel(level);
-                        
-                        setTimeout(function() {
-                            $("#parent_code").val(parentCode);
-                        }, 500);
-                    } else {
-                        $("#parent-group").hide();
-                        $("#hierarchy-help").html('<strong>Validación jerárquica:</strong><br>' +
-                            '<small>• <span class="text-success">✓ Nivel seleccionado: ' + level + '</span><br>' +
-                            '• <span class="text-success">✓ No requiere cuenta padre (nivel raíz)</span></small>');
-                    }
-                    
-                    $("#code_number").prop("readonly", true);
-                    $("#account_level").prop("disabled", true);
-                    $("#parent_code").prop("disabled", true);
-                    
-                    $("#md-asset").modal("show");
-                    
-                } else {
-                    alertify.alert(data.msg || "Error al cargar datos");
-                }
-            }, "json");
-        });
-
-        $(document).on("click", ".btn-delete", function () {
-            var $this = $(this);
-            alertify.confirm("¿Está seguro que desea eliminar esta cuenta de activo?", function () {
-                var url = $("#frmAssetDelete").attr("action");
-                var params = $("#frmAssetDelete").serialize();
-                params += '&id=' + $this.attr("data-id") + "&account_type=asset";
-                $.post(url, params, function (data) {
-                    if (data.status == "OK") {
-                        $("#tbl_asset").DataTable().ajax.reload();
-                    }
-                }, "json");
             });
         });
     });
+});
 </script>

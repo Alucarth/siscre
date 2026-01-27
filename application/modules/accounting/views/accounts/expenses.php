@@ -2,13 +2,10 @@
     td:nth-child(1) { white-space: nowrap; }
     td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) { text-align: center; }
     .dataTables_info { float:left; }
-    .indent-0 { padding-left: 8px !important; font-weight: bold; }
-    .indent-1 { padding-left: 30px !important; font-weight: 600; }
-    .indent-2 { padding-left: 50px !important; }
-    .indent-3 { padding-left: 70px !important; font-style: italic; }
-    .indent-4 { padding-left: 90px !important; }
-    #tbl_expenses td:nth-child(2) { font-family: 'Courier New', monospace; }
-    #tbl_expenses tr td.indent-0 { background-color: #f8f9fa !important; }
+    .indent-0 { padding-left: 8px !important; }
+    .indent-1 { padding-left: 30px !important; }
+    .indent-2 { padding-left: 60px !important; }
+    .indent-3 { padding-left: 70px !important; }
 </style>
 
 <div class="section">
@@ -35,27 +32,30 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Cuenta de Gastos</h5>
+                <h5 class="modal-title">Cuenta de Activo</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="expenses_id" name="id" value="" />
+                <input type="hidden" id="expenses_id" name="id" />
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Nivel:</label>
+                            <label>Nivel de la Cuenta:</label>
                             <select class="form-control" id="expenses_account_level" name="account_level">
                                 <option value="">Seleccionar nivel</option>
-                                <option value="1">Nivel 1</option><option value="2">Nivel 2</option>
-                                <option value="3">Nivel 3</option><option value="4">Nivel 4</option>
+                                <option value="1">Nivel 1 - Clase Principal (2 dígitos)</option>
+                                <option value="2">Nivel 2 - Subclase (4 dígitos)</option>
+                                <option value="3">Nivel 3 - Cuenta específica (6 dígitos)</option>
+                                <option value="4">Nivel 4 - Cuenta detallada (8 dígitos)</option>
                             </select>
                         </div>
                         <div class="form-group" id="expenses_parent_group" style="display:none;">
                             <label>Cuenta Padre:</label>
                             <select class="form-control" id="expenses_parent_code" name="parent_code"></select>
+                            <small class="text-info" id="expenses_parent_hint"></small>
                         </div>
                         <div class="form-group">
-                            <label>Código:</label>
+                            <label>Código Generado:</label>
                             <input type="text" class="form-control" id="expenses_code_number" name="code_number" readonly />
                         </div>
                     </div>
@@ -66,189 +66,282 @@
                         </div>
                         <div class="form-group">
                             <label>Descripción:</label>
-                            <textarea class="form-control" id="expenses_description" name="description"></textarea>
+                            <textarea class="form-control" id="expenses_description" name="description" rows="4"></textarea>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-primary" id="btn-save-expenses">Guardar</button>
+                <button type="button" class="btn btn-primary" id="btn-save-expenses">Guardar Cuenta</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    function loadExpensesParents(level) {
-        if (level > 1) {
-            $("#expenses_parent_group").show();
-            var reqLen = (level == 2) ? 2 : (level == 3 ? 4 : 6);
-            $.post('<?= site_url("accounting/get_parent_accounts_by_level"); ?>', {
-                softtoken: $("input[name='softtoken']").val(), 
-                account_type: 'expenses', 
-                required_length: reqLen
-            }, function(res) {
-                if(res.status == "OK") {
-                    $("#expenses_parent_code").empty().append('<option value="">Seleccionar...</option>');
-                    $.each(res.accounts, function(i, a) {
-                        $("#expenses_parent_code").append('<option value="'+a.code_number+'">'+a.code_number+' - '+a.account_name+'</option>');
-                    });
-                }
-            }, "json");
-        } else {
-            $("#expenses_parent_group").hide();
-            generateExpensesCode();
-        }
-    }
-
-    function generateExpensesCode() {
-        $.post('<?= site_url("accounting/generate_hierarchical_code"); ?>', {
-            softtoken: $("input[name='softtoken']").val(), 
-            account_type: 'expenses',
-            parent_code: $("#expenses_parent_code").val(), 
-            account_level: $("#expenses_account_level").val()
-        }, function(res) { 
-            if(res.status == "OK") {
-                $("#expenses_code_number").val(res.code_number); 
-            }
-        }, "json");
-    }
-
-    function applyExpensesIndentation() {
-        $('#tbl_expenses tbody tr').each(function() {
-            var row = $(this);
-            var codeNumber = row.find('td:eq(1)').text().trim();
-            var accountNameCell = row.find('td:eq(2)');
-            var codeCell = row.find('td:eq(1)');
-            
-            // Calcular nivel basado en longitud
-            var level = 0;
-            if (codeNumber.length <= 2) level = 0;
-            else if (codeNumber.length <= 4) level = 1;
-            else if (codeNumber.length <= 6) level = 2;
-            else level = 3;
-            
-            // Aplicar sangría a nombre Y código
-            accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4')
-                           .addClass('indent-' + level);
-            codeCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4')
-                    .addClass('indent-' + level);
-        });
-    }
-
-    function validateExpensesForm() {
-        var level = $("#expenses_account_level").val();
-        var parentCode = $("#expenses_parent_code").val();
-        var accountName = $("#expenses_account_name").val().trim();
-        
-        if (!level) {
-            alert("Por favor seleccione un nivel de cuenta");
-            return false;
-        }
-        
-        if (level > 1 && !parentCode) {
-            alert("Por favor seleccione una cuenta padre");
-            return false;
-        }
-        
-        if (!accountName) {
-            alert("Por favor ingrese el nombre de la cuenta");
-            return false;
-        }
-        
-        return true;
-    }
-
-    function resetExpensesForm() {
-        $("#md-expenses input[type='text'], #md-expenses textarea").val("");
-        $("#expenses_id").val("");
-        $("#expenses_account_level").val("").prop("disabled", false);
+var isAdmin = <?php echo ($this->Employee->get_logged_in_employee_info()->role_id == 13) ? 'true' : 'false'; ?>;
+function loadexpensesParents(level) {
+var select = $("#expenses_parent_code");
+    select.empty().append('<option value="">Cargando...</option>');
+    
+    // SI ES NIVEL 1: Ocultar padre y generar código directamente
+    if (level == 1) {
         $("#expenses_parent_group").hide();
-        $("#expenses_parent_code").empty().append('<option value="">Seleccionar...</option>');
+        $("#expenses_parent_code").val(""); 
+        generateexpensesCode(); // <--- Esto genera el código 11, 12, etc. al instante
+        return;
     }
+    
+    if (!level || level === "") {
+        $("#expenses_parent_group").hide();
+        return;
+    }
+    
+    $("#expenses_parent_group").show();
+    
+    var lengths = [];
+    if (level == 2) lengths = [2];
+    else if (level == 3) {
+        lengths = [2, 4];
+    } 
+    else if (level == 4) lengths = [2, 4, 6];
 
-    $(document).ready(function () {
-        // Ordenar por código (columna 1) ascendente por defecto
-        var table = $('#tbl_expenses').DataTable();
-        table.order([1, 'asc']).draw();
-        
-        // Aplicar indentación después de cada draw
-        $('#tbl_expenses').on('draw.dt', function () { 
-            applyExpensesIndentation(); 
-        });
-        
-        // Aplicar indentación inicial
-        applyExpensesIndentation();
-        
-        // Botón para nueva cuenta
-        $("#tbl_expenses_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-expenses'>Nueva cuenta de gasto</a>");
-        
-        // Eventos
-        $(document).on("change", "#expenses_account_level", function() { 
-            loadExpensesParents($(this).val()); 
-        });
-        
-        $(document).on("change", "#expenses_parent_code", function() { 
-            generateExpensesCode(); 
-        });
+    var requests = lengths.map(function(len) {
+        return $.post('<?=site_url("accounting/get_parent_accounts_by_level");?>', {
+            softtoken: $("input[name='softtoken']").val(),
+            account_type: 'expenses',
+            required_length: len
+        }, null, "json");
+    });
 
-        $(document).on("click", "#btn-new-expenses", function(){ 
-            resetExpensesForm();
-            $("#md-expenses").modal("show");
-        });
-
-        $(document).on("click", "#btn-save-expenses", function(){
-            if (!validateExpensesForm()) return;
-            
-            var params = $("#md-expenses input, #md-expenses select, #md-expenses textarea").serialize() + 
-                         '&account_type=expenses&type=3&softtoken=' + $("input[name='softtoken']").val();
-            
-            $.post('<?=site_url('accounting/ajax');?>', params, function(data){
-                if (data.status == "OK") { 
-                    $("#md-expenses").modal("hide"); 
-                    $("#tbl_expenses").DataTable().ajax.reload(function() {
-                        // Re-aplicar orden después de recargar
-                        $('#tbl_expenses').DataTable().order([1, 'asc']).draw();
-                        applyExpensesIndentation();
-                    }, false);
-                } else {
-                    alert("Error: " + (data.message || "No se pudo guardar la cuenta"));
-                }
-            }, "json");
-        });
-
-        $(document).on("click", ".btn-edit-expenses", function(){
-            var id = $(this).data("id");
-            $.post('<?=site_url('accounting/ajax');?>', {
-                softtoken: $("input[name='softtoken']").val(), 
-                type: 4, 
-                id: id,
-                account_type: 'expenses'
-            }, function(data){
-                if (data.status == "OK") {
-                    $("#expenses_id").val(data.row.id);
-                    $("#expenses_account_name").val(data.row.account_name);
-                    $("#expenses_description").val(data.row.description);
-                    $("#expenses_code_number").val(data.row.code_number);
-                    
-                    var level = data.row.code_number.length / 2;
-                    $("#expenses_account_level").val(level).prop("disabled", true);
-                    
-                    // Cargar cuenta padre si es nivel > 1
-                    if (level > 1) {
-                        loadExpensesParents(level);
-                        setTimeout(function() {
-                            var parentCode = data.row.code_number.substring(0, (level-1)*2);
-                            $("#expenses_parent_code").val(parentCode);
-                        }, 500);
-                    } else {
-                        $("#expenses_parent_group").hide();
-                    }
-                    
-                    $("#md-expenses").modal("show");
-                }
-            }, "json");
+    $.when.apply($, requests).done(function() {
+        select.empty().append('<option value="">Seleccionar cuenta padre</option>');
+        var args = (lengths.length === 1) ? [arguments] : arguments;
+        
+        $.each(args, function(i, response) {
+            var data = response[0];
+            if(data && data.status == "OK") {
+                $.each(data.accounts, function(j, a) {
+                    var label = (a.code_number.length == 2) ? " " : " ";
+                    if(a.code_number.length == 6) label = " ";
+                    select.append('<option value="'+a.code_number+'">'+label + a.code_number+' - '+a.account_name+'</option>');
+                });
+            }
         });
     });
+}
+
+function generateexpensesCode() {
+    var parentCode = $("#expenses_parent_code").val();
+    var targetLevel = $("#expenses_account_level").val();
+
+    $.post('<?=site_url("accounting/generate_hierarchical_code");?>', {
+        softtoken: $("input[name='softtoken']").val(),
+        account_type: 'expenses',
+        parent_code: parentCode,
+        account_level: targetLevel
+    }, function(res) {
+        if(res.status == "OK") {
+            $("#expenses_code_number").val(res.code_number);
+        }
+    }, "json");
+}
+
+function applyexpensesIndentation() {
+    $('#tbl_expenses tbody tr').each(function() {
+        var row = $(this);
+        var codeNumber = row.find('td:eq(1)').text().trim();
+        var accountNameCell = row.find('td:eq(2)');
+        var level = (codeNumber.length <= 2) ? 0 : (codeNumber.length <= 4 ? 1 : (codeNumber.length <= 6 ? 2 : 3));
+        accountNameCell.removeClass('indent-0 indent-1 indent-2 indent-3 indent-4').addClass('indent-' + level);
+    });
+}
+
+function resetexpensesForm() {
+    $("#expenses_id").val("");
+    $("#expenses_account_name").val("");
+    $("#expenses_description").val("");
+    $("#expenses_code_number").val("");
+    $("#expenses_account_level").val("").prop("disabled", false);
+    $("#expenses_parent_code").val("").prop("disabled", false);
+    $("#expenses-parent-group").hide();
+    $("#expenses-hierarchy-help").hide();
+    
+    $("#md-expenses input, #md-expenses select, #md-expenses textarea").prop("disabled", false).prop("readonly", function() {
+        return $(this).attr('id') === 'expenses_code_number';
+    });
+}
+
+function validateexpensesForm() {
+    var accountLevel = $("#expenses_account_level").val();
+    var parentCode = $("#expenses_parent_code").val();
+    var codeNumber = $("#expenses_code_number").val();
+    var accountName = $("#expenses_account_name").val();
+    
+    if (!accountLevel) {
+        alertify.alert("Debe seleccionar el nivel de la cuenta");
+        return false;
+    }
+    
+    if (!accountName.trim()) {
+        alertify.alert("Debe ingresar el nombre de la cuenta");
+        $("#expenses_account_name").focus();
+        return false;
+    }
+    
+    if (!codeNumber) {
+        alertify.alert("Debe generar un código primero. Seleccione el nivel y cuenta padre si aplica.");
+        return false;
+    }
+    
+    if (accountLevel > 1 && !parentCode) {
+        alertify.alert("Para nivel " + accountLevel + " debe seleccionar una cuenta padre");
+        $("#expenses_parent_code").focus();
+        return false;
+    }
+    
+    return true;
+}
+
+$(document).ready(function() {
+    $('#tbl_expenses').on('draw.dt', function () {
+        $('#tbl_expenses tbody tr').each(function() {
+            var code = $(this).find('td:eq(1)').text().trim();
+            var indent = (code.length <= 2) ? 0 : (code.length <= 4 ? 1 : (code.length <= 6 ? 2 : 3));
+            $(this).find('td:eq(2)').addClass('indent-' + indent);
+        });
+    });
+
+    $("#tbl_expenses_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-expenses' style='margin-right:10px'>Nueva cuenta</a>");
+    
+    $(document).on("change", "#expenses_account_level", function() { loadexpensesParents($(this).val()); });
+    $(document).on("change", "#expenses_parent_code", function() { generateexpensesCode(); });
+    
+    $(document).on("click", "#btn-new-expenses", function() {
+        $("#md-expenses input, #md-expenses textarea").val("");
+        $("#expenses_account_level").val("").prop("disabled", false);
+        $("#expenses_parent_group").hide();
+        $("#expenses_parent_hint").text("");
+        $("#md-expenses").modal("show");
+    });
+
+    // Localiza el evento click del botón #btn-save-expenses y actualízalo:
+    $(document).on("click", "#btn-save-expenses", function () {
+        var id = $("#expenses_id").val();
+        var code_number = $("#expenses_code_number").val();
+        var account_name = $("#expenses_account_name").val();
+        var description = $("#expenses_description").val();
+        var account_level = $("#expenses_account_level").val();
+        var parent_code = $("#expenses_parent_code").val();
+        var $btn = $(this); // Capturamos el botón
+        
+        if ($btn.prop('disabled')) return; // 1. EVITA EJECUCIÓN MÚLTIPLE
+        $btn.prop('disabled', true);
+
+        if (account_name == "" || code_number == "") {
+            alertify.alert("Por favor complete los campos obligatorios (Nombre y Código)");
+            return;
+        }
+
+        var $btn = $(this);
+        var originalHtml = $btn.html();
+        $btn.html('<i class="fa fa-spinner fa-spin"></i> Guardando...').prop('disabled', true);
+
+        $.ajax({
+            url: '<?=site_url('accounting/ajax');?>',
+            type: 'POST',
+            data: {
+                softtoken: $("input[name='softtoken']").val(),
+                type: 3, // Tipo 3 es _save_account
+                id: id,
+                code_number: code_number,
+                account_name: account_name,
+                description: description,
+                account_type: 'expenses',
+                account_level: account_level,
+                parent_code: parent_code,
+                account_map: code_number // Añadimos el campo account_map igual al código
+            },
+            dataType: 'json',
+            success: function (data) {
+                if (data.status == "OK") {
+                    alertify.success("Cuenta de activo guardada correctamente");
+                    $("#md-expenses").modal('hide');
+                    $("#tbl_expenses").DataTable().ajax.reload(null, false);
+                    
+                    // Limpiar campos y resetear el modal
+                    $("#expenses_id").val("");
+                    $("#expenses_account_name").val("");
+                    $("#expenses_description").val("");
+                    $("#expenses_account_level").val("").trigger('change');
+                } else {
+                    alertify.alert("Error: " + (data.msg || "No se pudo guardar la cuenta"));
+                }
+            },
+            error: function() {
+                alertify.alert("Error de conexión con el servidor");
+            },
+            complete: function() {
+                $btn.html(originalHtml).prop('disabled', false);
+            }
+        });
+    });
+
+    $(document).on("click", ".btn-edit-expenses", function() {
+        var id = $(this).data("id");
+        $.post('<?=site_url('accounting/ajax');?>', {
+            softtoken: $("input[name='softtoken']").val(), 
+            type: 4, 
+            id: id
+        }, function(data) {
+            if (data.status == "OK") {
+                $("#expenses_id").val(data.row.id);
+                $("#expenses_account_name").val(data.row.account_name);
+                $("#expenses_description").val(data.row.description);
+                $("#expenses_code_number").val(data.row.code_number);
+                $("#expenses_account_level").val(data.row.code_number.length / 2); //.prop("disabled", true)
+                $("#expenses_parent_code").val(data.row.parent_code); //.prop("disabled", true)
+                $("#expenses_parent_group").hide(); 
+                $("#md-expenses").modal("show");
+            }
+        }, "json");
+        if (isAdmin) { $("#expenses_code_number").prop("readonly", false); }
+    });
+
+    $(document).on("click", ".btn-delete", function () {
+        var accountId = $(this).data("id");
+        var $deleteBtn = $(this);
+        
+        alertify.confirm("¿Está seguro que desea eliminar esta cuenta de activos?", function () {
+            var originalHtml = $deleteBtn.html();
+            $deleteBtn.html('<i class="fa fa-spinner fa-spin"></i>').prop('disabled', true);
+            
+            $.ajax({
+                url: '<?=site_url('accounting/ajax');?>',
+                type: 'POST',
+                data: {
+                    softtoken: $("input[name='softtoken']").val(),
+                    type: 2,
+                    id: accountId,
+                    account_type: 'expenses'
+                },
+                dataType: 'json',
+                success: function (data) {
+                    if (data.status == "OK") {
+                        alertify.success("Cuenta eliminada correctamente");
+                        $("#tbl_expenses").DataTable().ajax.reload(null, false);
+                    } else {
+                        alertify.alert("Error: " + (data.msg || "No se pudo eliminar la cuenta"));
+                    }
+                },
+                error: function() {
+                    alertify.alert("Error al conectar con el servidor");
+                },
+                complete: function() {
+                    $deleteBtn.html(originalHtml).prop('disabled', false);
+                }
+            });
+        });
+    });
+});
 </script>
