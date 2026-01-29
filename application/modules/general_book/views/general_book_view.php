@@ -61,16 +61,16 @@
                                         <div class="col-lg-3">
                                             <div class="form-group">
                                                 <label>Cuenta Contable</label>
-                                                <select class="form-control account-select" name="accounts[]" required>
-                                                    <option value="">Seleccionar cuenta</option>
-                                                    <?php foreach ($accounts as $account): ?>
-                                                        <?php if (strlen((string)$account->code_number) == 8): ?>
-                                                            <option value="<?php echo $account->id; ?>">
-                                                                <?php echo $account->code_number . ' - ' . $account->account_name; ?>
-                                                            </option>
-                                                        <?php endif; ?>
-                                                    <?php endforeach; ?>
-                                                </select>
+                                                    <select class="form-control account-select" name="accounts[]" id="account_id" required>
+                                                        <option value="">Seleccionar cuenta</option>
+                                                        <?php foreach ($accounts as $account): ?>
+                                                            <?php if (strlen((string)$account->code_number) == 8): ?>
+                                                                <option value="<?php echo $account->id; ?>">
+                                                                    <?php echo $account->code_number . ' - ' . $account->account_name; ?>
+                                                                </option>
+                                                            <?php endif; ?>
+                                                        <?php endforeach; ?>
+                                                    </select>
                                             </div>
                                         </div>
                                         <div class="col-lg-3">
