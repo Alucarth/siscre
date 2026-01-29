@@ -60,13 +60,15 @@
                                         </div>
                                         <div class="col-lg-3">
                                             <div class="form-group">
-                                                <label>Cuenta Contable:</label>
-                                                <select class="form-control" name="account_id" id="account_id">
-                                                    <option value="">Todas las cuentas</option>
+                                                <label>Cuenta Contable</label>
+                                                <select class="form-control account-select" name="accounts[]" required>
+                                                    <option value="">Seleccionar cuenta</option>
                                                     <?php foreach ($accounts as $account): ?>
-                                                    <option value="<?php echo $account->id; ?>">
-                                                        <?php echo $account->code_number . ' - ' . $account->account_name; ?>
-                                                    </option>
+                                                        <?php if (strlen((string)$account->code_number) == 8): ?>
+                                                            <option value="<?php echo $account->id; ?>">
+                                                                <?php echo $account->code_number . ' - ' . $account->account_name; ?>
+                                                            </option>
+                                                        <?php endif; ?>
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>

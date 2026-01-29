@@ -483,7 +483,7 @@ class Payments extends Secure_area implements iData_controller {
                 
                 // Haber
                 ['account_id' => 58,  'debit' => 0, 'credit' => $capital_final,         'description' => $descripcion . ' - Capital',               'transaction_type' => 'asset', 'transaction_order' => '2'],
-                ['account_id' => 360, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income', 'transaction_order' => '3'],
+                ['account_id' => 375, 'debit' => 0, 'credit' => $intereses_amortizables, 'description' => $descripcion . ' - Intereses Amortizables','transaction_type' => 'income', 'transaction_order' => '3'],
                 ['account_id' => 84,  'debit' => 0, 'credit' => $iva,                    'description' => $descripcion . ' - IVA',                   'transaction_type' => 'liability', 'transaction_order' => '4'],
                 ['account_id' => 85,  'debit' => 0, 'credit' => $it,                     'description' => $descripcion . ' - IT',                    'transaction_type' => 'liability', 'transaction_order' => '5']
             ];
