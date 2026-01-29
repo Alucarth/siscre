@@ -30,6 +30,30 @@ class Accounting_model extends CI_Model
         return $query;
     }
     
+    function diagnose_duplicate_issue()
+    {
+        // Buscar cuentas duplicadas exactas
+        $sql = "SELECT code_number, account_name, COUNT(*) as duplicates 
+                FROM c19_accounting_accounts 
+                WHERE deleted = 0 
+                GROUP BY code_number, account_name 
+                HAVING duplicates > 1 
+                ORDER BY duplicates DESC";
+        
+        $query = $this->db->query($sql);
+        
+        if ($query->num_rows() > 0) {
+            error_log("=== DIAGNÓSTICO DE DUPLICADOS ===");
+            foreach ($query->result() as $row) {
+                error_log("Código: {$row->code_number}, Nombre: {$row->account_name}, Duplicados: {$row->duplicates}");
+            }
+            
+            return $query->result();
+        }
+        
+        return [];
+    }
+
     function get_sel_accounts($account_type)
     {
         $this->db->where("account_type", $account_type);
@@ -38,6 +62,10 @@ class Accounting_model extends CI_Model
         // {
         //     $this->db->where("branch_id", $this->session->userdata("branch_id"));
         // }
+        
+        // Ordenar por estructura jerárquica
+        $this->db->order_by('LENGTH(code_number)', 'ASC');
+        $this->db->order_by('code_number', 'ASC');
         
         $query = $this->db->get("accounting_accounts");
         
@@ -136,7 +164,8 @@ class Accounting_model extends CI_Model
         }
         
         $sql = "
-            SELECT  b.account_type,
+            SELECT  b.id,
+                    b.account_type,
                     b.code_number, 
                     b.account_name, 
                     SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE 0 END) as debit_amount,
@@ -145,18 +174,26 @@ class Accounting_model extends CI_Model
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
             WHERE 1 $where
-            GROUP BY b.account_name, b.account_type, b.code_number
-            ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses'), b.account_name
+            GROUP BY b.id, b.account_name, b.account_type, b.code_number
+            ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses'), 
+                    LENGTH(b.code_number) ASC,
+                    b.code_number ASC
             ";
         
         $query = $this->db->query( $sql );
         
         $tmp = [];
+        $cuentas_procesadas = []; // Para evitar duplicados
+        
         if ( $query && $query->num_rows() > 0 )
         {
             foreach( $query->result() as $row )
             {
-                $tmp[] = $row;
+                // Usar el ID de cuenta como clave única
+                if (!isset($cuentas_procesadas[$row->id])) {
+                    $tmp[] = $row;
+                    $cuentas_procesadas[$row->id] = true;
+                }
             }
         }
         
@@ -180,8 +217,9 @@ class Accounting_model extends CI_Model
             }
 
             $sql = "
-                SELECT  b.account_type,
-                        b.code_number 
+                SELECT  b.id,
+                        b.account_type,
+                        b.code_number,
                         b.account_name, 
                         SUM(a.amount) as debit_amount,
                         0 as credit_amount,
@@ -189,8 +227,10 @@ class Accounting_model extends CI_Model
                 FROM c19_account_transactions a 
                 LEFT JOIN c19_accounts b ON b.id = a.account_id
                 WHERE 1 $where
-                GROUP BY b.account_name, b.account_type, b.code_number
-                ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses')
+                GROUP BY b.id, b.account_name, b.account_type, b.code_number
+                ORDER BY FIELD(b.account_type, 'asset', 'liability', 'equity', 'income', 'expenses'),
+                        LENGTH(b.code_number) ASC,
+                        b.code_number ASC
                 ";
 
             $query = $this->db->query( $sql );
@@ -201,8 +241,21 @@ class Accounting_model extends CI_Model
                 {
                     if ( $row->account_type != '' )
                     {
-                        // Para el plugin de accounts, asumimos que todo es débito
-                        $tmp[] = $row;
+                        // Verificar si ya existe esta cuenta en los resultados principales
+                        $existe = false;
+                        foreach($tmp as $cuenta_existente) {
+                            if ($cuenta_existente->code_number == $row->code_number && 
+                                $cuenta_existente->account_name == $row->account_name) {
+                                // Sumar los montos si es la misma cuenta
+                                $cuenta_existente->debit_amount += $row->debit_amount;
+                                $existe = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!$existe) {
+                            $tmp[] = $row;
+                        }
                     }
                 }
             }
@@ -242,51 +295,41 @@ class Accounting_model extends CI_Model
         return $result;
     }
     
-    public function get_income_statement_data($filters = [])
+    public function get_income_statement_data($date_from, $date_to = null)
     {
-        $date_from = isset($filters["date_from"]) ? date("Y-m-d", $filters["date_from"]) : '1900-01-01';
-        $date_to = isset($filters["date_to"]) ? date("Y-m-d", $filters["date_to"]) : '2100-01-01';
-        
-        $branch_condition = "";
-        if (is_plugin_active("branches")) {
-            $branch_id = $this->session->userdata("branch_id");
-            $branch_condition = " AND a.branch_id = $branch_id";
-        }
-        
-        $sql = "
-            SELECT 
-                b.account_type, 
-                b.account_name, 
-                b.account_map,
-                b.code_number,
-                SUM(a.amount) as amount,
-                COUNT(a.id) as transaction_count
-            FROM c19_accounting_transactions a 
-            INNER JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type IN ('income', 'expenses')
-            AND DATE(a.added_date) BETWEEN '$date_from' AND '$date_to'
-            AND a.amount != 0
-            $branch_condition
-            GROUP BY b.id, b.account_name, b.account_type, b.code_number, b.account_map
-            ORDER BY b.account_type, b.code_number
-        ";
-                
-        $query = $this->db->query($sql);
-        
-        if (!$query) {
-            $error = $this->db->error();
-            return [];
-        }
-        
-        $financial_data = [];
-        
-        if ($query->num_rows() > 0) {
-            foreach ($query->result() as $row) {
-                $financial_data[] = $row;
+        // 1. Obtener todas las cuentas de ingresos y gastos
+        $this->db->from('c19_accounting_accounts');
+        $this->db->where_in('account_type', array('income', 'expenses'));
+        $this->db->order_by('code_number', 'ASC');
+        $all_accounts = $this->db->get()->result();
+
+        // 2. Obtener saldos reales de transacciones (solo nivel detalle: 8 dígitos)
+        $this->db->select('a.code_number, SUM(CASE WHEN t.movement_type = "debit" THEN t.amount ELSE -t.amount END) as total');
+        $this->db->from('c19_accounting_transactions t');
+        $this->db->join('c19_accounting_accounts a', 'a.id = t.account_id');
+        $this->db->where('LENGTH(a.code_number)', 8);
+        if ($date_from) $this->db->where('t.added_date >=', date('Y-m-d H:i:s', $date_from));
+        if ($date_to) $this->db->where('t.added_date <=', date('Y-m-d H:i:s', $date_to));
+        $this->db->group_by('a.code_number');
+        $saldos_reales = $this->db->get()->result();
+
+        $mapa_saldos = [];
+        foreach($saldos_reales as $sr) { $mapa_saldos[$sr->code_number] = $sr->total; }
+
+        // 3. Consolidar montos hacia arriba (Padres)
+        $final_accounts = [];
+        foreach ($all_accounts as $account) {
+            $account->amount = 0;
+            $prefix = (string)$account->code_number;
+            foreach ($mapa_saldos as $code8 => $monto) {
+                if (strpos($code8, $prefix) === 0) { $account->amount += $monto; }
+            }
+            if (abs($account->amount) > 0.001) {
+                $account->amount = abs($account->amount);
+                $final_accounts[] = $account;
             }
         }
-        
-        return $financial_data;
+        return $final_accounts;
     }
 
     public function get_consolidated_income_statement($filters = [])
@@ -474,34 +517,28 @@ class Accounting_model extends CI_Model
             }
         }
 
-        // 5. CALCULAR TOTALES FINALES (SOLO CON DATOS REALES DE LA BD)
-        $total_activos = $total_activos_corrientes + $total_activos_no_corrientes;
-        $total_pasivos_patrimonio = $total_pasivos + $total_patrimonio;
-        
-        // Verificar si el balance cuadra (con tolerancia para decimales)
-        $diferencia = abs($total_activos - $total_pasivos_patrimonio);
-        $balance_cuadra = ($diferencia < 0.01);
-
-        // 6. PREPARAR DATOS PARA LA VISTA
-        $data['activos_corrientes'] = $activos_corrientes;
-        $data['total_activos_corrientes'] = $total_activos_corrientes;
-        
-        $data['activos_no_corrientes'] = $activos_no_corrientes;
-        $data['total_activos_no_corrientes'] = $total_activos_no_corrientes;
-        
-        $data['pasivos'] = $pasivos;
-        $data['total_pasivos'] = $total_pasivos;
-        
-        $data['patrimonio'] = $patrimonio;
-        $data['total_patrimonio'] = $total_patrimonio;
-        
-        $data['total_activos'] = $total_activos;
-        $data['total_pasivos_patrimonio'] = $total_pasivos_patrimonio;
-        $data['balance_cuadra'] = $balance_cuadra;
-        $data['diferencia'] = $total_activos - $total_pasivos_patrimonio;
-
-        return $data;
-    }
+        $res_data = $this->get_income_statement_data($filters["date_from"], $filters["date_to"]);
+            $resultado_neto = 0;
+            foreach ($res_data as $acc) {
+                if (strlen((string)$acc->code_number) == 8) {
+                    $resultado_neto += ($acc->account_type == 'income') ? $acc->amount : -$acc->amount;
+                }
+            }
+            
+            // Añadir el resultado al array de patrimonio para que la vista lo muestre y sume
+            $obj_res = new stdClass();
+            $obj_res->account_name = "RESULTADO DE LA GESTIÓN";
+            $obj_res->account_map = "31999";
+            $obj_res->amount = $resultado_neto;
+            $data['patrimonio'][] = $obj_res;
+            $data['total_patrimonio'] += $resultado_neto;
+            
+            // Recalcular total pasivo + patrimonio
+            $data['total_pasivos_patrimonio'] = $data['total_pasivos'] + $data['total_patrimonio'];
+            $data['balance_cuadra'] = (abs($data['total_activos'] - $data['total_pasivos_patrimonio']) < 0.01);
+            
+            return $data;
+        }
 
     public function get_equity_evolution_data($filters = [])
     {        
@@ -999,6 +1036,7 @@ class Accounting_model extends CI_Model
         
         return $consolidated_data;
     }
+
     public function get_account_data($account_type = '', $filters = [])
     {
         $where = '';
@@ -1019,22 +1057,30 @@ class Accounting_model extends CI_Model
         
         $sql = "
             SELECT  b.id, 
-                    SUM(a.amount) amount,
-                    b.account_name 
+                    b.code_number,
+                    b.account_name,
+                    SUM(a.amount) amount
             FROM c19_accounting_transactions a 
             LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
             WHERE b.account_type = '$account_type' $where
-            GROUP BY a.account_id;
+            GROUP BY b.id, b.code_number, b.account_name
+            ORDER BY LENGTH(b.code_number) ASC, b.code_number ASC
             ";
         
         $query = $this->db->query( $sql );
         
         $account_data = [];
+        $cuentas_procesadas = [];
+        
         if ( $query && $query->num_rows() > 0 )
         {
             foreach ( $query->result() as $row )
             {
-                $account_data[] = $row;
+                // Evitar duplicados usando ID de cuenta como clave única
+                if (!isset($cuentas_procesadas[$row->id])) {
+                    $account_data[] = $row;
+                    $cuentas_procesadas[$row->id] = true;
+                }
             }
         }
         
@@ -1058,13 +1104,16 @@ class Accounting_model extends CI_Model
             }
 
             $sql = "
-                SELECT  b.account_type, 
+                SELECT  b.id,
+                        b.account_type, 
+                        b.code_number,
                         b.account_name, 
                         SUM(a.amount) amount
                 FROM c19_account_transactions a 
                 LEFT JOIN c19_accounts b ON b.id = a.account_id
                 WHERE b.account_type = '$account_type' $where
-                GROUP BY b.account_name
+                GROUP BY b.id, b.account_name, b.code_number
+                ORDER BY LENGTH(b.code_number) ASC, b.code_number ASC
                 ";
 
             $query = $this->db->query( $sql );
@@ -1075,7 +1124,21 @@ class Accounting_model extends CI_Model
                 {
                     if ( $row->account_type != '' )
                     {
-                        $account_data[] = $row;
+                        // Verificar si ya existe esta cuenta en los resultados principales
+                        $existe = false;
+                        foreach($account_data as $cuenta_existente) {
+                            if ($cuenta_existente->code_number == $row->code_number && 
+                                $cuenta_existente->account_name == $row->account_name) {
+                                // Sumar los montos si es la misma cuenta
+                                $cuenta_existente->amount += $row->amount;
+                                $existe = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!$existe) {
+                            $account_data[] = $row;
+                        }
                     }
                 }
             }
@@ -1254,7 +1317,8 @@ class Accounting_model extends CI_Model
 
     function get_all_accounts()
     {
-        $this->db->order_by('code_number');
+        $this->db->order_by('LENGTH(code_number)', 'ASC');
+        $this->db->order_by('code_number', 'ASC');
         return $this->db->get('c19_accounting_accounts');
     }
 

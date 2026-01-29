@@ -84,11 +84,10 @@ function loadAssetParents(level) {
 var select = $("#asset_parent_code");
     select.empty().append('<option value="">Cargando...</option>');
     
-    // SI ES NIVEL 1: Ocultar padre y generar código directamente
     if (level == 1) {
         $("#asset_parent_group").hide();
         $("#asset_parent_code").val(""); 
-        generateAssetCode(); // <--- Esto genera el código 11, 12, etc. al instante
+        generateAssetCode();
         return;
     }
     
@@ -225,7 +224,6 @@ $(document).ready(function() {
         $("#md-asset").modal("show");
     });
 
-    // Localiza el evento click del botón #btn-save-asset y actualízalo:
     $(document).on("click", "#btn-save-asset", function () {
         var id = $("#asset_id").val();
         var code_number = $("#asset_code_number").val();
@@ -233,9 +231,9 @@ $(document).ready(function() {
         var description = $("#asset_description").val();
         var account_level = $("#asset_account_level").val();
         var parent_code = $("#asset_parent_code").val();
-        var $btn = $(this); // Capturamos el botón
+        var $btn = $(this);
         
-        if ($btn.prop('disabled')) return; // 1. EVITA EJECUCIÓN MÚLTIPLE
+        if ($btn.prop('disabled')) return; // EVITA EJECUCIÓN MÚLTIPLE
         $btn.prop('disabled', true);
 
         if (account_name == "" || code_number == "") {
@@ -252,7 +250,7 @@ $(document).ready(function() {
             type: 'POST',
             data: {
                 softtoken: $("input[name='softtoken']").val(),
-                type: 3, // Tipo 3 es _save_account
+                type: 3,
                 id: id,
                 code_number: code_number,
                 account_name: account_name,
@@ -260,7 +258,7 @@ $(document).ready(function() {
                 account_type: 'asset',
                 account_level: account_level,
                 parent_code: parent_code,
-                account_map: code_number // Añadimos el campo account_map igual al código
+                account_map: code_number
             },
             dataType: 'json',
             success: function (data) {
@@ -269,7 +267,6 @@ $(document).ready(function() {
                     $("#md-asset").modal('hide');
                     $("#tbl_asset").DataTable().ajax.reload(null, false);
                     
-                    // Limpiar campos y resetear el modal
                     $("#asset_id").val("");
                     $("#asset_account_name").val("");
                     $("#asset_description").val("");
@@ -299,13 +296,13 @@ $(document).ready(function() {
                 $("#asset_account_name").val(data.row.account_name);
                 $("#asset_description").val(data.row.description);
                 $("#asset_code_number").val(data.row.code_number);
-                $("#asset_account_level").val(data.row.code_number.length / 2); //.prop("disabled", true)
-                $("#asset_parent_code").val(data.row.parent_code); //.prop("disabled", true)
+                $("#asset_account_level").val(data.row.code_number.length / 2).prop("disabled", true);
+                $("#asset_parent_code").val(data.row.parent_code).prop("disabled", true);
                 $("#asset_parent_group").hide(); 
                 $("#md-asset").modal("show");
             }
         }, "json");
-        if (isAdmin) { $("#asset_code_number").prop("readonly", false); }
+        //if (isAdmin) { $("#asset_code_number").prop("readonly", false); }
     });
 
     $(document).on("click", ".btn-delete", function () {

@@ -1038,7 +1038,6 @@ function generate_hierarchical_code()
 
     function voucher_create()
     {
-        // Cargar datos necesarios para la vista
         $data['accounts'] = $this->accounting_model->get_all_accounts()->result();
         $data['next_voucher_id'] = $this->accounting_model->get_next_voucher_id();
         
@@ -1440,14 +1439,29 @@ function generate_hierarchical_code()
                 $data["accounts"] = $this->accounting_model->get_trial_balance_data($filters);
                 break;
             case 'income_statement':
-                $income_data = $this->accounting_model->get_consolidated_income_statement($filters);
-                $data["accounts"] = $income_data['accounts'];
-                $data["total_income"] = $income_data['total_income'];
-                $data["total_expenses"] = $income_data['total_expenses'];
-                $data["net_income"] = $income_data['net_income'];
-                $data["iue"] = $income_data['iue'];
-                $data["utilidad"] = $income_data['utilidad'];
-                break; 
+                $accounts = $this->accounting_model->get_income_statement_data($filters['date_from'], $filters['date_to']);
+                
+                $total_income = 0;
+                $total_expenses = 0;
+
+                foreach ($accounts as $account) {
+                    // REGLA DE ORO: Solo sumamos al gran total las cuentas de detalle (8 dígitos)
+                    if (strlen((string)$account->code_number) == 8) {
+                        if (strtolower($account->account_type) == 'income') {
+                            $total_income += $account->amount;
+                        } else {
+                            $total_expenses += $account->amount;
+                        }
+                    }
+                }
+
+                $data["accounts"] = $accounts;
+                $data["total_income"] = $total_income;
+                $data["total_expenses"] = $total_expenses;
+                $data["net_income"] = $total_income - $total_expenses;
+                $data["iue"] = ($data["net_income"] > 0) ? $data["net_income"] * 0.25 : 0;
+                $data["utilidad"] = $data["net_income"] - $data["iue"];
+                break;
             case 'balance_sheet':
                 $data = $this->accounting_model->get_balance_sheet_data($filters);
                 $data["interest_on_current"] = $this->accounting_model->get_interest_on_current($filters);

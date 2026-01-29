@@ -79,12 +79,11 @@
 </div>
 
 <script>
-var isAdmin = <?php echo ($this->Employee->get_logged_in_employee_info()->role_id == 13) ? 'true' : 'false'; ?>;
+var isAdmin = <?php echo ($this->Employee->get_logged_in_employee_info()->role_id == 13 || 17) ? 'true' : 'false'; ?>;
 function loadincomeParents(level) {
 var select = $("#income_parent_code");
     select.empty().append('<option value="">Cargando...</option>');
     
-    // SI ES NIVEL 1: Ocultar padre y generar código directamente
     if (level == 1) {
         $("#income_parent_group").hide();
         $("#income_parent_code").val(""); 
@@ -225,7 +224,6 @@ $(document).ready(function() {
         $("#md-income").modal("show");
     });
 
-    // Localiza el evento click del botón #btn-save-income y actualízalo:
     $(document).on("click", "#btn-save-income", function () {
         var id = $("#income_id").val();
         var code_number = $("#income_code_number").val();
@@ -233,9 +231,9 @@ $(document).ready(function() {
         var description = $("#income_description").val();
         var account_level = $("#income_account_level").val();
         var parent_code = $("#income_parent_code").val();
-        var $btn = $(this); // Capturamos el botón
+        var $btn = $(this);
         
-        if ($btn.prop('disabled')) return; // 1. EVITA EJECUCIÓN MÚLTIPLE
+        if ($btn.prop('disabled')) return; // EVITA EJECUCIÓN MÚLTIPLE
         $btn.prop('disabled', true);
 
         if (account_name == "" || code_number == "") {
@@ -252,7 +250,7 @@ $(document).ready(function() {
             type: 'POST',
             data: {
                 softtoken: $("input[name='softtoken']").val(),
-                type: 3, // Tipo 3 es _save_account
+                type: 3,
                 id: id,
                 code_number: code_number,
                 account_name: account_name,
@@ -260,7 +258,7 @@ $(document).ready(function() {
                 account_type: 'income',
                 account_level: account_level,
                 parent_code: parent_code,
-                account_map: code_number // Añadimos el campo account_map igual al código
+                account_map: code_number
             },
             dataType: 'json',
             success: function (data) {
@@ -269,7 +267,6 @@ $(document).ready(function() {
                     $("#md-income").modal('hide');
                     $("#tbl_income").DataTable().ajax.reload(null, false);
                     
-                    // Limpiar campos y resetear el modal
                     $("#income_id").val("");
                     $("#income_account_name").val("");
                     $("#income_description").val("");
@@ -299,13 +296,13 @@ $(document).ready(function() {
                 $("#income_account_name").val(data.row.account_name);
                 $("#income_description").val(data.row.description);
                 $("#income_code_number").val(data.row.code_number);
-                $("#income_account_level").val(data.row.code_number.length / 2); //.prop("disabled", true)
-                $("#income_parent_code").val(data.row.parent_code); //.prop("disabled", true)
+                $("#income_account_level").val(data.row.code_number.length / 2).prop("disabled", true);
+                $("#income_parent_code").val(data.row.parent_code).prop("disabled", true);
                 $("#income_parent_group").hide(); 
                 $("#md-income").modal("show");
             }
         }, "json");
-        if (isAdmin) { $("#income_code_number").prop("readonly", false); }
+        //if (isAdmin) { $("#income_code_number").prop("readonly", false); }
     });
 
     $(document).on("click", ".btn-delete", function () {

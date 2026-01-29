@@ -80,15 +80,14 @@
 
 <script>
 var isAdmin = <?php echo ($this->Employee->get_logged_in_employee_info()->role_id == 13 || 17) ? 'true' : 'false'; ?>;
-function loadequityParents(level) {
+function loadEquityParents(level) {
 var select = $("#equity_parent_code");
     select.empty().append('<option value="">Cargando...</option>');
     
-    // SI ES NIVEL 1: Ocultar padre y generar código directamente
     if (level == 1) {
         $("#equity_parent_group").hide();
         $("#equity_parent_code").val(""); 
-        generateequityCode();
+        generateEquityCode();
         return;
     }
     
@@ -131,7 +130,7 @@ var select = $("#equity_parent_code");
     });
 }
 
-function generateequityCode() {
+function generateEquityCode() {
     var parentCode = $("#equity_parent_code").val();
     var targetLevel = $("#equity_account_level").val();
 
@@ -147,7 +146,7 @@ function generateequityCode() {
     }, "json");
 }
 
-function applyequityIndentation() {
+function applyEquityIndentation() {
     $('#tbl_equity tbody tr').each(function() {
         var row = $(this);
         var codeNumber = row.find('td:eq(1)').text().trim();
@@ -157,7 +156,7 @@ function applyequityIndentation() {
     });
 }
 
-function resetequityForm() {
+function resetEquityForm() {
     $("#equity_id").val("");
     $("#equity_account_name").val("");
     $("#equity_description").val("");
@@ -172,7 +171,7 @@ function resetequityForm() {
     });
 }
 
-function validateequityForm() {
+function validateEquityForm() {
     var accountLevel = $("#equity_account_level").val();
     var parentCode = $("#equity_parent_code").val();
     var codeNumber = $("#equity_code_number").val();
@@ -214,8 +213,8 @@ $(document).ready(function() {
 
     $("#tbl_equity_filter").prepend("<a href='javascript:void(0)' class='btn btn-primary pull-left' id='btn-new-equity' style='margin-right:10px'>Nueva cuenta</a>");
     
-    $(document).on("change", "#equity_account_level", function() { loadequityParents($(this).val()); });
-    $(document).on("change", "#equity_parent_code", function() { generateequityCode(); });
+    $(document).on("change", "#equity_account_level", function() { loadEquityParents($(this).val()); });
+    $(document).on("change", "#equity_parent_code", function() { generateEquityCode(); });
     
     $(document).on("click", "#btn-new-equity", function() {
         $("#md-equity input, #md-equity textarea").val("");
@@ -225,7 +224,6 @@ $(document).ready(function() {
         $("#md-equity").modal("show");
     });
 
-    // Localiza el evento click del botón #btn-save-equity y actualízalo:
     $(document).on("click", "#btn-save-equity", function () {
         var id = $("#equity_id").val();
         var code_number = $("#equity_code_number").val();
@@ -233,9 +231,9 @@ $(document).ready(function() {
         var description = $("#equity_description").val();
         var account_level = $("#equity_account_level").val();
         var parent_code = $("#equity_parent_code").val();
-        var $btn = $(this); // Capturamos el botón
+        var $btn = $(this);
         
-        if ($btn.prop('disabled')) return; // 1. EVITA EJECUCIÓN MÚLTIPLE
+        if ($btn.prop('disabled')) return; // EVITA EJECUCIÓN MÚLTIPLE
         $btn.prop('disabled', true);
 
         if (account_name == "" || code_number == "") {
@@ -252,7 +250,7 @@ $(document).ready(function() {
             type: 'POST',
             data: {
                 softtoken: $("input[name='softtoken']").val(),
-                type: 3, // Tipo 3 es _save_account
+                type: 3,
                 id: id,
                 code_number: code_number,
                 account_name: account_name,
@@ -260,7 +258,7 @@ $(document).ready(function() {
                 account_type: 'equity',
                 account_level: account_level,
                 parent_code: parent_code,
-                account_map: code_number // Añadimos el campo account_map igual al código
+                account_map: code_number
             },
             dataType: 'json',
             success: function (data) {
@@ -269,7 +267,6 @@ $(document).ready(function() {
                     $("#md-equity").modal('hide');
                     $("#tbl_equity").DataTable().ajax.reload(null, false);
                     
-                    // Limpiar campos y resetear el modal
                     $("#equity_id").val("");
                     $("#equity_account_name").val("");
                     $("#equity_description").val("");
@@ -299,13 +296,13 @@ $(document).ready(function() {
                 $("#equity_account_name").val(data.row.account_name);
                 $("#equity_description").val(data.row.description);
                 $("#equity_code_number").val(data.row.code_number);
-                $("#equity_account_level").val(data.row.code_number.length / 2); //.prop("disabled", true)
-                $("#equity_parent_code").val(data.row.parent_code); //.prop("disabled", true)
+                $("#equity_account_level").val(data.row.code_number.length / 2).prop("disabled", true);
+                $("#equity_parent_code").val(data.row.parent_code).prop("disabled", true);
                 $("#equity_parent_group").hide(); 
                 $("#md-equity").modal("show");
             }
         }, "json");
-        if (isAdmin) { $("#equity_code_number").prop("readonly", false); }
+        //if (isAdmin) { $("#equity_code_number").prop("readonly", false); }
     });
 
     $(document).on("click", ".btn-delete", function () {
