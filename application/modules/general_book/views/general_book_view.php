@@ -79,7 +79,7 @@
                                                 <select class="form-control" name="branch_id" id="branch_id">
                                                     <option value="">Todas las sucursales</option>
                                                     <?php 
-                                                    $current_branch_id = 1; // Valor por defecto
+                                                    $current_branch_id = $value; // Valor por defecto
                                                     if (method_exists($this->Employee, 'get_logged_in_employee_branch_id')) {
                                                         $current_branch_id = $this->Employee->get_logged_in_employee_branch_id();
                                                     }
