@@ -384,7 +384,7 @@ class Accounting_model extends CI_Model
         // Usamos LOWER para que no importe si dice 'Asset' o 'asset'
         $sql_saldos = "
             SELECT b.code_number, LOWER(b.account_type) as account_type,
-                SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE -a.amount END) as balance
+                SUM(CASE WHEN a.movement_type = 'credit' THEN a.amount ELSE -a.amount END) as balance
             FROM c19_accounting_transactions a
             JOIN c19_accounting_accounts b ON a.account_id = b.id
             WHERE $where AND LENGTH(b.code_number) = 8
@@ -398,9 +398,10 @@ class Accounting_model extends CI_Model
 
         foreach($res_saldos as $s) {
             $saldos_hoja[$s->code_number] = ['bal' => $s->balance, 'type' => $s->account_type];
-            // Calculamos resultado de gestión para que el balance cierre
-            if($s->account_type == 'income') $total_ingresos += abs($s->balance);
-            if($s->account_type == 'expenses') $total_gastos += abs($s->balance);
+            
+            // El Resultado de Gestión siempre es Ingresos (Haberes) - Gastos (Debes)
+            if($s->account_type == 'income') $total_ingresos += $s->balance; 
+            if($s->account_type == 'expenses') $total_gastos += abs($s->balance); 
         }
         
         $resultado_gestion = $total_ingresos - $total_gastos;
@@ -421,14 +422,17 @@ class Accounting_model extends CI_Model
             $tipo = $info['type'];
 
             if ($tipo == 'asset') {
-                if (strpos($code8, '11') === 0) $data['total_activos_corrientes'] += $monto;
-                if (strpos($code8, '12') === 0) $data['total_activos_no_corrientes'] += $monto;
+                // Para Activos, invertimos el signo para mostrarlo positivo en el reporte 
+                // ya que usualmente tienen saldo Deudor (negativo en esta lógica)
+                $monto_reporte = abs($monto); 
+                if (strpos($code8, '11') === 0) $data['total_activos_corrientes'] += $monto_reporte;
+                if (strpos($code8, '12') === 0) $data['total_activos_no_corrientes'] += $monto_reporte;
             } elseif ($tipo == 'liability') {
-                if (strpos($code8, '21') === 0) $data['total_pasivos_corrientes'] += abs($monto); // 21 Corriente
-                if (strpos($code8, '22') === 0) $data['total_pasivos_no_corrientes'] += abs($monto); // 22 No Corriente
-                $data['total_pasivos'] += abs($monto);
+                if (strpos($code8, '21') === 0) $data['total_pasivos_corrientes'] += $monto;
+                if (strpos($code8, '22') === 0) $data['total_pasivos_no_corrientes'] += $monto;
+                $data['total_pasivos'] += $monto;
             } elseif ($tipo == 'equity') {
-                $data['total_patrimonio'] += abs($monto);
+                $data['total_patrimonio'] += $monto;
             }
         }
         
