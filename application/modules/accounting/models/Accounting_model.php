@@ -606,11 +606,13 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND at.branch_id = $branch_id";
         }
 
-        // FILTRO ESTRICTO: Solo Balance (1: Activo, 2: Pasivo, 3: Patrimonio)
-        // Esto elimina automáticamente cuentas 4 (Ingresos) y 5 (Egresos)
+        $exclude_specific_accounts = " AND aa.code_number NOT IN ('11010101', '11020201') ";
         $only_balance = " AND (aa.code_number LIKE '1%' OR aa.code_number LIKE '2%' OR aa.code_number LIKE '3%') ";
+        
+        // Unimos ambos filtros
+        $final_filter = $only_balance . $exclude_specific_accounts;
 
-        // PASO 1: Saldos Iniciales
+        // Actualiza los SQL de saldos iniciales y transacciones usando $final_filter
         $sql_saldos_iniciales = "
             SELECT aa.id as account_id,
                 SUM(CASE 
@@ -619,7 +621,7 @@ class Accounting_model extends CI_Model
                 END) as saldo_inicial
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) < ? $branch_condition $only_balance
+            WHERE DATE(at.added_date) < ? $branch_condition $final_filter
             GROUP BY aa.id";
         
         $query_inicial = $this->db->query($sql_saldos_iniciales, [$date_from]);
