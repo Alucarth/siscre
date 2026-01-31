@@ -615,8 +615,10 @@ class Accounting_model extends CI_Model
                 aa.account_name,
                 aa.account_type,
                 SUM(CASE 
-                    WHEN at.movement_type = 'debit' THEN at.amount 
-                    ELSE -at.amount 
+                    WHEN LOWER(aa.account_type) IN ('asset', 'expenses') THEN 
+                        (CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE -at.amount END)
+                    ELSE 
+                        (CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE -at.amount END)
                 END) as saldo_inicial
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
@@ -650,10 +652,12 @@ class Accounting_model extends CI_Model
                 at.voucher_id,
                 at.payment_methods,
                 -- Calcular saldo acumulado por cuenta
-                (SELECT SUM(CASE 
-                    WHEN at2.movement_type = 'debit' THEN at2.amount 
-                    ELSE -at2.amount 
-                END)
+                    SUM(CASE 
+                        WHEN LOWER(aa.account_type) IN ('asset', 'expenses') THEN 
+                            (CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE -at.amount END)
+                        ELSE 
+                            (CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE -at.amount END)
+                    END)
                 FROM c19_accounting_transactions at2 
                 WHERE at2.account_id = aa.id 
                 AND DATE(at2.added_date) <= '$date_to'
@@ -773,77 +777,65 @@ class Accounting_model extends CI_Model
 
     public function get_cash_flow_with_totals($filters = [])
     {
-        
-        // Obtener datos base
         $cash_flow_data = $this->get_cash_flow_data($filters);
         
         if (empty($cash_flow_data)) {
-            return [
-                'accounts' => [],
-                'totals' => [
-                    'operating' => 0,
-                    'investing' => 0, 
-                    'financing' => 0,
-                    'net_cash_flow' => 0
-                ],
-                'summary' => []
-            ];
+            return ['accounts' => [], 'totals' => ['operating' => 0, 'investing' => 0, 'financing' => 0, 'net_cash_flow' => 0], 'summary' => []];
         }
-        
-        // Estructuras para cálculos
-        $totals_by_activity = [
-            'operating' => 0,
-            'investing' => 0,
-            'financing' => 0
-        ];
-        
+
+        $totals_by_activity = ['operating' => 0, 'investing' => 0, 'financing' => 0];
         $accounts_summary = [];
         $processed_accounts = [];
         
-        // PASO 1: Procesar cada transacción y calcular totales        
+        // Para la conciliación final
+        $variacion_disponibilidades = 0; 
+
         foreach ($cash_flow_data as $transaction) {
             $account_id = $transaction->id;
-            
-            // Solo procesar la primera transacción de cada cuenta para el resumen
-            if (!isset($processed_accounts[$account_id]) && $transaction->es_primera_cuenta) {
+            $es_disponibilidad = (strpos($transaction->code_number, '1101') === 0); // Ajusta según tu plan de cuentas (Caja/Bancos)
+
+            if ($transaction->es_primera_cuenta) {
+                // REGLA DE SIGNOS CONTABLES PARA FLUJO
+                // Variación positiva en Activo = Salida de dinero (-)
+                // Variación positiva en Pasivo/Patrimonio = Entrada de dinero (+)
+                if (strtolower($transaction->account_type) == 'asset') {
+                    $monto_flujo = -$transaction->variacion;
+                } else {
+                    $monto_flujo = $transaction->variacion;
+                }
+
+                // Si es cuenta de efectivo, no suma a actividades, se guarda para el total final
+                if ($es_disponibilidad) {
+                    $variacion_disponibilidades += $transaction->variacion;
+                } else {
+                    $totals_by_activity[$transaction->activity_type] += $monto_flujo;
+                }
+
                 $accounts_summary[$account_id] = [
                     'code_number' => $transaction->code_number,
                     'account_name' => $transaction->account_name,
-                    'account_type' => $transaction->account_type,
                     'activity_type' => $transaction->activity_type,
                     'saldo_inicial' => $transaction->saldo_inicial,
                     'saldo_final' => $transaction->saldo_final,
-                    'variacion' => $transaction->variacion,
-                    'clasificacion' => $this->get_variacion_clasificacion($transaction->variacion)
+                    'variacion_neta' => $transaction->variacion,
+                    'impacto_efectivo' => $es_disponibilidad ? 0 : $monto_flujo
                 ];
-                $processed_accounts[$account_id] = true;
             }
-            
-            // Acumular por tipo de actividad (usar monto_variacion de cada transacción)
-            $monto_actividad = $transaction->monto_variacion;
-            $totals_by_activity[$transaction->activity_type] += $monto_actividad;
         }
-        
-        // PASO 2: Calcular flujo neto de efectivo
+
         $net_cash_flow = $totals_by_activity['operating'] + $totals_by_activity['investing'] + $totals_by_activity['financing'];
-        
-        // PASO 3: Preparar datos finales
-        $result = [
+
+        return [
             'accounts' => $cash_flow_data,
             'totals' => [
                 'operating' => $totals_by_activity['operating'],
                 'investing' => $totals_by_activity['investing'],
                 'financing' => $totals_by_activity['financing'],
-                'net_cash_flow' => $net_cash_flow
+                'net_cash_flow' => $net_cash_flow,
+                'reconciliation_check' => $variacion_disponibilidades // Debe ser igual a net_cash_flow
             ],
-            'summary' => array_values($accounts_summary),
-            'period' => [
-                'date_from' => isset($filters["date_from"]) ? $filters["date_from"] : null,
-                'date_to' => isset($filters["date_to"]) ? $filters["date_to"] : null
-            ]
+            'summary' => array_values($accounts_summary)
         ];
-        
-        return $result;
     }
 
     // Función auxiliar para clasificar la variación
