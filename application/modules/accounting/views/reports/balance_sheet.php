@@ -179,15 +179,15 @@
 <div style="margin-top:30px; padding:15px; border:1px solid #ccc; background-color:#f9f9f9;">
     <table width="100%" style="border-collapse:collapse;">
         <tr>
-            <td width="70%" class="bold">TOTAL ACTIVOS:</td>
+            <td width="70%" class="bold">ACTIVOS:</td>
             <td width="30%" class="right-text bold"><?=money($total_activos)?></td>
         </tr>
         <tr>
-            <td class="bold">TOTAL PASIVOS:</td>
+            <td class="bold">PASIVOS:</td>
             <td class="right-text bold"><?=money($total_pasivos)?></td>
         </tr>
         <tr>
-            <td class="bold">TOTAL PATRIMONIO:</td>
+            <td class="bold">PATRIMONIO:</td>
             <td class="right-text bold"><?=money($total_patrimonio)?></td>
         </tr>
         <tr>
