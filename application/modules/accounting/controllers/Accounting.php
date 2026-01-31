@@ -1473,7 +1473,7 @@ function generate_hierarchical_code()
                 $data["accounts"] = $this->accounting_model->get_profit_loss_data($filters);
                 break;
             case 'cash_flow':
-                $data["accounts"] = $this->accounting_model->get_cash_flow_consolidated($filters);
+                $data['cash_flow_result'] = $this->accounting_model->get_cash_flow_with_totals($filters);
                 break;
             case 'equity_evolution':
                 $data["accounts"] = $this->accounting_model->get_equity_evolution_data($filters);

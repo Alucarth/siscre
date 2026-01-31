@@ -593,7 +593,9 @@ class Accounting_model extends CI_Model
     
     public function get_cash_flow_data($filters = [])
     {        
-        if (empty($filters["date_from"]) || empty($filters["date_to"])) return [];
+        if (empty($filters["date_from"]) || empty($filters["date_to"])) {
+            return [];
+        }
         
         $date_from = is_numeric($filters["date_from"]) ? date("Y-m-d", $filters["date_from"]) : $filters["date_from"];
         $date_to = is_numeric($filters["date_to"]) ? date("Y-m-d", $filters["date_to"]) : $filters["date_to"];
@@ -604,53 +606,84 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND at.branch_id = $branch_id";
         }
 
-        $only_balance_accounts = " AND (aa.code_number LIKE '1%' OR aa.code_number LIKE '2%' OR aa.code_number LIKE '3%') ";
+        // FILTRO ESTRICTO: Solo Balance (1: Activo, 2: Pasivo, 3: Patrimonio)
+        // Esto elimina automáticamente cuentas 4 (Ingresos) y 5 (Egresos)
+        $only_balance = " AND (aa.code_number LIKE '1%' OR aa.code_number LIKE '2%' OR aa.code_number LIKE '3%') ";
 
-        $sql_ini = "SELECT aa.id, SUM(CASE WHEN LOWER(aa.account_type)='asset' THEN (CASE WHEN at.movement_type='debit' THEN at.amount ELSE -at.amount END) ELSE (CASE WHEN at.movement_type='credit' THEN at.amount ELSE -at.amount END) END) as saldo_ini
-                    FROM c19_accounting_transactions at INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-                    WHERE DATE(at.added_date) < ? $branch_condition $only_balance_accounts GROUP BY aa.id";
-        $res_ini = $this->db->query($sql_ini, [$date_from])->result();
-        $saldos_ini = array_column($res_ini, 'saldo_ini', 'id');
+        // PASO 1: Saldos Iniciales
+        $sql_saldos_iniciales = "
+            SELECT aa.id as account_id,
+                SUM(CASE 
+                    WHEN aa.code_number LIKE '1%' THEN (CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE -at.amount END)
+                    ELSE (CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE -at.amount END)
+                END) as saldo_inicial
+            FROM c19_accounting_transactions at
+            INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
+            WHERE DATE(at.added_date) < ? $branch_condition $only_balance
+            GROUP BY aa.id";
+        
+        $query_inicial = $this->db->query($sql_saldos_iniciales, [$date_from]);
+        $saldos_iniciales = [];
+        foreach ($query_inicial->result() as $row) {
+            $saldos_iniciales[$row->account_id] = $row->saldo_inicial;
+        }
 
-        $sql_trans = "SELECT aa.id, aa.code_number, aa.account_name, aa.account_type, at.amount, at.movement_type, at.added_date,
-                    (SELECT SUM(CASE WHEN LOWER(aa2.account_type)='asset' THEN (CASE WHEN at2.movement_type='debit' THEN at2.amount ELSE -at2.amount END) ELSE (CASE WHEN at2.movement_type='credit' THEN at2.amount ELSE -at2.amount END) END)
-                    FROM c19_accounting_transactions at2 INNER JOIN c19_accounting_accounts aa2 ON aa2.id = at2.account_id
-                    WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= ? $branch_condition) as saldo_fin
-                    FROM c19_accounting_transactions at INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-                    WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $only_balance_accounts
-                    ORDER BY aa.code_number ASC";
-        $query = $this->db->query($sql_trans, [$date_to, $date_from, $date_to]);
+        // PASO 2: Transacciones del Período
+        $sql_transacciones = "
+            SELECT aa.id, aa.code_number, aa.account_name, aa.account_type, 
+                at.amount, at.movement_type, at.added_date, at.description,
+                (SELECT SUM(CASE 
+                    WHEN aa2.code_number LIKE '1%' THEN (CASE WHEN at2.movement_type = 'debit' THEN at2.amount ELSE -at2.amount END)
+                    ELSE (CASE WHEN at2.movement_type = 'credit' THEN at2.amount ELSE -at2.amount END)
+                END)
+                FROM c19_accounting_transactions at2 
+                INNER JOIN c19_accounting_accounts aa2 ON aa2.id = at2.account_id
+                WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= ? $branch_condition) as saldo_final
+            FROM c19_accounting_transactions at
+            INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
+            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $only_balance
+            ORDER BY aa.code_number ASC, at.added_date ASC";
 
-        $data = [];
-        $processed = [];
+        $query = $this->db->query($sql_transacciones, [$date_to, $date_from, $date_to]);
+        
+        $cash_flow_data = [];
+        $cuentas_procesadas = [];
 
         foreach ($query->result() as $row) {
-            $ini = $saldos_ini[$row->id] ?? 0;
-            $variacion = $row->saldo_fin - $ini;
+            $acc_id = $row->id;
+            $saldo_ini = $saldos_iniciales[$acc_id] ?? 0;
+            $variacion_contable = $row->saldo_final - $saldo_ini;
 
-            if (strtolower($row->account_type) == 'asset') {
-                $monto_flujo = -$variacion; 
+            // LÓGICA DE FLUJO DE EFECTIVO (SIGNOS)
+            if (substr($row->code_number, 0, 1) == '1') {
+                // ACTIVO: Aumento (+) significa salida de efectivo (-)
+                $monto_flujo = -$variacion_contable;
             } else {
-                $monto_flujo = $variacion; 
+                // PASIVO/PATRIMONIO: Aumento (+) significa entrada de efectivo (+)
+                // Aquí el signo se mantiene igual a la variación contable
+                $monto_flujo = $variacion_contable;
             }
-
-            $data[] = (object)[
-                'id' => $row->id,
+            
+            $cash_flow_data[] = (object) array(
+                'id' => $acc_id,
                 'code_number' => $row->code_number,
                 'account_name' => $row->account_name,
                 'account_type' => $row->account_type,
                 'amount' => $row->amount,
                 'movement_type' => $row->movement_type,
+                'added_date' => $row->added_date,
+                'description' => $row->description,
                 'activity_type' => $this->get_activity_type($row->code_number, $row->account_type, $row->movement_type),
-                'saldo_inicial' => $ini,
-                'saldo_final' => $row->saldo_fin,
-                'variacion' => $variacion,
-                'monto_variacion' => $monto_flujo,
-                'es_primera_cuenta' => !isset($processed[$row->id])
-            ];
-            $processed[$row->id] = true;
+                'saldo_inicial' => $saldo_ini,
+                'saldo_final' => $row->saldo_final,
+                'variacion' => $variacion_contable, 
+                'monto_variacion' => $monto_flujo, // VARIABLE CLAVE PARA LA VISTA
+                'es_primera_cuenta' => !isset($cuentas_procesadas[$acc_id])
+            );
+            $cuentas_procesadas[$acc_id] = true;
         }
-        return $data;
+        
+        return $cash_flow_data;
     }
 
     public function get_activity_type($account_code, $account_type, $movement_type)
