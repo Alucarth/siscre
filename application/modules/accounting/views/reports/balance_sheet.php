@@ -39,7 +39,7 @@
     <tr>
         <td class="bold">11</td>
         <td class="bold">ACTIVOS CORRIENTES</td>
-        <td class="right-text"></td>
+        <td class="right-text bold border-bottom"><?=money($total_activos_corrientes)?></td>
     </tr>
     
     <?php foreach($activos_corrientes as $activo): ?>
@@ -62,7 +62,7 @@
     <tr>
         <td class="bold">12</td>
         <td class="bold">ACTIVOS NO CORRIENTES</td>
-        <td class="right-text"></td>
+        <td class="right-text bold border-bottom"><?=money($total_activos_no_corrientes)?></td>
     </tr>
     
     <?php foreach($activos_no_corrientes as $activo): ?>
@@ -103,7 +103,7 @@
     <tr>
         <td class="bold">21</td>
         <td class="bold">PASIVOS CORRIENTES</td>
-        <td class="right-text"></td>
+        <td class="right-text bold border-bottom"><?=money($total_pasivos_corrientes)?></td>
     </tr>
     <?php foreach($pasivos_corrientes as $p): ?>
         <tr>
@@ -121,7 +121,7 @@
     <tr>
         <td class="bold">22</td>
         <td class="bold">PASIVOS NO CORRIENTES</td>
-        <td class="right-text"></td>
+        <td class="right-text bold border-bottom"><?=money($total_pasivos_no_corrientes)?></td>
     </tr>
     <?php foreach($pasivos_no_corrientes as $p): ?>
         <tr>
@@ -148,7 +148,7 @@
         <tr>
         <td class="bold">31</td>
         <td class="bold">PATRIMONIO NETO</td>
-        <td class="right-text"></td>
+        <td class="right-text bold border-bottom"><?=money($total_patrimonio)?></td>
     </tr>
     <?php foreach($patrimonio as $pat): ?>
     <?php if($pat->amount != 0): ?>
