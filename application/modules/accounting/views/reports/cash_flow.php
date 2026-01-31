@@ -10,12 +10,14 @@
     .text-center { text-align: center; }
     .total-section { background-color: #f9f9f9; font-weight: bold; }
     .empresa-info { font-size:12px; line-height:1.2; }
+    .bold { font-weight: bold; }
 </style>
 
 <div style="position:absolute; top:20px; left:40px;" class="empresa-info">
     <div class="bold">CREDISURGIR S.R.L.</div>
     <div>NIT: 485672023</div>
 </div>
+
 <div class="report-container">
     <div class="report-header">
         <div class="report-title">ESTADO DE FLUJO DE EFECTIVO</div>
@@ -34,12 +36,12 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
         <thead>
             <tr>
                 <th>CÓDIGO</th>
+                <th class="text-center">VARIACIÓN</th>
                 <th>CUENTA</th>
+                <th class="text-center">CLASIFICACIÓN</th>
                 <th class="text-right">S. INICIAL</th>
                 <th class="text-right">S. FINAL</th>
-                <th class="text-right">VARIACIÓN</th>
-                <th class="text-center">TIPO ACTIVIDAD</th>
-                <th class="text-right">EFECTO EFECTIVO</th>
+                <th class="text-right">DIFERENCIA</th>
             </tr>
         </thead>
         <tbody>
@@ -50,7 +52,18 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
                     if($row->activity_type == 'investing') $total_investing += $row->monto_variacion;
                     if($row->activity_type == 'financing') $total_financing += $row->monto_variacion;
 
-                    // Traducción de etiquetas
+                    // Lógica para el texto de Variación
+                    $texto_variacion = 'SIN CAMBIOS';
+                    $clase_variacion = '';
+                    if ($row->variacion > 0.01) {
+                        $texto_variacion = 'AUMENTO';
+                        $clase_variacion = 'aumento';
+                    } elseif ($row->variacion < -0.01) {
+                        $texto_variacion = 'DISMINUCIÓN';
+                        $clase_variacion = 'disminucion';
+                    }
+
+                    // Traducción de etiquetas de clasificación
                     $tipo_label = '';
                     switch($row->activity_type) {
                         case 'operating': $tipo_label = 'OPERACIÓN'; break;
@@ -61,11 +74,13 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
                 ?>
                 <tr>
                     <td><?php echo $row->code_number; ?></td>
+                    <td class="text-center <?php echo $clase_variacion; ?>">
+                        <strong><?php echo $texto_variacion; ?></strong>
+                    </td>
                     <td><?php echo $row->account_name; ?></td>
+                    <td class="text-center"><strong><?php echo $tipo_label; ?></strong></td>
                     <td class="text-right"><?php echo money($row->saldo_inicial); ?></td>
                     <td class="text-right"><?php echo money($row->saldo_final); ?></td>
-                    <td class="text-right"><?php echo money($row->variacion); ?></td>
-                    <td class="text-center"><strong><?php echo $tipo_label; ?></strong></td>
                     <td class="text-right <?php echo $row->monto_variacion >= 0 ? 'aumento' : 'disminucion'; ?>">
                         <?php echo money($row->monto_variacion); ?>
                     </td>
@@ -88,11 +103,13 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
 
             <tr class="total-section" style="font-size: 13px; background-color: #eee;">
                 <td colspan="6" class="text-right">EFECTIVO INICIAL:</td>
-                <td class="text-right"><?php echo money(0); ?></td>
+                <td class="text-right"><?php echo money($cash_flow_result['totals']['efectivo_inicial'] ?? 0); ?></td>
             </tr>
             <tr class="total-section" style="font-size: 13px; background-color: #eee;">
                 <td colspan="6" class="text-right">EFECTIVO FINAL:</td>
-                <td class="text-right"><?php echo money($total_operating - $total_investing + $total_financing); ?></td>
+                <td class="text-right" style="border-top: 2px solid #000;">
+                    <?php echo money($cash_flow_result['totals']['efectivo_final'] ?? ($total_operating + $total_investing + $total_financing)); ?>
+                </td>
             </tr>
         </tbody>
     </table>
