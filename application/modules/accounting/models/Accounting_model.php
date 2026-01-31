@@ -409,7 +409,8 @@ class Accounting_model extends CI_Model
         $data = [
             'activos_corrientes' => [], 'total_activos_corrientes' => 0,
             'activos_no_corrientes' => [], 'total_activos_no_corrientes' => 0,
-            'pasivos' => [], 'total_pasivos' => 0,
+            'pasivos_corrientes' => [], 'total_pasivos_corrientes' => 0,
+            'pasivos_no_corrientes' => [], 'total_pasivos_no_corrientes' => 0,
             'patrimonio' => [], 'total_patrimonio' => 0,
             'total_activos' => 0, 'total_pasivos_patrimonio' => 0
         ];
@@ -423,6 +424,8 @@ class Accounting_model extends CI_Model
                 if (strpos($code8, '11') === 0) $data['total_activos_corrientes'] += $monto;
                 if (strpos($code8, '12') === 0) $data['total_activos_no_corrientes'] += $monto;
             } elseif ($tipo == 'liability') {
+                if (strpos($code8, '21') === 0) $data['total_pasivos_corrientes'] += abs($monto); // 21 Corriente
+                if (strpos($code8, '22') === 0) $data['total_pasivos_no_corrientes'] += abs($monto); // 22 No Corriente
                 $data['total_pasivos'] += abs($monto);
             } elseif ($tipo == 'equity') {
                 $data['total_patrimonio'] += abs($monto);
@@ -462,7 +465,8 @@ class Accounting_model extends CI_Model
                 if (strpos($code, '11') === 0) $data['activos_corrientes'][] = $acc;
                 elseif (strpos($code, '12') === 0) $data['activos_no_corrientes'][] = $acc;
             } elseif ($type == 'liability') {
-                $data['pasivos'][] = $acc;
+                if (strpos($code, '21') === 0) $data['pasivos_corrientes'][] = $acc;
+            elseif (strpos($code, '22') === 0) $data['pasivos_no_corrientes'][] = $acc;
             } elseif ($type == 'equity') {
                 $data['patrimonio'][] = $acc;
             }

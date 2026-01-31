@@ -99,27 +99,57 @@
     <tr>
         <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">PASIVOS</td>
     </tr>
-    
-    <?php foreach($pasivos as $pasivo): ?>
-    <?php if($pasivo->amount != 0): ?>
+
     <tr>
-        <td><?=$pasivo->account_map?></td>
-        <td class="left-text"><?=$pasivo->account_name?></td>
-        <td class="right-text"><?=money($pasivo->amount)?></td>
+        <td class="bold">21</td>
+        <td class="bold">PASIVOS CORRIENTES</td>
+        <td class="right-text"></td>
     </tr>
-    <?php endif; ?>
+    <?php foreach($pasivos_corrientes as $p): ?>
+        <tr>
+            <td><?=$p->account_map?></td>
+            <td class="left-text"><?=$p->account_name?></td>
+            <td class="right-text"><?=money($p->amount)?></td>
+        </tr>
     <?php endforeach; ?>
-    
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL PASIVOS CORRIENTES</td>
+        <td class="right-text bold border-bottom"><?=money($total_pasivos_corrientes)?></td>
+    </tr>
+
+    <tr>
+        <td class="bold">22</td>
+        <td class="bold">PASIVOS NO CORRIENTES</td>
+        <td class="right-text"></td>
+    </tr>
+    <?php foreach($pasivos_no_corrientes as $p): ?>
+        <tr>
+            <td><?=$p->account_map?></td>
+            <td class="left-text"><?=$p->account_name?></td>
+            <td class="right-text"><?=money($p->amount)?></td>
+        </tr>
+    <?php endforeach; ?>
+    <tr>
+        <td></td>
+        <td class="bold right-text">TOTAL PASIVOS NO CORRIENTES</td>
+        <td class="right-text bold border-bottom"><?=money($total_pasivos_no_corrientes)?></td>
+    </tr>
+
     <tr>
         <td></td>
         <td class="bold right-text">TOTAL PASIVOS</td>
-        <td class="right-text bold border-bottom"><?=money($total_pasivos)?></td>
+        <td class="right-text bold" style="background-color:#f8e8e8;"><?=money($total_pasivos)?></td>
     </tr>
     <!-- PATRIMONIO -->
     <tr>
         <td colspan="3" class="center-text bold" style="background-color:#f0f0f0;">PATRIMONIO</td>
     </tr>
-    
+        <tr>
+        <td class="bold">31</td>
+        <td class="bold">PATRIMONIO NETO</td>
+        <td class="right-text"></td>
+    </tr>
     <?php foreach($patrimonio as $pat): ?>
     <?php if($pat->amount != 0): ?>
     <tr>
