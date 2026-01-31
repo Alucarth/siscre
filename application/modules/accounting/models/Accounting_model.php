@@ -593,12 +593,10 @@ class Accounting_model extends CI_Model
     
     public function get_cash_flow_data($filters = [])
     {        
-        // 1. Validación de filtros
         if (empty($filters["date_from"]) || empty($filters["date_to"])) {
             return [];
         }
         
-        // Convertir timestamps a formato SQL si es necesario
         $date_from = is_numeric($filters["date_from"]) ? date("Y-m-d", $filters["date_from"]) : $filters["date_from"];
         $date_to = is_numeric($filters["date_to"]) ? date("Y-m-d", $filters["date_to"]) : $filters["date_to"];
         
@@ -607,8 +605,11 @@ class Accounting_model extends CI_Model
             $branch_id = (int)$this->session->userdata("branch_id");
             $branch_condition = " AND at.branch_id = $branch_id";
         }
-        
-        // PASO 1: Saldos Iniciales (Optimizado)
+
+        // Filtro para excluir Ingresos (4), Egresos (5) y Costos (6)
+        $exclude_condition = " AND aa.code_number NOT REGEXP '^[456]' ";
+
+        // PASO 1: Saldos Iniciales con Naturaleza Contable
         $sql_saldos_iniciales = "
             SELECT aa.id as account_id,
                 SUM(CASE 
@@ -619,7 +620,7 @@ class Accounting_model extends CI_Model
                 END) as saldo_inicial
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) < ? $branch_condition
+            WHERE DATE(at.added_date) < ? $branch_condition $exclude_condition
             GROUP BY aa.id
             HAVING ABS(saldo_inicial) > 0.01";
         
@@ -629,40 +630,48 @@ class Accounting_model extends CI_Model
             $saldos_iniciales[$row->account_id] = $row->saldo_inicial;
         }
 
-        // PASO 2: Transacciones
-        // Nota: Eliminamos el subquery pesado y calcularemos el saldo final en PHP o mediante un JOIN de totales
+        // PASO 2: Transacciones con Saldo Final corregido
         $sql_transacciones = "
             SELECT aa.id, aa.code_number, aa.account_name, aa.account_type, 
                 at.amount, at.movement_type, at.added_date, at.description, 
-                at.voucher_id, at.payment_methods
+                at.voucher_id, at.payment_methods,
+                (SELECT SUM(CASE 
+                    WHEN LOWER(aa2.account_type) IN ('asset', 'expenses') THEN 
+                        (CASE WHEN at2.movement_type = 'debit' THEN at2.amount ELSE -at2.amount END)
+                    ELSE 
+                        (CASE WHEN at2.movement_type = 'credit' THEN at2.amount ELSE -at2.amount END)
+                END)
+                FROM c19_accounting_transactions at2 
+                INNER JOIN c19_accounting_accounts aa2 ON aa2.id = at2.account_id
+                WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= ? $branch_condition) as saldo_final
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition
+            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $exclude_condition
             ORDER BY aa.account_type, aa.code_number, at.added_date";
 
-        $query = $this->db->query($sql_transacciones, [$date_from, $date_to]);
+        $query = $this->db->query($sql_transacciones, [$date_to, $date_from, $date_to]);
         
         if (!$query) return [];
 
         $cash_flow_data = [];
         $cuentas_procesadas = [];
-        $totales_periodo = []; // Para calcular el saldo final sin subqueries repetitivos
-
-        // Opcional: Podrías hacer una consulta previa de "totales hasta date_to" 
-        // para obtener el saldo_final real de cada cuenta de una sola vez.
 
         foreach ($query->result() as $row) {
             $acc_id = $row->id;
             $is_first = !isset($cuentas_procesadas[$acc_id]);
-            
-            $activity_type = $this->get_activity_type($row->code_number, $row->account_type, $row->movement_type);
             $saldo_ini = $saldos_iniciales[$acc_id] ?? 0;
             
-            // Lógica de variación por movimiento
-            $monto_variacion = ($row->movement_type == 'debit') ? $row->amount : -$row->amount;
+            // Variación nominal (diferencia de saldos)
+            $variacion = $row->saldo_final - $saldo_ini;
 
-            // Aquí deberías tener el saldo_final ya calculado. 
-            // Si no usas el subquery, podrías calcularlo sumando la variación al saldo inicial acumulado.
+            // APLICACIÓN DE REGLA DE FLUJO (SIGNOS)
+            // Si es Activo: Aumento (+) = Salida de efectivo (-)
+            // Si es Pasivo/Patrimonio: Aumento (+) = Entrada de efectivo (+)
+            if (strtolower($row->account_type) == 'asset') {
+                $impacto_efectivo = -$variacion;
+            } else {
+                $impacto_efectivo = $variacion;
+            }
             
             $cash_flow_data[] = (object) array(
                 'id' => $acc_id,
@@ -672,10 +681,11 @@ class Accounting_model extends CI_Model
                 'amount' => $row->amount,
                 'movement_type' => $row->movement_type,
                 'added_date' => $row->added_date,
-                'description' => $row->description,
-                'activity_type' => $activity_type,
+                'activity_type' => $this->get_activity_type($row->code_number, $row->account_type, $row->movement_type),
                 'saldo_inicial' => $saldo_ini,
-                'monto_variacion' => $monto_variacion,
+                'saldo_final' => $row->saldo_final,
+                'variacion' => $variacion, 
+                'monto_variacion' => $impacto_efectivo, // Este es el que suma al total
                 'es_primera_cuenta' => $is_first
             );
 
@@ -736,66 +746,52 @@ class Accounting_model extends CI_Model
         $cash_flow_data = $this->get_cash_flow_data($filters);
         
         if (empty($cash_flow_data)) {
-            return [
-                'accounts' => [],
-                'totals' => [
-                    'operating' => 0,
-                    'investing' => 0, 
-                    'financing' => 0,
-                    'net_cash_flow' => 0
-                ],
-                'summary' => []
-            ];
+            return ['accounts' => [], 'totals' => ['operating' => 0, 'investing' => 0, 'financing' => 0, 'net_cash_flow' => 0], 'summary' => []];
         }
         
-        $totals_by_activity = [
-            'operating' => 0,
-            'investing' => 0,
-            'financing' => 0
-        ];
-        
+        $totals_by_activity = ['operating' => 0, 'investing' => 0, 'financing' => 0];
         $accounts_summary = [];
         $processed_accounts = [];
         
         foreach ($cash_flow_data as $transaction) {
             $account_id = $transaction->id;
             
+            // Solo procesamos la variación una vez por cuenta para el resumen
             if (!isset($processed_accounts[$account_id]) && $transaction->es_primera_cuenta) {
+                
+                // Verificamos si es una cuenta de efectivo (ej: 1101) 
+                // Las cuentas de efectivo NO deben sumar a las actividades, son el resultado final.
+                $es_efectivo = (strpos($transaction->code_number, '11') === 0 && $transaction->account_type == 'asset');
+
+                if (!$es_efectivo) {
+                    $totals_by_activity[$transaction->activity_type] += $transaction->monto_variacion;
+                }
+
                 $accounts_summary[$account_id] = [
                     'code_number' => $transaction->code_number,
                     'account_name' => $transaction->account_name,
-                    'account_type' => $transaction->account_type,
                     'activity_type' => $transaction->activity_type,
                     'saldo_inicial' => $transaction->saldo_inicial,
                     'saldo_final' => $transaction->saldo_final,
                     'variacion' => $transaction->variacion,
-                    'clasificacion' => $this->get_variacion_clasificacion($transaction->variacion)
+                    'impacto_efectivo' => $transaction->monto_variacion,
+                    'clasificacion' => $this->get_variacion_clasificacion($transaction->monto_variacion)
                 ];
                 $processed_accounts[$account_id] = true;
             }
-            
-            $monto_actividad = $transaction->monto_variacion;
-            $totals_by_activity[$transaction->activity_type] += $monto_actividad;
         }
         
-        $net_cash_flow = $totals_by_activity['operating'] + $totals_by_activity['investing'] + $totals_by_activity['financing'];
+        $net_cash_flow = array_sum($totals_by_activity);
         
-        $result = [
+        return [
             'accounts' => $cash_flow_data,
-            'totals' => [
-                'operating' => $totals_by_activity['operating'],
-                'investing' => $totals_by_activity['investing'],
-                'financing' => $totals_by_activity['financing'],
-                'net_cash_flow' => $net_cash_flow
-            ],
+            'totals' => array_merge($totals_by_activity, ['net_cash_flow' => $net_cash_flow]),
             'summary' => array_values($accounts_summary),
             'period' => [
-                'date_from' => isset($filters["date_from"]) ? $filters["date_from"] : null,
-                'date_to' => isset($filters["date_to"]) ? $filters["date_to"] : null
+                'date_from' => $filters["date_from"] ?? null,
+                'date_to' => $filters["date_to"] ?? null
             ]
         ];
-        
-        return $result;
     }
 
     // Función auxiliar para clasificar la variación
