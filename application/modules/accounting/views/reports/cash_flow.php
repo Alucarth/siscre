@@ -55,7 +55,7 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
                     // Lógica para el texto de Variación
                     $texto_variacion = 'SIN CAMBIOS';
                     $clase_variacion = '';
-                    if ($row->variacion > 0.01) {
+                    if ($row->variacion > 0.001) {
                         $texto_variacion = 'AUMENTO';
                         $clase_variacion = 'aumento';
                     } elseif ($row->variacion < -0.01) {
