@@ -606,7 +606,7 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND at.branch_id = $branch_id";
         }
 
-        // ESTA ES LA LÍNEA MODIFICADA: Excluye 4, 5, 6 y las cuentas específicas 11010101 y 11020201
+        // FILTRO MODIFICADO: Excluye 4, 5, 6 Y las dos cuentas específicas solicitadas
         $exclude_condition = " AND aa.code_number NOT REGEXP '^[456]' AND aa.code_number NOT IN ('11010101', '11020201') ";
 
         // PASO 1: Saldos Iniciales
@@ -663,12 +663,8 @@ class Accounting_model extends CI_Model
             
             $variacion_contable = $row->saldo_final - $saldo_ini;
 
-            // MANTENEMOS TU LÓGICA DE SIGNOS INTACTA
-            if (substr($row->code_number, 0, 1) == '1') {
-                $monto_reporte = -$variacion_contable;
-            } else {
-                $monto_reporte = $variacion_contable;
-            }
+            // RESTAURADA LA LÓGICA DE SIGNOS ORIGINAL (SIN INVERSIÓN)
+            $monto_reporte = $variacion_contable;
             
             $cash_flow_data[] = (object) array(
                 'id' => $acc_id,
