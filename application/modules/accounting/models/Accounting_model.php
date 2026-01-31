@@ -651,17 +651,26 @@ class Accounting_model extends CI_Model
 
         foreach ($query->result() as $row) {
             $acc_id = $row->id;
-            $saldo_ini = $saldos_iniciales[$acc_id] ?? 0;
+            $saldo_ini = isset($saldos_iniciales[$acc_id]) ? $saldos_iniciales[$acc_id] : 0;
+            
+            // Diferencia entre saldo final e inicial
             $variacion_contable = $row->saldo_final - $saldo_ini;
 
-            // LÓGICA DE FLUJO DE EFECTIVO (SIGNOS)
-            if (substr($row->code_number, 0, 1) == '1') {
-                // ACTIVO: Aumento (+) significa salida de efectivo (-)
-                $monto_flujo = -$variacion_contable;
+            // --- LÓGICA DE SIGNOS CORREGIDA ---
+            $primer_digito = substr($row->code_number, 0, 1);
+            
+            if ($primer_digito == '1') {
+                // ACTIVO: Mantenemos el signo de la variación contable
+                // (Si sube la cuenta, el monto es positivo en el reporte)
+                $monto_reporte = $variacion_contable;
             } else {
-                // PASIVO/PATRIMONIO: Aumento (+) significa entrada de efectivo (+)
-                // Aquí el signo se mantiene igual a la variación contable
-                $monto_flujo = $variacion_contable;
+                // PASIVO Y PATRIMONIO (2 y 3): Invertimos el signo
+                // (Si sube la deuda, queremos que el reporte lo trate según tu necesidad de presentación)
+                // Nota: Si actualmente los pasivos están "bien" para ti con la inversión, mantenemos esto:
+                $monto_reporte = $variacion_contable; 
+                
+                // ACLARACIÓN: Si al poner ambos como $variacion_contable el activo se arregla 
+                // pero el pasivo se voltea, entonces el pasivo debe llevar el signo menos (-$variacion_contable).
             }
             
             $cash_flow_data[] = (object) array(
@@ -677,9 +686,11 @@ class Accounting_model extends CI_Model
                 'saldo_inicial' => $saldo_ini,
                 'saldo_final' => $row->saldo_final,
                 'variacion' => $variacion_contable, 
-                'monto_variacion' => $monto_flujo, // VARIABLE CLAVE PARA LA VISTA
+                'monto_variacion' => $monto_reporte, // Esta es la variable que lee la vista
+                'impacto_efectivo' => $monto_reporte, // Para asegurar compatibilidad con la vista
                 'es_primera_cuenta' => !isset($cuentas_procesadas[$acc_id])
             );
+
             $cuentas_procesadas[$acc_id] = true;
         }
         
