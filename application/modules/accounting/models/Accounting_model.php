@@ -369,10 +369,8 @@ class Accounting_model extends CI_Model
     
     public function get_balance_sheet_data($filters = [])
     {
-        $data = [];
-        
-        // Configurar filtros de fecha
-        $where = '';
+        // 1. Filtros de fecha y prefijo de tabla
+        $where = " 1=1 ";
         if (isset($filters["date_from"]) && trim($filters["date_from"]) != '') {
             $date_from = date("Y-m-d", $filters["date_from"]);
             $where .= " AND DATE(a.added_date) >= '$date_from'";
@@ -381,164 +379,108 @@ class Accounting_model extends CI_Model
             $date_to = date("Y-m-d", $filters["date_to"]);
             $where .= " AND DATE(a.added_date) <= '$date_to'";
         }
-        
-        if(is_plugin_active("branches")) {
-            $where .= " AND a.branch_id = " . $this->session->userdata("branch_id");
-        }
 
-        // 1. ACTIVOS CORRIENTES (cuentas que empiezan con 11)
-        $sql_activos_corrientes = "
-            SELECT 
-                b.id, 
-                b.account_name, 
-                b.account_map,
-                SUM(CASE 
-                    WHEN a.movement_type = 'debit' THEN a.amount 
-                    ELSE -a.amount 
-                END) as amount,
-                0 as depreciation_amount
-            FROM c19_accounting_transactions a 
-            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type = 'asset' 
-            AND b.account_map LIKE '11%' 
-            $where
-            GROUP BY b.id, b.account_name, b.account_map
-            HAVING ABS(amount) > 0.01
-            ORDER BY b.account_map
-        ";
+        // 2. Obtener saldos de cuentas de 8 dígitos (Cuentas de movimiento)
+        // Usamos LOWER para que no importe si dice 'Asset' o 'asset'
+        $sql_saldos = "
+            SELECT b.code_number, LOWER(b.account_type) as account_type,
+                SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE -a.amount END) as balance
+            FROM c19_accounting_transactions a
+            JOIN c19_accounting_accounts b ON a.account_id = b.id
+            WHERE $where AND LENGTH(b.code_number) = 8
+            GROUP BY b.code_number, b.account_type";
         
-        $query = $this->db->query($sql_activos_corrientes);
-        $activos_corrientes = [];
-        $total_activos_corrientes = 0;
+        $res_saldos = $this->db->query($sql_saldos)->result();
         
-        if ($query && $query->num_rows() > 0) {
-            foreach ($query->result() as $row) {
-                $activos_corrientes[] = $row;
-                $total_activos_corrientes += $row->amount;
+        $saldos_hoja = [];
+        $total_ingresos = 0;
+        $total_gastos = 0;
+
+        foreach($res_saldos as $s) {
+            $saldos_hoja[$s->code_number] = ['bal' => $s->balance, 'type' => $s->account_type];
+            // Calculamos resultado de gestión para que el balance cierre
+            if($s->account_type == 'income') $total_ingresos += abs($s->balance);
+            if($s->account_type == 'expenses') $total_gastos += abs($s->balance);
+        }
+        
+        $resultado_gestion = $total_ingresos - $total_gastos;
+
+        // 3. Preparar estructura de datos para la vista
+        $data = [
+            'activos_corrientes' => [], 'total_activos_corrientes' => 0,
+            'activos_no_corrientes' => [], 'total_activos_no_corrientes' => 0,
+            'pasivos' => [], 'total_pasivos' => 0,
+            'patrimonio' => [], 'total_patrimonio' => 0,
+            'total_activos' => 0, 'total_pasivos_patrimonio' => 0
+        ];
+
+        // 4. Calcular Totales Generales (Sumando directamente las hojas de 8 dígitos)
+        foreach($saldos_hoja as $code8 => $info) {
+            $monto = $info['bal'];
+            $tipo = $info['type'];
+
+            if ($tipo == 'asset') {
+                if (strpos($code8, '11') === 0) $data['total_activos_corrientes'] += $monto;
+                if (strpos($code8, '12') === 0) $data['total_activos_no_corrientes'] += $monto;
+            } elseif ($tipo == 'liability') {
+                $data['total_pasivos'] += abs($monto);
+            } elseif ($tipo == 'equity') {
+                $data['total_patrimonio'] += abs($monto);
             }
         }
+        
+        // El resultado de la gestión se suma al patrimonio total
+        $data['total_patrimonio'] += $resultado_gestion;
 
-        // 2. ACTIVOS NO CORRIENTES (cuentas que empiezan con 12)
-        $sql_activos_no_corrientes = "
-            SELECT 
-                b.id, 
-                b.account_name, 
-                b.account_map,
-                SUM(CASE 
-                    WHEN a.movement_type = 'debit' THEN a.amount 
-                    ELSE -a.amount 
-                END) as amount,
-                COALESCE((
-                    SELECT SUM(at2.depreciate_amount) 
-                    FROM c19_accounting_transactions at2 
-                    WHERE at2.account_id = b.id 
-                    AND at2.depreciate_amount != 0
-                    $where
-                ), 0) as depreciation_amount
-            FROM c19_accounting_transactions a 
-            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type = 'asset' 
-            AND b.account_map LIKE '12%' 
-            $where
-            GROUP BY b.id, b.account_name, b.account_map
-            HAVING ABS(amount) > 0.01
-            ORDER BY b.account_map
-        ";
-        
-        $query = $this->db->query($sql_activos_no_corrientes);
-        $activos_no_corrientes = [];
-        $total_activos_no_corrientes = 0;
-        
-        if ($query && $query->num_rows() > 0) {
-            foreach ($query->result() as $row) {
-                $activos_no_corrientes[] = $row;
-                $net_amount = $row->amount - $row->depreciation_amount;
-                $total_activos_no_corrientes += $net_amount;
-            }
-        }
+        // 5. Procesar lista de cuentas para los bucles de la vista
+        $todas_las_cuentas = $this->db->order_by('code_number', 'ASC')->get('c19_accounting_accounts')->result();
 
-        // 3. PASIVOS (todas las cuentas de liability)
-        $sql_pasivos = "
-            SELECT 
-                b.id, 
-                b.account_name, 
-                b.account_map,
-                SUM(CASE 
-                    WHEN a.movement_type = 'credit' THEN a.amount 
-                    ELSE -a.amount 
-                END) as amount
-            FROM c19_accounting_transactions a 
-            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type = 'liability' 
-            $where
-            GROUP BY b.id, b.account_name, b.account_map
-            HAVING ABS(amount) > 0.01
-            ORDER BY b.account_map
-        ";
-        
-        $query = $this->db->query($sql_pasivos);
-        $pasivos = [];
-        $total_pasivos = 0;
-        
-        if ($query && $query->num_rows() > 0) {
-            foreach ($query->result() as $row) {
-                $pasivos[] = $row;
-                $total_pasivos += $row->amount;
-            }
-        }
-
-        // 4. PATRIMONIO (todas las cuentas de equity - SOLO LAS QUE EXISTEN EN LA BD)
-        $sql_patrimonio = "
-            SELECT 
-                b.id, 
-                b.account_name, 
-                b.account_map,
-                SUM(CASE 
-                    WHEN a.movement_type = 'credit' THEN a.amount 
-                    ELSE -a.amount 
-                END) as amount
-            FROM c19_accounting_transactions a 
-            LEFT JOIN c19_accounting_accounts b ON b.id = a.account_id
-            WHERE b.account_type = 'equity' 
-            $where
-            GROUP BY b.id, b.account_name, b.account_map
-            HAVING ABS(amount) > 0.01
-            ORDER BY b.account_map
-        ";
-        
-        $query = $this->db->query($sql_patrimonio);
-        $patrimonio = [];
-        $total_patrimonio = 0;
-        
-        if ($query && $query->num_rows() > 0) {
-            foreach ($query->result() as $row) {
-                $patrimonio[] = $row;
-                $total_patrimonio += $row->amount;
-            }
-        }
-
-        $res_data = $this->get_income_statement_data($filters["date_from"], $filters["date_to"]);
-            $resultado_neto = 0;
-            foreach ($res_data as $acc) {
-                if (strlen((string)$acc->code_number) == 8) {
-                    $resultado_neto += ($acc->account_type == 'income') ? $acc->amount : -$acc->amount;
-                }
-            }
+        foreach ($todas_las_cuentas as $acc) {
+            $code = (string)$acc->code_number;
+            $type = strtolower($acc->account_type);
             
-            // Añadir el resultado al array de patrimonio para que la vista lo muestre y sume
-            $obj_res = new stdClass();
-            $obj_res->account_name = "RESULTADO DE LA GESTIÓN";
-            $obj_res->account_map = "31999";
-            $obj_res->amount = $resultado_neto;
-            $data['patrimonio'][] = $obj_res;
-            $data['total_patrimonio'] += $resultado_neto;
-            
-            // Recalcular total pasivo + patrimonio
-            $data['total_pasivos_patrimonio'] = $data['total_pasivos'] + $data['total_patrimonio'];
-            $data['balance_cuadra'] = (abs($data['total_activos'] - $data['total_pasivos_patrimonio']) < 0.01);
-            
-            return $data;
+            // CORRECCIÓN CLAVE: La vista usa 'account_map', no 'code_number'
+            $acc->account_map = $code;
+            $acc->depreciation_amount = 0; // Inicializar para evitar errores en vista
+
+            // Sumar todos los hijos para esta cuenta específica
+            $saldo_acum = 0;
+            foreach ($saldos_hoja as $c8 => $info) {
+                if (strpos($c8, $code) === 0) { $saldo_acum += $info['bal']; }
+            }
+
+            // Si la cuenta no tiene saldo ni hijos con saldo, no la incluimos
+            if (abs($saldo_acum) < 0.0001) continue;
+
+            // Formatear monto según naturaleza
+            $acc->amount = ($type == 'asset') ? $saldo_acum : abs($saldo_acum);
+
+            // No incluir niveles raíz (11, 12) en las listas porque la vista los pone fijos
+            if (strlen($code) <= 2) continue;
+
+            if ($type == 'asset') {
+                if (strpos($code, '11') === 0) $data['activos_corrientes'][] = $acc;
+                elseif (strpos($code, '12') === 0) $data['activos_no_corrientes'][] = $acc;
+            } elseif ($type == 'liability') {
+                $data['pasivos'][] = $acc;
+            } elseif ($type == 'equity') {
+                $data['patrimonio'][] = $acc;
+            }
         }
+        
+        // Inyectar el Resultado de la Gestión en la lista de Patrimonio
+        $res_obj = new stdClass();
+        $res_obj->account_map = "39999999"; 
+        $res_obj->account_name = "RESULTADO DE LA GESTIÓN";
+        $res_obj->amount = $resultado_gestion;
+        $data['patrimonio'][] = $res_obj;
+
+        // Totales Finales
+        $data['total_activos'] = $data['total_activos_corrientes'] + $data['total_activos_no_corrientes'];
+        $data['total_pasivos_patrimonio'] = $data['total_pasivos'] + $data['total_patrimonio'];
+
+        return $data;
+    }
 
     public function get_equity_evolution_data($filters = [])
     {        
