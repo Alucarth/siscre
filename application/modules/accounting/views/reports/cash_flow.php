@@ -9,10 +9,13 @@
     .text-right { text-align: right; }
     .text-center { text-align: center; }
     .total-section { background-color: #f9f9f9; font-weight: bold; }
-    .aumento { color: #008000; font-weight: bold; }
-    .disminucion { color: #ff0000; font-weight: bold; }
+    .empresa-info { font-size:12px; line-height:1.2; }
 </style>
 
+<div style="position:absolute; top:20px; left:40px;" class="empresa-info">
+    <div class="bold">CREDISURGIR S.R.L.</div>
+    <div>NIT: 485672023</div>
+</div>
 <div class="report-container">
     <div class="report-header">
         <div class="report-title">ESTADO DE FLUJO DE EFECTIVO</div>
