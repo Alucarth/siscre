@@ -191,6 +191,13 @@
             <td class="right-text bold"><?=money($total_patrimonio)?></td>
         </tr>
         <tr>
+            <td colspan="2" style="height: 15px;"></td>
+        </tr>
+        <tr>
+            <td width="70%" class="bold">TOTAL ACTIVOS:</td>
+            <td width="30%" class="right-text bold"><?=money($total_activos)?></td>
+        </tr>
+        <tr>
             <td class="bold">TOTAL PASIVOS + PATRIMONIO:</td>
             <td class="right-text bold"><?=money($total_pasivos_patrimonio)?></td>
         </tr>
