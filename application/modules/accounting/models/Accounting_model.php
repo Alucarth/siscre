@@ -382,29 +382,37 @@ class Accounting_model extends CI_Model
 
         // 2. Obtener saldos de cuentas de 8 dígitos (Cuentas de movimiento)
         // Usamos LOWER para que no importe si dice 'Asset' o 'asset'
-        $sql_saldos = "
-            SELECT b.code_number, LOWER(b.account_type) as account_type,
-                SUM(CASE WHEN a.movement_type = 'credit' THEN a.amount ELSE -a.amount END) as balance
-            FROM c19_accounting_transactions a
-            JOIN c19_accounting_accounts b ON a.account_id = b.id
-            WHERE $where AND LENGTH(b.code_number) = 8
-            GROUP BY b.code_number, b.account_type";
-        
-        $res_saldos = $this->db->query($sql_saldos)->result();
-        
-        $saldos_hoja = [];
-        $total_ingresos = 0;
-        $total_gastos = 0;
+            $sql_saldos = "
+                SELECT b.code_number, LOWER(b.account_type) as account_type,
+                    SUM(CASE WHEN a.movement_type = 'debit' THEN a.amount ELSE 0 END) as total_debit,
+                    SUM(CASE WHEN a.movement_type = 'credit' THEN a.amount ELSE 0 END) as total_credit
+                FROM c19_accounting_transactions a
+                JOIN c19_accounting_accounts b ON a.account_id = b.id
+                WHERE $where AND LENGTH(b.code_number) = 8
+                GROUP BY b.code_number, b.account_type";
 
-        foreach($res_saldos as $s) {
-            $saldos_hoja[$s->code_number] = ['bal' => $s->balance, 'type' => $s->account_type];
-            
-            // El Resultado de Gestión siempre es Ingresos (Haberes) - Gastos (Debes)
-            if($s->account_type == 'income') $total_ingresos += $s->balance; 
-            if($s->account_type == 'expenses') $total_gastos += abs($s->balance); 
-        }
-        
-        $resultado_gestion = $total_ingresos - $total_gastos;
+            $res_saldos = $this->db->query($sql_saldos)->result();
+
+            $saldos_hoja = [];
+            $utilidad_neta = 0;
+            foreach($res_saldos as $s) {
+                // Calculamos el saldo según el tipo de cuenta
+                if (in_array($s->account_type, ['asset', 'expenses'])) {
+                    // Naturaleza Deudora: Debe - Haber
+                    $balance = $s->total_debit - $s->total_credit;
+                } else {
+                    // Naturaleza Acreedora (Pasivo, Patrimonio, Ingresos): Haber - Debe
+                    $balance = $s->total_credit - $s->total_debit;
+                }
+
+                $saldos_hoja[$s->code_number] = ['bal' => $balance, 'type' => $s->account_type];
+
+                // Para el Resultado de Gestión (Ingresos - Gastos)
+                if($s->account_type == 'income') $utilidad_neta += $balance;
+                if($s->account_type == 'expenses') $utilidad_neta -= $balance;
+            }
+
+            $acc->amount = $saldo_acum;
 
         // 3. Preparar estructura de datos para la vista
         $data = [
