@@ -647,7 +647,7 @@ class Accounting_model extends CI_Model
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
             WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $exclude_condition
-            ORDER BY aa.account_type, aa.code_number, at.added_date";
+            ORDER BY aa.code_number";
 
         $query = $this->db->query($sql_transacciones, [$date_to, $date_from, $date_to]);
         
