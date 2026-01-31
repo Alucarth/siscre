@@ -88,7 +88,7 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
 
             <tr class="total-section" style="font-size: 13px; background-color: #eee;">
                 <td colspan="6" class="text-right">EFECTIVO INICIAL:</td>
-                <td class="text-right"></td>
+                <td class="text-right"><?php echo money(0); ?></td>
             </tr>
             <tr class="total-section" style="font-size: 13px; background-color: #eee;">
                 <td colspan="6" class="text-right">EFECTIVO FINAL:</td>
