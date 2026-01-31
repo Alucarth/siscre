@@ -87,8 +87,12 @@ if (isset($cash_flow_result) && !empty($cash_flow_result['accounts'])) {
             </tr>
 
             <tr class="total-section" style="font-size: 13px; background-color: #eee;">
-                <td colspan="6" class="text-right">AUMENTO (DISMINUCIÓN) NETO DE EFECTIVO:</td>
-                <td class="text-right"><?php echo money($total_operating + $total_investing + $total_financing); ?></td>
+                <td colspan="6" class="text-right">EFECTIVO INICIAL:</td>
+                <td class="text-right"></td>
+            </tr>
+            <tr class="total-section" style="font-size: 13px; background-color: #eee;">
+                <td colspan="6" class="text-right">EFECTIVO FINAL:</td>
+                <td class="text-right"><?php echo money($total_financing - $total_operating - $total_investing); ?></td>
             </tr>
         </tbody>
     </table>
