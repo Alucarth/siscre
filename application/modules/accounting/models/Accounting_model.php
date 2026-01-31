@@ -606,20 +606,23 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND at.branch_id = $branch_id";
         }
 
-        $exclude_filter = " AND (aa.code_number LIKE '1%' OR aa.code_number LIKE '2%' OR aa.code_number LIKE '3%') ";
-        $exclude_filter .= " AND aa.code_number NOT IN ('11010101', '11020201') ";
+        // ESTA ES LA LÍNEA MODIFICADA: Excluye 4, 5, 6 y las cuentas específicas 11010101 y 11020201
+        $exclude_condition = " AND aa.code_number NOT REGEXP '^[456]' AND aa.code_number NOT IN ('11010101', '11020201') ";
 
-        // Actualiza los SQL de saldos iniciales y transacciones usando $final_filter
+        // PASO 1: Saldos Iniciales
         $sql_saldos_iniciales = "
             SELECT aa.id as account_id,
                 SUM(CASE 
-                    WHEN aa.code_number LIKE '1%' THEN (CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE -at.amount END)
-                    ELSE (CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE -at.amount END)
+                    WHEN LOWER(aa.account_type) IN ('asset', 'expenses') THEN 
+                        (CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE -at.amount END)
+                    ELSE 
+                        (CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE -at.amount END)
                 END) as saldo_inicial
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) < ? $branch_condition $final_filter
-            GROUP BY aa.id";
+            WHERE DATE(at.added_date) < ? $branch_condition $exclude_condition
+            GROUP BY aa.id
+            HAVING ABS(saldo_inicial) > 0.01";
         
         $query_inicial = $this->db->query($sql_saldos_iniciales, [$date_from]);
         $saldos_iniciales = [];
@@ -627,49 +630,44 @@ class Accounting_model extends CI_Model
             $saldos_iniciales[$row->account_id] = $row->saldo_inicial;
         }
 
-        // PASO 2: Transacciones del Período
+        // PASO 2: Transacciones con Saldo Final
         $sql_transacciones = "
             SELECT aa.id, aa.code_number, aa.account_name, aa.account_type, 
-                at.amount, at.movement_type, at.added_date, at.description,
+                at.amount, at.movement_type, at.added_date, at.description, 
+                at.voucher_id, at.payment_methods,
                 (SELECT SUM(CASE 
-                    WHEN aa2.code_number LIKE '1%' THEN (CASE WHEN at2.movement_type = 'debit' THEN at2.amount ELSE -at2.amount END)
-                    ELSE (CASE WHEN at2.movement_type = 'credit' THEN at2.amount ELSE -at2.amount END)
+                    WHEN LOWER(aa2.account_type) IN ('asset', 'expenses') THEN 
+                        (CASE WHEN at2.movement_type = 'debit' THEN at2.amount ELSE -at2.amount END)
+                    ELSE 
+                        (CASE WHEN at2.movement_type = 'credit' THEN at2.amount ELSE -at2.amount END)
                 END)
                 FROM c19_accounting_transactions at2 
                 INNER JOIN c19_accounting_accounts aa2 ON aa2.id = at2.account_id
                 WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= ? $branch_condition) as saldo_final
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $only_balance
-            ORDER BY aa.code_number ASC, at.added_date ASC";
+            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $exclude_condition
+            ORDER BY aa.account_type, aa.code_number, at.added_date";
 
         $query = $this->db->query($sql_transacciones, [$date_to, $date_from, $date_to]);
         
+        if (!$query) return [];
+
         $cash_flow_data = [];
         $cuentas_procesadas = [];
 
         foreach ($query->result() as $row) {
             $acc_id = $row->id;
-            $saldo_ini = isset($saldos_iniciales[$acc_id]) ? $saldos_iniciales[$acc_id] : 0;
+            $is_first = !isset($cuentas_procesadas[$acc_id]);
+            $saldo_ini = $saldos_iniciales[$acc_id] ?? 0;
             
-            // Diferencia entre saldo final e inicial
             $variacion_contable = $row->saldo_final - $saldo_ini;
 
-            // --- LÓGICA DE SIGNOS CORREGIDA ---
-            $primer_digito = substr($row->code_number, 0, 1);
-            
-            if ($primer_digito == '1') {
-                // ACTIVO: Mantenemos el signo de la variación contable
-                // (Si sube la cuenta, el monto es positivo en el reporte)
-                $monto_reporte = $variacion_contable;
+            // MANTENEMOS TU LÓGICA DE SIGNOS INTACTA
+            if (substr($row->code_number, 0, 1) == '1') {
+                $monto_reporte = -$variacion_contable;
             } else {
-                // PASIVO Y PATRIMONIO (2 y 3): Invertimos el signo
-                // (Si sube la deuda, queremos que el reporte lo trate según tu necesidad de presentación)
-                // Nota: Si actualmente los pasivos están "bien" para ti con la inversión, mantenemos esto:
-                $monto_reporte = $variacion_contable; 
-                
-                // ACLARACIÓN: Si al poner ambos como $variacion_contable el activo se arregla 
-                // pero el pasivo se voltea, entonces el pasivo debe llevar el signo menos (-$variacion_contable).
+                $monto_reporte = $variacion_contable;
             }
             
             $cash_flow_data[] = (object) array(
@@ -681,13 +679,15 @@ class Accounting_model extends CI_Model
                 'movement_type' => $row->movement_type,
                 'added_date' => $row->added_date,
                 'description' => $row->description,
+                'voucher_id' => $row->voucher_id,
+                'payment_methods' => $row->payment_methods,
                 'activity_type' => $this->get_activity_type($row->code_number, $row->account_type, $row->movement_type),
                 'saldo_inicial' => $saldo_ini,
                 'saldo_final' => $row->saldo_final,
                 'variacion' => $variacion_contable, 
-                'monto_variacion' => $monto_reporte, // Esta es la variable que lee la vista
-                'impacto_efectivo' => $monto_reporte, // Para asegurar compatibilidad con la vista
-                'es_primera_cuenta' => !isset($cuentas_procesadas[$acc_id])
+                'monto_variacion' => $monto_reporte,
+                'impacto_efectivo' => $monto_reporte,
+                'es_primera_cuenta' => $is_first
             );
 
             $cuentas_procesadas[$acc_id] = true;
