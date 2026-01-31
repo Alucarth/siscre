@@ -607,24 +607,20 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND at.branch_id = $branch_id";
         }
         
-        // PASO 1: Obtener saldos iniciales (antes de date_from)
+        // PASO 1: Obtener saldos iniciales con lógica de naturaleza
         $sql_saldos_iniciales = "
-            SELECT 
-                aa.id as account_id,
-                aa.code_number,
-                aa.account_name,
-                aa.account_type,
+            SELECT aa.id as account_id, aa.code_number, aa.account_name, aa.account_type,
                 SUM(CASE 
-                    WHEN at.movement_type = 'debit' THEN at.amount 
-                    ELSE -at.amount 
+                    WHEN LOWER(aa.account_type) IN ('asset', 'expenses') THEN 
+                        (CASE WHEN at.movement_type = 'debit' THEN at.amount ELSE -at.amount END)
+                    ELSE 
+                        (CASE WHEN at.movement_type = 'credit' THEN at.amount ELSE -at.amount END)
                 END) as saldo_inicial
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) < '$date_from'
-            $branch_condition
+            WHERE DATE(at.added_date) < '$date_from' $branch_condition
             GROUP BY aa.id, aa.code_number, aa.account_name, aa.account_type
-            HAVING ABS(saldo_inicial) > 0.01
-        ";
+            HAVING ABS(saldo_inicial) > 0.01";
         
         $query_inicial = $this->db->query($sql_saldos_iniciales);
         $saldos_iniciales = [];
@@ -636,35 +632,23 @@ class Accounting_model extends CI_Model
         } else {
         }
         
-        // PASO 2: Obtener transacciones del período con saldos finales
+        // PASO 2: Obtener transacciones y saldo final con lógica de naturaleza
         $sql_transacciones = "
-            SELECT 
-                aa.id,
-                aa.code_number,
-                aa.account_name,
-                aa.account_type,
-                at.amount,
-                at.movement_type,
-                at.added_date,
-                at.description,
-                at.voucher_id,
-                at.payment_methods,
-                -- Calcular saldo acumulado por cuenta
-                (SELECT SUM(CASE 
-                    WHEN at2.movement_type = 'debit' THEN at2.amount 
-                    ELSE -at2.amount 
-                END)
-                FROM c19_accounting_transactions at2 
-                WHERE at2.account_id = aa.id 
-                AND DATE(at2.added_date) <= '$date_to'
-                $branch_condition) as saldo_final
+            SELECT aa.id, aa.code_number, aa.account_name, aa.account_type, at.amount, at.movement_type, at.added_date, at.description, at.voucher_id, at.payment_methods,
+            (SELECT SUM(CASE 
+                        WHEN LOWER(aa2.account_type) IN ('asset', 'expenses') THEN 
+                            (CASE WHEN at2.movement_type = 'debit' THEN at2.amount ELSE -at2.amount END)
+                        ELSE 
+                            (CASE WHEN at2.movement_type = 'credit' THEN at2.amount ELSE -at2.amount END)
+                    END)
+            FROM c19_accounting_transactions at2 
+            INNER JOIN c19_accounting_accounts aa2 ON aa2.id = at2.account_id
+            WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= '$date_to' $branch_condition) as saldo_final
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) BETWEEN '$date_from' AND '$date_to'
-            $branch_condition
-            ORDER BY aa.account_type, aa.code_number, at.added_date
-        ";
-        
+            WHERE DATE(at.added_date) BETWEEN '$date_from' AND '$date_to' $branch_condition
+            ORDER BY aa.account_type, aa.code_number, at.added_date";
+
         $query = $this->db->query($sql_transacciones);
         
         if (!$query) {
@@ -688,7 +672,12 @@ class Accounting_model extends CI_Model
                 $saldo_inicial = isset($saldos_iniciales[$row->id]) ? $saldos_iniciales[$row->id] : 0;
                 
                 // Calcular variación
-                $monto_variacion = $row->movement_type == 'debit' ? $row->amount : -$row->amount;
+                // Cálculo de variación individual según naturaleza
+                if (LOWER($row->account_type) == 'asset' || LOWER($row->account_type) == 'expenses') {
+                    $monto_variacion = ($row->movement_type == 'debit') ? $row->amount : -$row->amount;
+                } else {
+                    $monto_variacion = ($row->movement_type == 'credit') ? $row->amount : -$row->amount;
+                }
                 
                 // Para la primera transacción de cada cuenta, calcular variación total
                 if (!isset($cuentas_procesadas[$row->id])) {
@@ -772,9 +761,7 @@ class Accounting_model extends CI_Model
     }
 
     public function get_cash_flow_with_totals($filters = [])
-    {
-        
-        // Obtener datos base
+    {  
         $cash_flow_data = $this->get_cash_flow_data($filters);
         
         if (empty($cash_flow_data)) {
@@ -790,7 +777,6 @@ class Accounting_model extends CI_Model
             ];
         }
         
-        // Estructuras para cálculos
         $totals_by_activity = [
             'operating' => 0,
             'investing' => 0,
@@ -800,11 +786,9 @@ class Accounting_model extends CI_Model
         $accounts_summary = [];
         $processed_accounts = [];
         
-        // PASO 1: Procesar cada transacción y calcular totales        
         foreach ($cash_flow_data as $transaction) {
             $account_id = $transaction->id;
             
-            // Solo procesar la primera transacción de cada cuenta para el resumen
             if (!isset($processed_accounts[$account_id]) && $transaction->es_primera_cuenta) {
                 $accounts_summary[$account_id] = [
                     'code_number' => $transaction->code_number,
@@ -819,15 +803,12 @@ class Accounting_model extends CI_Model
                 $processed_accounts[$account_id] = true;
             }
             
-            // Acumular por tipo de actividad (usar monto_variacion de cada transacción)
             $monto_actividad = $transaction->monto_variacion;
             $totals_by_activity[$transaction->activity_type] += $monto_actividad;
         }
         
-        // PASO 2: Calcular flujo neto de efectivo
         $net_cash_flow = $totals_by_activity['operating'] + $totals_by_activity['investing'] + $totals_by_activity['financing'];
         
-        // PASO 3: Preparar datos finales
         $result = [
             'accounts' => $cash_flow_data,
             'totals' => [
