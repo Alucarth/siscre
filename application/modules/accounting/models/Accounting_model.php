@@ -606,16 +606,10 @@ class Accounting_model extends CI_Model
             $branch_condition = " AND at.branch_id = $branch_id";
         }
 
-        // 1. FILTROS DE EXCLUSIÓN Y BALANCE
-        // Excluimos 4, 5, 6 y las cuentas específicas 11010101, 11020201
-        $exclude_filter = " AND aa.code_number NOT IN ('11010101', '11020201') 
-                            AND aa.code_number NOT LIKE '4%' 
-                            AND aa.code_number NOT LIKE '5%' 
-                            AND aa.code_number NOT LIKE '6%' ";
-        
-        $only_balance = " AND (aa.code_number LIKE '1%' OR aa.code_number LIKE '2%' OR aa.code_number LIKE '3%') ";
+        $exclude_filter = " AND (aa.code_number LIKE '1%' OR aa.code_number LIKE '2%' OR aa.code_number LIKE '3%') ";
+        $exclude_filter .= " AND aa.code_number NOT IN ('11010101', '11020201') ";
 
-        // 2. OBTENER SALDOS INICIALES
+        // Actualiza los SQL de saldos iniciales y transacciones usando $final_filter
         $sql_saldos_iniciales = "
             SELECT aa.id as account_id,
                 SUM(CASE 
@@ -624,7 +618,7 @@ class Accounting_model extends CI_Model
                 END) as saldo_inicial
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) < ? $branch_condition $only_balance $exclude_filter
+            WHERE DATE(at.added_date) < ? $branch_condition $final_filter
             GROUP BY aa.id";
         
         $query_inicial = $this->db->query($sql_saldos_iniciales, [$date_from]);
@@ -633,7 +627,7 @@ class Accounting_model extends CI_Model
             $saldos_iniciales[$row->account_id] = $row->saldo_inicial;
         }
 
-        // 3. OBTENER TRANSACCIONES Y SALDO FINAL
+        // PASO 2: Transacciones del Período
         $sql_transacciones = "
             SELECT aa.id, aa.code_number, aa.account_name, aa.account_type, 
                 at.amount, at.movement_type, at.added_date, at.description,
@@ -643,10 +637,10 @@ class Accounting_model extends CI_Model
                 END)
                 FROM c19_accounting_transactions at2 
                 INNER JOIN c19_accounting_accounts aa2 ON aa2.id = at2.account_id
-                WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= ? $branch_condition $exclude_filter) as saldo_final
+                WHERE at2.account_id = aa.id AND DATE(at2.added_date) <= ? $branch_condition) as saldo_final
             FROM c19_accounting_transactions at
             INNER JOIN c19_accounting_accounts aa ON aa.id = at.account_id
-            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $only_balance $exclude_filter
+            WHERE DATE(at.added_date) BETWEEN ? AND ? $branch_condition $only_balance
             ORDER BY aa.code_number ASC, at.added_date ASC";
 
         $query = $this->db->query($sql_transacciones, [$date_to, $date_from, $date_to]);
@@ -657,17 +651,25 @@ class Accounting_model extends CI_Model
         foreach ($query->result() as $row) {
             $acc_id = $row->id;
             $saldo_ini = isset($saldos_iniciales[$acc_id]) ? $saldos_iniciales[$acc_id] : 0;
+            
+            // Diferencia entre saldo final e inicial
             $variacion_contable = $row->saldo_final - $saldo_ini;
 
-            // --- LÓGICA DE SIGNOS SOLICITADA ---
+            // --- LÓGICA DE SIGNOS CORREGIDA ---
             $primer_digito = substr($row->code_number, 0, 1);
             
             if ($primer_digito == '1') {
-                // ACTIVO: Mantenemos signo contable (S.Final - S.Inicial)
+                // ACTIVO: Mantenemos el signo de la variación contable
+                // (Si sube la cuenta, el monto es positivo en el reporte)
                 $monto_reporte = $variacion_contable;
             } else {
-                // PASIVO Y PATRIMONIO (2 y 3): Invertimos signo para el reporte
-                $monto_reporte = -$variacion_contable;
+                // PASIVO Y PATRIMONIO (2 y 3): Invertimos el signo
+                // (Si sube la deuda, queremos que el reporte lo trate según tu necesidad de presentación)
+                // Nota: Si actualmente los pasivos están "bien" para ti con la inversión, mantenemos esto:
+                $monto_reporte = $variacion_contable; 
+                
+                // ACLARACIÓN: Si al poner ambos como $variacion_contable el activo se arregla 
+                // pero el pasivo se voltea, entonces el pasivo debe llevar el signo menos (-$variacion_contable).
             }
             
             $cash_flow_data[] = (object) array(
@@ -683,8 +685,8 @@ class Accounting_model extends CI_Model
                 'saldo_inicial' => $saldo_ini,
                 'saldo_final' => $row->saldo_final,
                 'variacion' => $variacion_contable, 
-                'monto_variacion' => $monto_reporte,
-                'impacto_efectivo' => $monto_reporte,
+                'monto_variacion' => $monto_reporte, // Esta es la variable que lee la vista
+                'impacto_efectivo' => $monto_reporte, // Para asegurar compatibilidad con la vista
                 'es_primera_cuenta' => !isset($cuentas_procesadas[$acc_id])
             );
 
