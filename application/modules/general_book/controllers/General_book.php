@@ -283,7 +283,7 @@ class General_book extends Secure_area implements iData_controller {
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td colspan="6" class="text-right"><strong>TOTALES:</strong></td>
+                        <td colspan="5" class="text-right"><strong>TOTALES:</strong></td>
                         <td class="text-right"><strong><?= number_format($data['total_debit'], 2) ?></strong></td>
                         <td class="text-right"><strong><?= number_format($data['total_credit'], 2) ?></strong></td>
                     </tr>

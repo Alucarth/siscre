@@ -58,7 +58,7 @@
         </tbody>
         <tfoot>
             <tr style="background-color: #f8f9fa; font-weight: bold;">
-                <td colspan="6" class="text-right"><strong>TOTALES:</strong></td>
+                <td colspan="5" class="text-right"><strong>TOTALES:</strong></td>
                 <td class="text-right"><?= money($total_debit) ?></td>
                 <td class="text-right"><?= money($total_credit) ?></td>
             </tr>
