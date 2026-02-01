@@ -381,7 +381,6 @@ $(document).ready(function() {
         return true;
     }
     
-    // FUNCIONES PARA EL PLUGIN DE BÚSQUEDA EN SELECTS
     function initializeAccountSelects() {
         $('.account-select').each(function() {
             initializeAccountSelect($(this));
@@ -389,9 +388,7 @@ $(document).ready(function() {
     }
     
     function initializeAccountSelect(selectElement) {
-        // Verificar qué plugin está disponible y aplicarlo
         if ($.fn.select2) {
-            // Usar Select2 si está disponible
             selectElement.select2({
                 placeholder: "Seleccionar cuenta",
                 allowClear: false,

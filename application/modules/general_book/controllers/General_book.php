@@ -249,14 +249,13 @@ class General_book extends Secure_area implements iData_controller {
             <table>
                 <thead>
                     <tr>
-                        <th width="5%" class="text-center">N°</th>
-                        <th width="7%" class="text-center">N° Transacción</th>
-                        <th width="7%" class="text-center">N° Voucher</th>
-                        <th width="6%" class="text-center">Fecha</th>
-                        <th width="15%" class="text-center">Razón Social</th>
-                        <th width="35%" class="text-center">Glosa</th>
+                        <th width="9%" class="text-center">N°</th>
+                        <th width="9%" class="text-center">N° Transacción</th>
+                        <th width="8%" class="text-center">N° Voucher</th>
+                        <th width="10%" class="text-center">Fecha</th>
+                        <th width="40%" class="text-center">Glosa</th>
                         <th width="12%" class="text-center">Debe</th>
-                        <th width="13%" class="text-center">Haber</th>
+                        <th width="12%" class="text-center">Haber</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -270,7 +269,6 @@ class General_book extends Secure_area implements iData_controller {
                             <td class="text-center"><?= $transaction->transaction_id ?></td>
                             <td class="text-center"><?= $transaction->voucher_id ?></td>
                             <td class="text-center"><?= date('d/m/Y', strtotime($transaction->added_date)) ?></td>
-                            <td class="text-center">CREDISURGIR S.R.L.</td>
                             <td class="text-left"><?= $transaction->description ?: 'Sin descripción' ?></td>
                             <td class="text-right"><?= $transaction->movement_type == 'debit' ? number_format($transaction->amount, 2) : '0.00' ?></td>
                             <td class="text-right"><?= $transaction->movement_type == 'credit' ? number_format($transaction->amount, 2) : '0.00' ?></td>

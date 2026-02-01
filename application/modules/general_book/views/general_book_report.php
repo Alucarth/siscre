@@ -24,14 +24,13 @@
     <table class="table table-bordered table-striped" id="tbl-general-book" style="font-size: 12px;">
         <thead class="thead-dark">
             <tr>
-                <th width="6%" class="text-center">N°</th>
-                <th width="6%" class="text-center">N° Transacción</th>
-                <th width="6%" class="text-center">N° Voucher</th>
-                <th width="10%" class="text-center">Fecha</th>
-                <th width="17%" class="text-center">Razón Social</th>
-                <th width="30%" class="text-center">Glosa</th>
-                <th width="10%" class="text-center">Debe</th>
-                <th width="10%" class="text-center">Haber</th>
+                <th width="8%" class="text-center">N°</th>
+                <th width="8%" class="text-center">N° Transacción</th>
+                <th width="8%" class="text-center">N° Voucher</th>
+                <th width="12%" class="text-center">Fecha</th>
+                <th width="40%" class="text-center">Glosa</th>
+                <th width="12%" class="text-center">Debe</th>
+                <th width="12%" class="text-center">Haber</th>
             </tr>
         </thead>
         <tbody>
@@ -45,7 +44,6 @@
                     <td class="text-center"><?= $transaction->transaction_id ?></td>
                     <td class="text-center"><?= $transaction->voucher_id ?></td>
                     <td class="text-center"><?= date('d/m/Y', strtotime($transaction->added_date)) ?></td>
-                    <td class="text-center">CREDISURGIR S.R.L.</td>
                     <td><?= $transaction->description ?: 'Sin descripción' ?></td>
                     <td class="text-right"><?= $transaction->movement_type == 'debit' ? money($transaction->amount) : '0.00' ?></td>
                     <td class="text-right"><?= $transaction->movement_type == 'credit' ? money($transaction->amount) : '0.00' ?></td>
