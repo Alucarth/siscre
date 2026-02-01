@@ -481,7 +481,7 @@ class Accounting_model extends CI_Model
         $data['patrimonio'][] = $res_obj;
         $res_obj = new stdClass();
         $res_obj->account_map = "31030201"; 
-        $res_obj->account_name = "RESULTADO DE LA GESTIÓN";
+        $res_obj->account_name = "Resultados de la gestión";
         $res_obj->amount = $resultado_gestion;
         $data['patrimonio'][] = $res_obj;
 
