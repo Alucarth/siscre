@@ -408,7 +408,7 @@ class Accounting_model extends CI_Model
         }
         
         // Resultado de la gestión (Utilidad/Pérdida)
-        //$resultado_gestion = $total_ingresos - $total_gastos;
+        $resultado_gestion = $total_ingresos - $total_gastos;
 
         // 3. Preparar estructura para la vista
         $data = [
@@ -438,7 +438,7 @@ class Accounting_model extends CI_Model
         }
         
         // Sumar resultado al patrimonio
-        //$data['total_patrimonio'] += $resultado_gestion;
+        $data['total_patrimonio'] += $resultado_gestion;
 
         // 5. Cargar todas las cuentas y asignar saldos acumulados
         $todas_las_cuentas = $this->db->order_by('code_number', 'ASC')->get('c19_accounting_accounts')->result();
@@ -475,9 +475,14 @@ class Accounting_model extends CI_Model
         
         // Inyectar Resultado de Gestión como objeto al final del Patrimonio
         $res_obj = new stdClass();
-        $res_obj->account_map = ""; 
+        $res_obj->account_map = "310302"; 
         $res_obj->account_name = "RESULTADO DE LA GESTIÓN";
-        //$res_obj->amount = $resultado_gestion;
+        $res_obj->amount = $resultado_gestion;
+        $data['patrimonio'][] = $res_obj;
+        $res_obj = new stdClass();
+        $res_obj->account_map = "31030201"; 
+        $res_obj->account_name = "RESULTADO DE LA GESTIÓN";
+        $res_obj->amount = $resultado_gestion;
         $data['patrimonio'][] = $res_obj;
 
         // Totales finales del reporte
