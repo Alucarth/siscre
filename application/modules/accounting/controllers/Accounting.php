@@ -1373,7 +1373,7 @@ function generate_hierarchical_code()
         
         $this->load->library('pdf');
         
-        if ( $report_type == 'balance_sheet' || $report_type == 'equity_evolution')
+        if ($report_type == 'equity_evolution')
         {
             $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');            
         }
