@@ -14,7 +14,6 @@
         margin-bottom: 15px;
         border-radius: 5px;
     }
-    /* Estilos para selects con búsqueda */
     .account-select {
         width: 100%;
     }

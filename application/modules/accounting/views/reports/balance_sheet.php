@@ -192,7 +192,7 @@
         </tr>
         
         <tr style="background-color: #fff;">
-            <td colspan="2" style="height: 20px; border-left:1px solid #ccc; border-right:1px solid #ccc;"></td>
+            <td colspan="2" style="height: 20px; border-left:1px solid #ffffff; border-right:1px solid #ffffff;"></td>
         </tr>
 
         <tr style="background-color:#e8f4f8;">

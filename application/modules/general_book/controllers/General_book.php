@@ -180,7 +180,7 @@ class General_book extends Secure_area implements iData_controller {
         $pdfFilePath = $reportsDir . "libro_mayor_{$timestamp}.pdf";
 
         $this->load->library('pdf');
-        $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');
+        $pdf = $this->pdf->load('"en-GB-x","A4-P","","",10,10,10,10,6,3');
 
         $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
         $pdf->WriteHTML($html);
