@@ -136,14 +136,14 @@
                 </div>
                 <table style="width: 100%; color: white; margin-top: 10px;">
                     <tr>
+                        <td><strong>Descripción:</strong></td>
+                        <td colspan="3"><?= !empty($voucher_info->voucher_description) ? $voucher_info->voucher_description : 'Sin descripción' ?></td>
+                    </tr>
+                    <tr>
                         <td style="width: 120px;"><strong>Fecha:</strong></td>
                         <td style="width: 200px;"><?= date($this->config->item('date_format'), strtotime($voucher_info->voucher_date)) ?></td>
                         <td style="width: 120px;"><strong>Total Debe:</strong></td>
                         <td><?= money($total_debit) ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Descripción:</strong></td>
-                        <td colspan="3"><?= !empty($voucher_info->voucher_description) ? $voucher_info->voucher_description : 'Sin descripción' ?></td>
                     </tr>
                     <tr>
                         <td><strong>Total Haber:</strong></td>
