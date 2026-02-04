@@ -86,27 +86,44 @@
     }
     ?>
     
-    <?php if ($has_accounting_data): ?>
-        <h3 style="color: #3b4753; margin-bottom: 20px;">Vouchers Contables</h3>
-        
+<?php if ($has_accounting_data): ?>
+    <h3 style="color: #3b4753; margin-bottom: 20px;">Vouchers Contables</h3>
+    
+    <?php 
+    $vouchers_to_display = is_object($accounting_transactions) ? (array)$accounting_transactions : $accounting_transactions;
+    ?>
+    
+    <?php foreach ($vouchers_to_display as $voucher_id => $voucher_data): ?>
         <?php 
-        $vouchers_to_display = is_object($accounting_transactions) ? (array)$accounting_transactions : $accounting_transactions;
-        ?>
+        if (is_object($voucher_data) && isset($voucher_data->voucher_info)) {
+            $voucher_info = $voucher_data->voucher_info;
+            $transactions = isset($voucher_data->transactions) ? $voucher_data->transactions : [];
+        } else {
+            continue;
+        }
+
+        // Calculamos los totales antes de imprimir el HTML para usarlos en Encabezado y Pie
+        $total_debit = 0;
+        $total_credit = 0;
         
-        <?php foreach ($vouchers_to_display as $voucher_id => $voucher_data): ?>
-            <?php 
-            if (is_object($voucher_data) && isset($voucher_data->voucher_info)) {
-                $voucher_info = $voucher_data->voucher_info;
-                $transactions = isset($voucher_data->transactions) ? $voucher_data->transactions : [];
+        foreach ($transactions as $t) {
+            if (isset($t->movement_type) && isset($t->amount)) {
+                if ($t->movement_type == 'debit') {
+                    $total_debit += $t->amount;
+                } else {
+                    $total_credit += $t->amount;
+                }
             } else {
-                continue;
+                $total_debit += (isset($t->debit) ? $t->debit : 0);
+                $total_credit += (isset($t->credit) ? $t->credit : 0);
             }
-            ?>
+        }
+        ?>
         
         <div class="voucher-section">
             <div class="voucher-header">
                 <h4 style="margin: 0; color: white;">
-                    Voucher: <?= $voucher_id ?>
+                    Voucher: <?= !empty($voucher_info->voucher_number) ? $voucher_info->voucher_number : $voucher_id ?>
                 </h4>
                 <div style="display: flex; gap: 10px;">
                     <a href="<?= site_url('general_ledger/print_voucher/' . $voucher_id) ?>" 
@@ -122,7 +139,7 @@
                         <td style="width: 120px;"><strong>Fecha:</strong></td>
                         <td style="width: 200px;"><?= date($this->config->item('date_format'), strtotime($voucher_info->voucher_date)) ?></td>
                         <td style="width: 120px;"><strong>Total Debe:</strong></td>
-                        <td><?= money($voucher_info->total_debit) ?></td>
+                        <td><?= money($total_debit) ?></td>
                     </tr>
                     <tr>
                         <td><strong>Descripción:</strong></td>
@@ -130,12 +147,12 @@
                     </tr>
                     <tr>
                         <td><strong>Total Haber:</strong></td>
-                        <td><?= money($voucher_info->total_credit) ?></td>
+                        <td><?= money($total_credit) ?></td>
                         <td><strong>Diferencia:</strong></td>
                         <td>
                             <?php 
-                            $diferencia = $voucher_info->total_debit - $voucher_info->total_credit;
-                            $color = ($diferencia == 0) ? '#28a745' : '#dc3545';
+                            $diferencia = $total_debit - $total_credit;
+                            $color = (abs($diferencia) < 0.01) ? '#28a745' : '#dc3545';
                             ?>
                             <span style="color: <?= $color ?>;"><?= money($diferencia) ?></span>
                         </td>
@@ -143,7 +160,6 @@
                 </table>
             </div>
 
-        <!-- TABLA DE TRANSACCIONES DEL VOUCHER -->
         <?php if (!empty($transactions)): ?>
             <table class="table table-bordered tbl-ledger">
                 <thead>
@@ -159,40 +175,39 @@
                     <?php foreach ($transactions as $transaction): ?>
                         <tr class="transaction-row">
                             <td>
-                                <strong><?= $transaction->account_number ?></strong><br>
+                                <strong><?= !empty($transaction->code_number) ? $transaction->code_number : $transaction->account_number ?></strong><br>
                                 <small><?= $transaction->account_name ?></small><br>
-                                <small style="color: #6c757d;"><?= $transaction->account_type ?></small>
+                                <small style="color: #6c757d;"><?= isset($transaction->account_type) ? $transaction->account_type : '' ?></small>
                             </td>
                             <td><?= !empty($transaction->explanation) ? $transaction->explanation : '---' ?></td>
                             <td>
-                                <?php if ($transaction->debit > 0): ?>
+                                <?php if ((isset($transaction->movement_type) && $transaction->movement_type == 'debit') || (isset($transaction->debit) && $transaction->debit > 0)): ?>
                                     <span class="badge badge-danger">DEBE</span>
                                 <?php else: ?>
                                     <span class="badge badge-success">HABER</span>
                                 <?php endif; ?>
                             </td>
                             <td style="text-align: right; font-weight: bold;">
-                                <?= $transaction->debit > 0 ? money($transaction->debit) : '---' ?>
+                                <?= (isset($transaction->movement_type) && $transaction->movement_type == 'debit') ? money($transaction->amount) : ((isset($transaction->debit) && $transaction->debit > 0) ? money($transaction->debit) : '---') ?>
                             </td>
                             <td style="text-align: right; font-weight: bold;">
-                                <?= $transaction->credit > 0 ? money($transaction->credit) : '---' ?>
+                                <?= (isset($transaction->movement_type) && $transaction->movement_type == 'credit') ? money($transaction->amount) : ((isset($transaction->credit) && $transaction->credit > 0) ? money($transaction->credit) : '---') ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                         
-                        <!-- FILA DE TOTALES -->
                         <tr class="voucher-totals">
                             <td colspan="3" style="text-align: right;"><strong>TOTALES DEL VOUCHER:</strong></td>
-                            <td style="text-align: right;"><strong><?= money($voucher_info->total_debit) ?></strong></td>
-                            <td style="text-align: right;"><strong><?= money($voucher_info->total_credit) ?></strong></td>
+                            <td style="text-align: right;"><strong><?= money($total_debit) ?></strong></td>
+                            <td style="text-align: right;"><strong><?= money($total_credit) ?></strong></td>
                         </tr>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <div class="no-transactions">
-                    Este voucher no tiene transacciones asociadas.
-                </div>
-            <?php endif; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <div class="no-transactions">
+                Este voucher no tiene transacciones asociadas.
+            </div>
+        <?php endif; ?>
         </div>
     <?php endforeach; ?>
 <?php else: ?>
