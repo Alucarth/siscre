@@ -151,7 +151,7 @@
                         <td><strong>Diferencia:</strong></td>
                         <td>
                             <?php 
-                            $diferencia = $total_debit - $total_credit;
+                            $diferencia = abs($total_debit - $total_credit);
                             $color = (abs($diferencia) < 0.01) ? '#28a745' : '#dc3545';
                             ?>
                             <span style="color: <?= $color ?>;"><?= money($diferencia) ?></span>
