@@ -575,6 +575,12 @@ class Loans extends Secure_area implements iData_controller
         $add_fee_amounts = $this->input->post("add_fee_amounts");
         
         $current_user_id = $this->Employee->get_logged_in_employee_info()->person_id;
+        // No permite modificar pr[estamos rechazados]
+        $loan_info = $this->Loan->get_info($loan_id);
+        if ($loan_id > 0 && strtolower($loan_info->loan_status) === 'reject') {
+            echo json_encode(array('success' => false, 'message' => 'No se puede modificar un préstamo rechazado. Cree un nuevo préstamo.'));
+            return;
+        }
         
         // No permite modificar préstamos rechazados
         $loan_info = $this->Loan->get_info($loan_id);
@@ -2069,6 +2075,15 @@ class Loans extends Secure_area implements iData_controller
 
         $this->db->where("loan_id", $loan_id);
         $this->db->update("loans", $update_data);
+
+        $loan_info = $this->Loan->get_info($loan_id);
+        if ($loan_info) {
+            $loan_data = [
+                'customer_id' => $loan_info->customer_id,
+                'apply_amount' => $loan_info->apply_amount
+            ];
+            $this->_create_loan_approval_voucher($loan_id, $loan_data);
+        }
 
         $return["status"] = "OK";
         send($return);

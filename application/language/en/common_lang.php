@@ -90,7 +90,5 @@ $lang["common_help"] = "Ayuda";
 $lang["common_modules"] = "Módulos";
 $lang["common_select"] = "Seleccione";
 $lang["common_date_of_birth"] = "Fecha de nacimiento";
-$lang["common_bank_account_number"] = "Cuenta bancaria
-
-";
+$lang["common_bank_account_number"] = "Cuenta bancaria";
 $lang["common_bank_name"] = "Nombre del banco";

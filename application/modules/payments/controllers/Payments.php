@@ -356,6 +356,9 @@ class Payments extends Secure_area implements iData_controller {
             // Nueva funcionalidad: Crear voucher y transacciones si está habilitado
             $voucher_id = $this->_create_payment_voucher($payment_data);
             
+            // Nueva funcionalidad: Crear voucher y transacciones si está habilitado
+            $voucher_id = $this->_create_payment_voucher($payment_data);
+            
             //New Payment            
             if ($payment_id == -1)
             {
@@ -374,6 +377,11 @@ class Payments extends Secure_area implements iData_controller {
                     'message' => $this->lang->line('loans_successful_updating') . ' ' . $payment_data['loan_payment_id'], 
                     'loan_payment_id' => $payment_id
                 );
+            }
+            
+            // Agregar voucher_id al return si se creó
+            if ($voucher_id) {
+                $return['voucher_id'] = $voucher_id;
             }
             
         }

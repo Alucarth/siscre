@@ -283,7 +283,7 @@ class Payment extends CI_Model {
      function getBranch($branch_id)
      {
      
-         $query =  $this->db->query("SELECT * from c19_branches cb where cb.id = ".$branch_id.";");
+         $query =  $this->db->query("SELECT * from c19_branches cb where cb.id = '".$branch_id."';");
          $branch = null;
 
          foreach ($query->result() as $row) {
