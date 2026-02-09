@@ -3568,7 +3568,7 @@ class Loan extends CI_Model {
             $tmp["payment_balance"] = $balance_owed; 
             $tmp["grace_period"] = $title != '' ? $grace_period_days : '';
             $tmp["penalty_amount"] = $penalty_amount / $pay_term;
-            $capital = $payment_amount - $interest_amount - $operating_expenses_amount;
+            $capital = $payment_amount - $interest_amount;
             $tmp["interest"] = round($interest_amount, 2);
             $tmp["payment_amount"] = round($payment_amount_fees, 2);
             $tmp["payment_amount_capital"] = round($capital, 2);
@@ -3662,6 +3662,13 @@ class Loan extends CI_Model {
             $interest = $apply_amount * $factor;
             $principal_amount = $payment_amount - $interest;
             $balance_owed = $apply_amount - $principal_amount;
+
+            if($i == $term - 1){
+                if( $balance_owed != 0 ){
+                    $payment_amount += $balance_owed; // Ajusta el pago total
+                    $balance_owed = 0; // Establece el balance a cero
+                }
+            }
 
             $tmp = [];
             $tmp["payment_date"] = date($this->config->item('date_format'), $payment_date);

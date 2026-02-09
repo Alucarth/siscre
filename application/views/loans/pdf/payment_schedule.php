@@ -186,7 +186,7 @@
                         <td>&nbsp;&nbsp;<?=$schedule->payment_date;?></td>
                         <!--<td style="text-align: center;"><?=isset($schedule->grace_period) ? $schedule->grace_period : '';?></td>-->
                         <!--<td align="right"><?= to_currency(($schedule->payment_amount - $schedule->interest), 1, 2);?></td>-->
-                        <td align="right"><?= to_currency(($schedule->payment_amount - $schedule->interest - $schedule->operating_expenses_amount), 1, 2);?></td>
+                        <td align="right"><?= to_currency($schedule->payment_amount_capital, 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->interest, 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->operating_expenses_amount, 1, 2);?></td>
                         <td align="right"><?= to_currency($schedule->payment_amount, 1, 2);?>&nbsp;&nbsp;</td>
