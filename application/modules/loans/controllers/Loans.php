@@ -2181,7 +2181,7 @@ class Loans extends Secure_area implements iData_controller
         $total_amount = 0;
         foreach( $scheds as $sched )
         {
-            $total_amount += $sched["payment_amount"];
+            $total_amount += $sched['payment_amount_capital'] + $sched['interest'];
         }
 
         $return["table_scheds"] = $table_scheds;

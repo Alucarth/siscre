@@ -124,6 +124,7 @@
                                                 <th style="text-align: center"><?=ktranslate2("Description");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Proceeds");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Balance");?></th>
+                                                <!-- <th style="text-align: center"><?=ktranslate2("Monto Total");?></th> -->
                                                 <th style="text-align: center"><?=ktranslate2("Agent");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Approved <br/>By");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Date <br/>Approved");?></th>
