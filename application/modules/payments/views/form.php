@@ -6,13 +6,11 @@
 
 <div class="title-block">
     <h3 class="title"> 
-
         <?php if ($payment_info->loan_payment_id > 0): ?>
             Ver pago
         <?php else: ?>
             Nuevo pago
         <?php endif; ?>
-
     </h3>
     <p class="title-description">
         Información básica de pago 
@@ -127,7 +125,6 @@
                                             Pago tardío <br/>sanciones (Total):
                                         </label>
                                         <div class="col-sm-10">
-                                            <!--<input type="text" id="hid-penalty-amount-total" class="form-control" name="lpp_amount" value="0" />-->
                                             <?php
                                             echo form_input(
                                                     array(
@@ -144,9 +141,25 @@
                                     </div>
                                     <div class="hr-line-dashed"></div>
 
+                                    <?php 
+                                        // ==========================================================
+                                        // CORRECCIÓN DE CÁLCULO INICIAL (PHP)
+                                        // ==========================================================
+                                        // Separamos la cuota pura del ahorro para mostrarlo correctamente
+                                        $ahorro_inicial = isset($payment_info->operating_expenses_amount) ? (float)$payment_info->operating_expenses_amount : 0;
+                                        $total_backend  = (float)$payment_info->paid_amount;
+                                        
+                                        // Si el backend manda el total, restamos el ahorro para obtener la cuota
+                                        $cuota_pura = $total_backend - $ahorro_inicial;
+                                        if($cuota_pura < 0) $cuota_pura = 0; // Seguridad
+
+                                        // El total visual debe coincidir con el backend
+                                        $total_visual = $cuota_pura + $ahorro_inicial;
+                                    ?>
+
                                     <div class="form-group row">
                                         <label class="col-sm-2 control-label">
-                                            Monto a pagar:
+                                            Monto a pagar (Cuota):
                                         </label>
                                         <div class="col-sm-10">
                                             <?php
@@ -154,7 +167,8 @@
                                                     array(
                                                         'name' => 'paid_amount',
                                                         'id' => 'paid_amount',
-                                                        'value' => $payment_info->paid_amount,
+                                                        // Usamos la cuota calculada, no el total
+                                                        'value' => number_format($cuota_pura, 2, '.', ''), 
                                                         'class' => 'form-control',
                                                         'type' => 'number',
                                                         'step' => 'any',
@@ -178,6 +192,7 @@
                                             </select>
                                         </div>
                                     </div>
+                                    
                                     <div class="form-group row">
                                         <label class="col-sm-2 control-label">Ahorro:</label>
                                         <div class="col-sm-10">
@@ -185,9 +200,7 @@
                                             echo form_input([
                                                 'name'     => 'operating_expenses_amount',
                                                 'id'       => 'operating_expenses_amount',
-                                                'value'    => isset($payment_info->operating_expenses_amount)
-                                                                ? $payment_info->operating_expenses_amount
-                                                                : '',
+                                                'value'    => number_format($ahorro_inicial, 2, '.', ''),
                                                 'class'    => 'form-control',
                                                 'type'     => 'number',
                                                 'step'     => 'any',
@@ -201,13 +214,10 @@
                                         <label class="col-sm-2 control-label">Monto total:</label>
                                         <div class="col-sm-10">
                                             <?php
-                                            // forzamos a float para evitar notices y asegurar que no sea null
-                                            $initial_total = (float)$payment_info->paid_amount
-                                                        + (float)$payment_info->operating_expenses_amount;
                                             echo form_input([
                                                 'name'     => 'total_amount',
                                                 'id'       => 'total_amount',
-                                                'value'    => number_format($initial_total, 2, '.', ''),
+                                                'value'    => number_format($total_visual, 2, '.', ''),
                                                 'class'    => 'form-control',
                                                 'type'     => 'number',
                                                 'step'     => 'any',
@@ -218,108 +228,74 @@
                                     </div>
                                     <div class="hr-line-dashed"></div>
 
-                                    <!-- old -->
-                                     <!--
-                                    <script>
-                                        $(document).ready(function () {
-                                            $("#loan_id").change(function () {
-                                                var url = '<?= site_url('payments/ajax') ?>';
-                                                var params = {
-                                                    softtoken: $("input[name='softtoken']").val(),
-                                                    loan_id: $("#loan_id").val(),
-                                                    type: 1
-                                                };
-                                                $("#sel_payment_due").prop('disabled', true);
-                                                $.post(url, params, function (data) {
-                                                    if (data.status == "OK")
-                                                    {
-                                                        $("#sel_payment_due").html(data.options);
-                                                        $("#sel_payment_due").prop('disabled', false);
-                                                        $("#balance_amount").val(data.balance);
-                                                    }
-                                                }, 'json');
-                                            });
-
-                                            $("#sel_payment_due").change(function () {
-                                                var url = '<?= site_url('payments/ajax') ?>';
-                                                var params = {
-                                                    softtoken: $("input[name='softtoken']").val(),
-                                                    loan_id: $("#loan_id").val(),   
-                                                    due_date: $("#sel_payment_due").val(),
-                                                    amount_to_pay: $("#sel_payment_due option:selected").attr('data-amount-to-pay'),
-                                                    penalty_value: $("#sel_payment_due option:selected").attr('data-penalty-value'),
-                                                    penalty_type: $("#sel_payment_due option:selected").attr('data-penalty-type'),
-                                                    type: 2
-                                                };
-                                                $.post(url, params, function (data) {
-                                                    if (data.status == "OK")
-                                                    {
-                                                        $("#hid-penalty-amount-total").val(data.penalty_amount);
-                                                        $("#paid_amount").val(data.amount_to_pay);
-                                                        $("#operating_expenses_amount").val(data.operating_expenses_amount);
-                                                    }
-                                                }, 'json');
-                                            });
-                                        });
-                                    </script>
-                                    -->
-                                    <!-- old -->
-
                                     <script>
                                     $(document).ready(function () {
 
-                                    // 1) Cuando cambia el préstamo, recargo los vencimientos
-                                    $("#loan_id").on("change", function () {
-                                        var url = '<?= site_url('payments/ajax') ?>';
-                                        var params = {
-                                        softtoken: $("input[name='softtoken']").val(),
-                                        loan_id:   $("#loan_id").val(),
-                                        type:      1
-                                        };
-                                        $("#sel_payment_due").prop('disabled', true);
-                                        $.post(url, params, function (data) {
-                                        if (data.status === "OK") {
-                                            $("#sel_payment_due").html(data.options).prop('disabled', false);
-                                            $("#balance_amount").val(data.balance);
+                                        // 1) Cuando cambia el préstamo, recargo los vencimientos
+                                        $("#loan_id").on("change", function () {
+                                            var url = '<?= site_url('payments/ajax') ?>';
+                                            var params = {
+                                            softtoken: $("input[name='softtoken']").val(),
+                                            loan_id:   $("#loan_id").val(),
+                                            type:      1
+                                            };
+                                            $("#sel_payment_due").prop('disabled', true);
+                                            $.post(url, params, function (data) {
+                                            if (data.status === "OK") {
+                                                $("#sel_payment_due").html(data.options).prop('disabled', false);
+                                                $("#balance_amount").val(data.balance);
+                                            }
+                                            }, 'json');
+                                        });
+
+                                        // Función para recalcular el Total (cuota + ahorro)
+                                        function recalcTotal() {
+                                            var cuota  = parseFloat($("#paid_amount").val())               || 0;
+                                            var ahorro = parseFloat($("#operating_expenses_amount").val()) || 0;
+                                            $("#total_amount").val((cuota + ahorro).toFixed(2));
                                         }
-                                        }, 'json');
-                                    });
 
-                                    // Función para recalcular el Total (cuota + ahorro)
-                                    function recalcTotal() {
-                                        var cuota  = parseFloat($("#paid_amount").val())               || 0;
-                                        var ahorro = parseFloat($("#operating_expenses_amount").val()) || 0;
-                                        $("#total_amount").val((cuota + ahorro).toFixed(2));
-                                    }
+                                        // 2) Cuando cambia la fecha de vencimiento, AJAX tipo 2 + recalcTotal()
+                                        $("#sel_payment_due").on("change", function () {
+                                            var url = '<?= site_url('payments/ajax') ?>';
+                                            var params = {
+                                                softtoken: $("input[name='softtoken']").val(),
+                                                loan_id:   $("#loan_id").val(),
+                                                due_date:  $("#sel_payment_due").val(),
+                                                amount_to_pay:    $("#sel_payment_due option:selected").attr('data-amount-to-pay'),
+                                                penalty_value:    $("#sel_payment_due option:selected").attr('data-penalty-value'),
+                                                penalty_type:     $("#sel_payment_due option:selected").attr('data-penalty-type'),
+                                                type: 2
+                                            };
 
-                                    // 2) Cuando cambia la fecha de vencimiento, AJAX tipo 2 + recalcTotal()
-                                    $("#sel_payment_due").on("change", function () {
-                                        var url = '<?= site_url('payments/ajax') ?>';
-                                        var params = {
-                                        softtoken: $("input[name='softtoken']").val(),
-                                        loan_id:   $("#loan_id").val(),
-                                        due_date:  $("#sel_payment_due").val(),
-                                        amount_to_pay:    $("#sel_payment_due option:selected").attr('data-amount-to-pay'),
-                                        penalty_value:    $("#sel_payment_due option:selected").attr('data-penalty-value'),
-                                        penalty_type:     $("#sel_payment_due option:selected").attr('data-penalty-type'),
-                                        type: 2
-                                        };
+                                            $.post(url, params, function (data) {
+                                                if (data.status === "OK") {
+                                                    $("#hid-penalty-amount-total").val(data.penalty_amount);
+                                                    
+                                                    // =========================================================
+                                                    // CORRECCIÓN JS: Evitar doble suma en el AJAX
+                                                    // =========================================================
+                                                    var totalBackend = parseFloat(data.amount_to_pay) || 0;
+                                                    var ahorroBackend = parseFloat(data.operating_expenses_amount) || 0;
+                                                    
+                                                    // Calculamos la cuota pura restando el ahorro al total que envía el backend
+                                                    var cuotaPura = totalBackend - ahorroBackend;
+                                                    if(cuotaPura < 0) cuotaPura = 0;
 
-                                        $.post(url, params, function (data) {
-                                        if (data.status === "OK") {
-                                            $("#hid-penalty-amount-total").val(data.penalty_amount);
-                                            $("#paid_amount").val(data.amount_to_pay);
-                                            $("#operating_expenses_amount").val(data.operating_expenses_amount);
-                                            recalcTotal();
-                                        }
-                                        }, 'json');
-                                    });
+                                                    $("#paid_amount").val(cuotaPura.toFixed(2));
+                                                    $("#operating_expenses_amount").val(ahorroBackend.toFixed(2));
+                                                    
+                                                    // Recalculamos el total visual
+                                                    recalcTotal();
+                                                }
+                                            }, 'json');
+                                        });
 
-                                    // 3) Si el usuario edita manualmente cualquiera de los dos inputs, vuelvo a calcular
-                                    $("#paid_amount, #operating_expenses_amount").on("input", recalcTotal);
+                                        // 3) Si el usuario edita manualmente cualquiera de los dos inputs, vuelvo a calcular
+                                        $("#paid_amount, #operating_expenses_amount").on("input", recalcTotal);
 
-                                    // 4) Al cargar la página, un primer recálculo (por si ya vienen valores precargados)
-                                    recalcTotal();
+                                        // 4) Al cargar la página, un primer recálculo (por si ya vienen valores precargados)
+                                        recalcTotal();
 
                                     });
                                     </script>
@@ -418,7 +394,6 @@
 echo form_close();
 ?>
 
-<!-- Modal -->
 <div class="modal fade" id="md-payment-receipt" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -437,13 +412,8 @@ echo form_close();
             </div>
 
         </div>
-        <!-- /.modal-content -->
+        </div>
     </div>
-    <!-- /.modal-dialog -->
-</div>
-<!-- /.modal -->
-
-
 <?php $this->load->view("partial/footer"); ?>
 
 <div class="modal in fade" role="modal" tabindex="-1" id="md-transaction-history">
