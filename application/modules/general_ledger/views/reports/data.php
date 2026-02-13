@@ -89,8 +89,9 @@
 <?php if ($has_accounting_data): ?>
     <h3 style="color: #3b4753; margin-bottom: 20px;">Vouchers Contables</h3>
     
-    <?php 
+<?php 
     $vouchers_to_display = is_object($accounting_transactions) ? (array)$accounting_transactions : $accounting_transactions;
+    krsort($vouchers_to_display);
     ?>
     
     <?php foreach ($vouchers_to_display as $voucher_id => $voucher_data): ?>
