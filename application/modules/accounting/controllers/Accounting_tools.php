@@ -5,8 +5,6 @@ class Accounting_tools extends MX_Controller {
 
     private $admin_id = 1; 
     private $default_branch_id = 1; 
-    
-    // Cache para evitar duplicados en la misma ejecución
     private $cache_ids_procesados = [];
 
     public function __construct() {
@@ -16,7 +14,7 @@ class Accounting_tools extends MX_Controller {
             die("ERROR: Acceso denegado. Solo CLI.");
         }
 
-        echo "1. Iniciando Herramienta (Recuperación de Hora Real + Ordenamiento Estricto)...\n";
+        echo "1. Iniciando Herramienta (Pagos al Final del Día)...\n";
         $this->load->database();
         $this->load->model('Customer'); 
         
@@ -65,14 +63,23 @@ class Accounting_tools extends MX_Controller {
         $prestamos = $this->db->get()->result_array();
         
         foreach ($prestamos as $p) {
-            // Recuperar fecha/hora real
-            $fecha_full = $this->_obtener_fecha_real_con_hora($p, 'loan_approved_date', null); 
-            $ts_evento = strtotime($fecha_full);
+            // Préstamos: Intentamos mantener hora real, si es 00:00 se queda al inicio (correcto)
+            $fecha_raw = $p['loan_approved_date'];
+            $ts = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
+            
+            // Si el préstamo tiene hora 00:00:00, le ponemos 08:00:00 para asegurar
+            // que esté antes que los pagos (23:59) pero sea horario laboral
+            if (date('H:i:s', $ts) == '00:00:00') {
+                $fecha_final = date('Y-m-d 08:00:00', $ts);
+                $ts = strtotime($fecha_final);
+            } else {
+                $fecha_final = date('Y-m-d H:i:s', $ts);
+            }
 
             $timeline[] = [
                 'tipo'      => 'prestamo', 
-                'timestamp' => $ts_evento,
-                'fecha_txt' => $fecha_full,
+                'timestamp' => $ts,
+                'fecha_txt' => $fecha_final,
                 'id_ref'    => 'LOAN-' . $p['loan_id'], 
                 'data'      => $p
             ];
@@ -85,14 +92,14 @@ class Accounting_tools extends MX_Controller {
         $pagos = $this->db->get()->result_array();
 
         foreach ($pagos as $p) {
-            // Recuperar fecha/hora real (usando date_modified como fallback si date_paid es 00:00)
-            $fecha_full = $this->_obtener_fecha_real_con_hora($p, 'date_paid', 'date_modified'); 
-            $ts_evento = strtotime($fecha_full);
+            // Pagos: FORZAR AL FINAL DEL DÍA
+            $fecha_final = $this->_forzar_final_dia($p['date_paid']);
+            $ts_evento = strtotime($fecha_final);
 
             $timeline[] = [
                 'tipo'      => 'pago',
                 'timestamp' => $ts_evento,
-                'fecha_txt' => $fecha_full,
+                'fecha_txt' => $fecha_final,
                 'id_ref'    => 'PAGO-' . $p['loan_id'] . '-' . $p['loan_payment_id'], 
                 'data'      => $p
             ];
@@ -100,31 +107,22 @@ class Accounting_tools extends MX_Controller {
 
         echo "   -> Total eventos encontrados: " . count($timeline) . "\n";
 
-        // 3. ORDENAMIENTO ESTRICTO (DÍA > TIPO > HORA)
-        echo "=== ORDENANDO (Día -> Desembolsos -> Pagos) ===\n";
+        // 3. ORDENAMIENTO
+        echo "=== ORDENANDO ===\n";
         
         usort($timeline, function($a, $b) {
-            // 1. Comparar solo el DÍA (Ymd)
-            $dia_a = date('Ymd', $a['timestamp']);
-            $dia_b = date('Ymd', $b['timestamp']);
-
-            if ($dia_a != $dia_b) {
-                return ($dia_a < $dia_b) ? -1 : 1;
+            // 1. Comparar Timestamp completo
+            if ($a['timestamp'] != $b['timestamp']) {
+                return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
             }
             
-            // 2. Si es el MISMO DÍA: Desembolso (0) gana a Pago (1)
+            // 2. Desempate por tipo (Prestamo gana)
             $peso_a = ($a['tipo'] === 'prestamo') ? 0 : 1;
             $peso_b = ($b['tipo'] === 'prestamo') ? 0 : 1;
             
             if ($peso_a != $peso_b) {
                 return ($peso_a < $peso_b) ? -1 : 1;
             }
-            
-            // 3. Si es Mismo Día y Mismo Tipo: Ordenar por Hora
-            if ($a['timestamp'] != $b['timestamp']) {
-                return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
-            }
-
             return 0;
         });
 
@@ -137,7 +135,7 @@ class Accounting_tools extends MX_Controller {
             $tipo = $evento['tipo'];
             $data = $evento['data'];
             $id_ref = $evento['id_ref'];
-            $fecha_real = $evento['fecha_txt']; // Usamos la fecha corregida con hora
+            $fecha_real = $evento['fecha_txt'];
 
             if (in_array($id_ref, $this->cache_ids_procesados)) continue;
 
@@ -173,37 +171,18 @@ class Accounting_tools extends MX_Controller {
     }
 
     // =========================================================================
-    // LÓGICA DE RECUPERACIÓN DE FECHA (CORAZÓN DEL ARREGLO)
+    // LÓGICA DE FECHAS (FORZAR HORA)
     // =========================================================================
 
-    private function _obtener_fecha_real_con_hora($row, $col_principal, $col_fallback = null) {
-        $val_principal = isset($row[$col_principal]) ? $row[$col_principal] : null;
+    private function _forzar_final_dia($fecha_input) {
+        // Convertir a Timestamp
+        $ts = is_numeric($fecha_input) ? $fecha_input : strtotime($fecha_input);
         
-        // Convertir a Timestamp si es string
-        $ts_p = is_numeric($val_principal) ? $val_principal : strtotime($val_principal);
+        // Extraer fecha base Y-m-d
+        $fecha_base = date('Y-m-d', $ts);
         
-        // Verificar si tiene hora (es decir, si NO es medianoche exacta 00:00:00)
-        // Ojo: Si la transacción fue realmente a medianoche, esto la moverá, pero es un caso raro.
-        $tiene_hora = (date('H:i:s', $ts_p) !== '00:00:00');
-
-        if ($tiene_hora) {
-            return date('Y-m-d H:i:s', $ts_p);
-        }
-
-        // Si es 00:00:00, intentamos usar el fallback (date_modified)
-        if ($col_fallback && isset($row[$col_fallback]) && !empty($row[$col_fallback])) {
-            $val_fallback = $row[$col_fallback];
-            $ts_f = is_numeric($val_fallback) ? $val_fallback : strtotime($val_fallback);
-            
-            // Solo usar fallback si es el MISMO DÍA (para no falsear la fecha contable)
-            if (date('Y-m-d', $ts_p) === date('Y-m-d', $ts_f)) {
-                // Usamos la fecha original + la hora del fallback
-                return date('Y-m-d H:i:s', $ts_f);
-            }
-        }
-
-        // Si no hay fallback válido, retornamos la original (ni modo, será 00:00:00)
-        return date('Y-m-d H:i:s', $ts_p);
+        // Retornar siempre a las 23:59:59
+        return $fecha_base . ' 23:59:59';
     }
 
     // =========================================================================
@@ -223,9 +202,8 @@ class Accounting_tools extends MX_Controller {
 
         $this->db->trans_start();
 
-        // Voucher
         $voucher_data = [
-            'voucher_date' => $fecha_op, // Fecha con Hora Real
+            'voucher_date' => $fecha_op,
             'voucher_type' => 'egreso',
             'description'  => $descripcion,
             'total_debit'  => $amount,
@@ -240,7 +218,6 @@ class Accounting_tools extends MX_Controller {
         }
         $voucher_id = $this->db->insert_id();
 
-        // Asientos
         $entries = [
             ['acc' => 58, 'deb' => $amount, 'cre' => 0, 'desc' => 'Préstamo por cobrar', 'type' => 'asset', 'ord' => 0],
             ['acc' => 5,  'deb' => 0, 'cre' => $amount, 'desc' => 'Desembolso en caja',  'type' => 'asset', 'ord' => 1]
@@ -333,7 +310,7 @@ class Accounting_tools extends MX_Controller {
         $this->db->trans_start();
 
         $voucher_data = [
-            'voucher_date' => $fecha_op, // Fecha con Hora Real
+            'voucher_date' => $fecha_op, // Fecha Forzada 23:59
             'voucher_type' => 'ingreso',
             'description'  => $descripcion,
             'total_debit'  => $total,
