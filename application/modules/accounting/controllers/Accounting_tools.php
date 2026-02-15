@@ -37,9 +37,6 @@ class Accounting_tools extends MX_Controller {
         }
     }
 
-    // =========================================================================
-    // COMANDO PRINCIPAL
-    // =========================================================================
     public function pobla_conta($fecha_inicio_str = null, $fecha_fin_str = null) {
         ini_set('memory_limit', '2048M');
         set_time_limit(0); 
@@ -56,19 +53,15 @@ class Accounting_tools extends MX_Controller {
 
         $timeline = [];
 
-        // 1. CARGAR PRÉSTAMOS
         $this->db->select('*')->from('c19_loans')
                  ->where('loan_approved_date >=', $ts_inicio)
                  ->where('loan_approved_date <=', $ts_fin);
         $prestamos = $this->db->get()->result_array();
         
         foreach ($prestamos as $p) {
-            // Préstamos: Intentamos mantener hora real, si es 00:00 se queda al inicio (correcto)
             $fecha_raw = $p['loan_approved_date'];
             $ts = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
             
-            // Si el préstamo tiene hora 00:00:00, le ponemos 08:00:00 para asegurar
-            // que esté antes que los pagos (23:59) pero sea horario laboral
             if (date('H:i:s', $ts) == '00:00:00') {
                 $fecha_final = date('Y-m-d 08:00:00', $ts);
                 $ts = strtotime($fecha_final);
@@ -85,14 +78,12 @@ class Accounting_tools extends MX_Controller {
             ];
         }
 
-        // 2. CARGAR PAGOS
         $this->db->select('*')->from('c19_loan_payments')
                  ->where('date_paid >=', $ts_inicio)
                  ->where('date_paid <=', $ts_fin);
         $pagos = $this->db->get()->result_array();
 
         foreach ($pagos as $p) {
-            // Pagos: FORZAR AL FINAL DEL DÍA
             $fecha_final = $this->_forzar_final_dia($p['date_paid']);
             $ts_evento = strtotime($fecha_final);
 
@@ -106,17 +97,13 @@ class Accounting_tools extends MX_Controller {
         }
 
         echo "   -> Total eventos encontrados: " . count($timeline) . "\n";
-
-        // 3. ORDENAMIENTO
         echo "=== ORDENANDO ===\n";
         
         usort($timeline, function($a, $b) {
-            // 1. Comparar Timestamp completo
             if ($a['timestamp'] != $b['timestamp']) {
                 return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
             }
             
-            // 2. Desempate por tipo (Prestamo gana)
             $peso_a = ($a['tipo'] === 'prestamo') ? 0 : 1;
             $peso_b = ($b['tipo'] === 'prestamo') ? 0 : 1;
             
@@ -126,7 +113,6 @@ class Accounting_tools extends MX_Controller {
             return 0;
         });
 
-        // 4. PROCESAR
         echo "=== INICIANDO PROCESAMIENTO ===\n";
         
         $ok = 0; $err = 0; $skip = 0;
@@ -170,24 +156,15 @@ class Accounting_tools extends MX_Controller {
         echo "Creados: $ok | Errores: $err | Ya existían: $skip\n";
     }
 
-    // =========================================================================
-    // LÓGICA DE FECHAS (FORZAR HORA)
-    // =========================================================================
 
     private function _forzar_final_dia($fecha_input) {
-        // Convertir a Timestamp
         $ts = is_numeric($fecha_input) ? $fecha_input : strtotime($fecha_input);
         
-        // Extraer fecha base Y-m-d
         $fecha_base = date('Y-m-d', $ts);
         
-        // Retornar siempre a las 23:59:59
         return $fecha_base . ' 23:59:59';
     }
 
-    // =========================================================================
-    // LÓGICA DE NEGOCIO (VOUCHERS)
-    // =========================================================================
 
     private function _crear_voucher_prestamo($loan_data, $invoice_ref, $fecha_op) {
         $loan_id = $loan_data['loan_id'];
@@ -259,7 +236,6 @@ class Accounting_tools extends MX_Controller {
 
         $amount = floatval($payment_data['paid_amount']); 
         
-        // Lógica de Cuota
         $installment_number = 0;
         $interest = 0;
         $json_objects = json_decode($loan_info->periodic_loan_table);
@@ -287,7 +263,6 @@ class Accounting_tools extends MX_Controller {
         }
         if ($installment_number == 0) $interest = 0;
 
-        // Cálculos
         $custom_round = function($n) {
             $n = floatval($n); $p = explode('.', strval($n));
             if (count($p) === 2 && strlen($p[1]) > 2 && intval(substr($p[1], 2, 1)) >= 5) return round($n + 0.001, 2);
