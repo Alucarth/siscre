@@ -6,7 +6,7 @@ class Accounting_tools extends MX_Controller {
     private $admin_id = 1; 
     private $default_branch_id = 1; 
     
-    // Cache para evitar consultar la BD repetidamente por el mismo ID en la misma ejecución
+    // Cache para evitar consultar la BD repetidamente
     private $cache_ids_procesados = [];
 
     public function __construct() {
@@ -16,7 +16,7 @@ class Accounting_tools extends MX_Controller {
             die("ERROR: Acceso denegado. Solo CLI.");
         }
 
-        echo "1. Iniciando Herramienta (Corrección Desembolsos + Orden Estricto)...\n";
+        echo "1. Iniciando Herramienta (Orden: Día > Tipo > Hora)...\n";
         $this->load->database();
         $this->load->model('Customer'); 
         
@@ -70,7 +70,7 @@ class Accounting_tools extends MX_Controller {
                 'tipo'      => 'prestamo', 
                 'timestamp' => $fecha,
                 'fecha_txt' => date('Y-m-d H:i:s', $fecha),
-                'id_ref'    => 'LOAN-' . $p['loan_id'], // Referencia única
+                'id_ref'    => 'LOAN-' . $p['loan_id'], 
                 'data'      => $p
             ];
         }
@@ -87,23 +87,27 @@ class Accounting_tools extends MX_Controller {
                 'tipo'      => 'pago',
                 'timestamp' => $fecha,
                 'fecha_txt' => date('Y-m-d H:i:s', $fecha),
-                'id_ref'    => 'PAGO-' . $p['loan_id'] . '-' . $p['loan_payment_id'], // Referencia única
+                'id_ref'    => 'PAGO-' . $p['loan_id'] . '-' . $p['loan_payment_id'], 
                 'data'      => $p
             ];
         }
 
         echo "   -> Total eventos encontrados: " . count($timeline) . "\n";
 
-        // 3. ORDENAMIENTO ESTRICTO (CRONOLÓGICO + TIPO)
-        echo "=== ORDENANDO (Desembolsos PRIMERO si coinciden fechas) ===\n";
+        // 3. ORDENAMIENTO REGLA DE NEGOCIO (DÍA > TIPO > HORA)
+        echo "=== ORDENANDO (Primero Desembolsos del Día, luego Pagos) ===\n";
         
         usort($timeline, function($a, $b) {
-            // A. Primero por Fecha
-            if ($a['timestamp'] != $b['timestamp']) {
-                return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
+            // A. Extraer solo el DÍA (Ymd) para comparar fechas sin importar la hora
+            $dia_a = date('Ymd', $a['timestamp']);
+            $dia_b = date('Ymd', $b['timestamp']);
+
+            // Si son días distintos, el día menor va primero
+            if ($dia_a != $dia_b) {
+                return ($dia_a < $dia_b) ? -1 : 1;
             }
             
-            // B. Si es la misma fecha exacta: Préstamo (0) va antes que Pago (1)
+            // B. Si es el MISMO DÍA: Desembolso (0) gana a Pago (1)
             $peso_a = ($a['tipo'] === 'prestamo') ? 0 : 1;
             $peso_b = ($b['tipo'] === 'prestamo') ? 0 : 1;
             
@@ -111,6 +115,11 @@ class Accounting_tools extends MX_Controller {
                 return ($peso_a < $peso_b) ? -1 : 1;
             }
             
+            // C. Si es Mismo Día y Mismo Tipo: Respetar hora original
+            if ($a['timestamp'] != $b['timestamp']) {
+                return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
+            }
+
             return 0;
         });
 
@@ -126,10 +135,10 @@ class Accounting_tools extends MX_Controller {
             $data = $evento['data'];
             $id_ref = $evento['id_ref'];
 
-            // Evitar procesar duplicados en el mismo loop
+            // Evitar procesar duplicados en memoria
             if (in_array($id_ref, $this->cache_ids_procesados)) continue;
 
-            // Validación estricta contra BD
+            // Validación estricta contra BD (Invoice Number)
             if ($this->_ya_existe_en_bd($id_ref)) {
                 $skip++;
                 $this->cache_ids_procesados[] = $id_ref;
@@ -140,12 +149,12 @@ class Accounting_tools extends MX_Controller {
 
             if ($tipo === 'prestamo') {
                 $resultado = $this->_crear_voucher_prestamo($data, $id_ref);
-                if ($resultado) echo "OK: Desembolso #{$data['loan_id']} ({$evento['fecha_txt']})\n";
+                if ($resultado) echo "OK: Desembolso #{$data['loan_id']} [{$evento['fecha_txt']}]\n";
                 else echo "ERROR GRAVE: Desembolso #{$data['loan_id']}\n";
 
             } elseif ($tipo === 'pago') {
                 $resultado = $this->_crear_voucher_pago($data, $id_ref);
-                if ($resultado) echo "OK: Pago ID {$data['loan_payment_id']} ({$evento['fecha_txt']})\n";
+                if ($resultado) echo "OK: Pago ID {$data['loan_payment_id']} [{$evento['fecha_txt']}]\n";
                 else echo "ERROR: Pago ID {$data['loan_payment_id']}\n";
             }
 
@@ -162,7 +171,7 @@ class Accounting_tools extends MX_Controller {
     }
 
     // =========================================================================
-    // LÓGICA DE NEGOCIO (CON DEBUGGING SQL)
+    // LÓGICA DE NEGOCIO
     // =========================================================================
 
     private function _crear_voucher_prestamo($loan_data, $invoice_ref) {
@@ -217,7 +226,7 @@ class Accounting_tools extends MX_Controller {
                 'movement_type'    => ($e['deb'] > 0) ? 'debit' : 'credit',
                 'voucher_id'       => $voucher_id,
                 'payment_methods'  => 'efectivo',
-                'invoice_number'   => $invoice_ref, // CLAVE PARA VALIDACIÓN
+                'invoice_number'   => $invoice_ref, 
                 'purchased_date'   => $fecha_op,
                 'transaction_order'=> $e['ord'],
                 'branch_id'        => $branch_id
@@ -225,7 +234,6 @@ class Accounting_tools extends MX_Controller {
             
             if (!$this->db->insert('c19_accounting_transactions', $t_data)) {
                 echo "   [SQL ERROR TRANSACTION] " . json_encode($this->db->error()) . "\n";
-                // Importante: Si falla una linea, rompemos todo para no dejar vouchers huerfanos
                 $this->db->trans_rollback();
                 return false;
             }
@@ -283,7 +291,7 @@ class Accounting_tools extends MX_Controller {
 
         $interest_cobrado = ($amount < $interest) ? $amount : $interest;
         $iva = $custom_round($interest_cobrado * 0.13);
-        $int_neto = $custom_round($interest_cobrado * 0.87); // Intereses amortizables (neto)
+        $int_neto = $custom_round($interest_cobrado * 0.87); 
         $it = $custom_round(($iva + $int_neto) * 0.03);
         $capital = $custom_round($amount - $iva - $int_neto);
         if ($capital < 0) $capital = 0;
@@ -334,7 +342,7 @@ class Accounting_tools extends MX_Controller {
                     'movement_type'    => ($e['deb'] > 0) ? 'debit' : 'credit',
                     'voucher_id'       => $voucher_id,
                     'payment_methods'  => $metodo,
-                    'invoice_number'   => $invoice_ref, // CLAVE
+                    'invoice_number'   => $invoice_ref, 
                     'purchased_date'   => $fecha_op,
                     'transaction_order'=> $e['ord'],
                     'branch_id'        => $branch_id
@@ -355,7 +363,6 @@ class Accounting_tools extends MX_Controller {
     // =========================================================================
 
     private function _ya_existe_en_bd($invoice_ref) {
-        // VALIDACIÓN INFALIBLE: Busca exactamente el identificador único en las transacciones
         $this->db->where('invoice_number', $invoice_ref);
         $count = $this->db->count_all_results('c19_accounting_transactions');
         return ($count > 0);
