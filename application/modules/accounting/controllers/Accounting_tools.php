@@ -36,9 +36,6 @@ class Accounting_tools extends MX_Controller {
         }
     }
 
-    // =========================================================================
-    // COMANDO PRINCIPAL (LÓGICA UNIFICADA)
-    // =========================================================================
     public function pobla_conta($fecha_inicio_str = null, $fecha_fin_str = null) {
         ini_set('memory_limit', '2048M');
         set_time_limit(0); 
@@ -52,17 +49,14 @@ class Accounting_tools extends MX_Controller {
 
         echo "=== RECOPILANDO TRANSACCIONES ($fecha_inicio_str al $fecha_fin_str) ===\n";
 
-        // 1. OBTENER TODO (SIN PROCESAR AÚN)
         $timeline = [];
 
-        // --- A. Cargar Préstamos ---
         $this->db->select('*')->from('c19_loans')
                  ->where('loan_approved_date >=', $ts_inicio)
                  ->where('loan_approved_date <=', $ts_fin);
         $prestamos = $this->db->get()->result_array();
         
         foreach ($prestamos as $p) {
-            // Normalizar fecha para ordenamiento
             $fecha = is_numeric($p['loan_approved_date']) ? $p['loan_approved_date'] : strtotime($p['loan_approved_date']);
             
             $timeline[] = [
@@ -74,14 +68,12 @@ class Accounting_tools extends MX_Controller {
         }
         echo "   -> " . count($prestamos) . " Préstamos encontrados.\n";
 
-        // --- B. Cargar Pagos ---
         $this->db->select('*')->from('c19_loan_payments')
                  ->where('date_paid >=', $ts_inicio)
                  ->where('date_paid <=', $ts_fin);
         $pagos = $this->db->get()->result_array();
 
         foreach ($pagos as $p) {
-            // Normalizar fecha
             $fecha = is_numeric($p['date_paid']) ? $p['date_paid'] : strtotime($p['date_paid']);
 
             $timeline[] = [
@@ -93,7 +85,6 @@ class Accounting_tools extends MX_Controller {
         }
         echo "   -> " . count($pagos) . " Pagos encontrados.\n";
 
-        // 2. ORDENAR CRONOLÓGICAMENTE
         echo "=== ORDENANDO TRANSACCIONES... ===\n";
         
         usort($timeline, function($a, $b) {
@@ -103,7 +94,6 @@ class Accounting_tools extends MX_Controller {
             return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
         });
 
-        // 3. PROCESAR EN ORDEN
         echo "=== INICIANDO PROCESAMIENTO SECUENCIAL ===\n";
         
         $total_ok = 0;
@@ -118,7 +108,6 @@ class Accounting_tools extends MX_Controller {
             if ($tipo === 'prestamo') {
                 $id = $data['loan_id'];
                 
-                // Validación existencia
                 if ($this->_voucher_existe("Préstamo #$id")) {
                     $saltados++; continue;
                 }
@@ -134,9 +123,7 @@ class Accounting_tools extends MX_Controller {
                 $id = $data['loan_payment_id'];
                 $loan_id = $data['loan_id'];
 
-                // Validación simple de duplicados
                 if ($this->_voucher_existe("Pago de préstamo #$loan_id", "Cuota")) {
-                     // Nota: validación débil, se confía en la lógica interna
                 }
 
                 echo "[$fecha_log] Procesando Pago ID $id... ";
@@ -154,17 +141,12 @@ class Accounting_tools extends MX_Controller {
         echo "Ya existían:   $saltados\n";
     }
 
-    // =========================================================================
-    // LÓGICA DE NEGOCIO (SIN CAMBIOS RESPECTO A VERSIÓN ANTERIOR)
-    // =========================================================================
-
     private function _crear_voucher_prestamo_local($loan_data) {
         try {
             $loan_id = $loan_data['loan_id'];
             $amount  = floatval($loan_data['apply_amount']);
             if ($amount <= 0) return false;
 
-            // Sucursal
             $branch_id = (isset($loan_data['branch_id']) && $loan_data['branch_id'] > 0) 
                          ? $loan_data['branch_id'] 
                          : 1;
@@ -181,7 +163,6 @@ class Accounting_tools extends MX_Controller {
 
             $this->db->trans_start();
 
-            // 1. Voucher
             $voucher_data = [
                 'voucher_date' => $fecha_historica,
                 'voucher_type' => 'egreso',
@@ -197,7 +178,6 @@ class Accounting_tools extends MX_Controller {
 
             if (!$voucher_id) { $this->db->trans_rollback(); return false; }
 
-            // 2. Transacciones
             $entries = [
                 ['acc' => 58, 'deb' => $amount, 'cre' => 0, 'desc' => 'Préstamo por cobrar', 'type' => 'asset', 'ord' => 0],
                 ['acc' => 5,  'deb' => 0, 'cre' => $amount, 'desc' => 'Desembolso en caja',  'type' => 'asset', 'ord' => 1]
@@ -235,7 +215,6 @@ class Accounting_tools extends MX_Controller {
         $payment_id = $payment_data['loan_payment_id'];
 
         try {
-            // Sucursal
             $branch_id = (isset($payment_data['branch_id']) && $payment_data['branch_id'] > 0) 
                          ? $payment_data['branch_id'] 
                          : 1;
@@ -245,13 +224,11 @@ class Accounting_tools extends MX_Controller {
 
             $amount = floatval($payment_data['paid_amount']); 
             
-            // Fecha Histórica
             $fecha_raw = $payment_data['date_paid'];
             $fecha_historica = is_numeric($fecha_raw) 
                                ? date('Y-m-d H:i:s', $fecha_raw) 
                                : $fecha_raw;
 
-            // --- LÓGICA DE CUOTA ---
             $installment_number = 0;
             $interest = 0;
             
@@ -269,7 +246,6 @@ class Accounting_tools extends MX_Controller {
                 $num = 0;
                 foreach($json_objects as $obj) {
                     $num++;
-                    // Convertir fecha JSON
                     $fecha_json_ymd = "N/A";
                     if (isset($obj->payment_date)) {
                         $temp_date = str_replace('/', '-', $obj->payment_date); 
@@ -289,7 +265,6 @@ class Accounting_tools extends MX_Controller {
             }
             if ($installment_number == 0) $interest = 0;
 
-            // --- CÁLCULOS ---
             $custom_round = function($number) {
                 $number = floatval($number);
                 $partes = explode('.', strval($number));
@@ -308,7 +283,6 @@ class Accounting_tools extends MX_Controller {
             $caja_moneda_nacional = $custom_round($capital_final + $iva + $intereses_amortizables);
             $total_val = $custom_round($caja_moneda_nacional + $it);
 
-            // --- VOUCHER ---
             $customer_name = $this->_get_customer_name($payment_data['customer_id']);
             $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer_name} - Cuota N° {$installment_number}";
             
@@ -331,7 +305,6 @@ class Accounting_tools extends MX_Controller {
 
             if (!$voucher_id) { $this->db->trans_rollback(); return false; }
 
-            // Asientos
             $entries = [
                 ['acc'=>348, 'deb'=>$it, 'cre'=>0, 'desc'=>'IT', 'type'=>'expenses', 'ord'=>0],
                 ['acc'=>5,   'deb'=>$caja_moneda_nacional, 'cre'=>0, 'desc'=>'Caja MN', 'type'=>'asset', 'ord'=>1],
