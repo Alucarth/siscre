@@ -461,16 +461,6 @@ class Payments extends Secure_area implements iData_controller {
             $total_debit = $custom_round($caja_moneda_nacional + $it);
             $total_credit = $custom_round($caja_moneda_nacional + $it);
 
-            // $this->db->from('c19_accounting_vouchers');
-            // $this->db->where('description', $descripcion);
-            // $this->db->where('total_debit', $total_debit);
-            // $this->db->where('added_by', $this->Employee->get_logged_in_employee_info()->person_id);
-            // $this->db->where('added_date >=', date('Y-m-d H:i:s', strtotime('-5 seconds')));
-
-            // if ($this->db->count_all_results() > 0) {
-            //     return null; 
-            // }
-
             $voucher_data = [
                 'voucher_date' => date('Y-m-d H:i:s'),
                 'voucher_type' => 'ingreso',
