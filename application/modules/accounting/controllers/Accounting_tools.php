@@ -13,7 +13,7 @@ class Accounting_tools extends MX_Controller {
             die("ERROR: Acceso denegado. Solo CLI.");
         }
 
-        echo "1. Iniciando Herramienta (Fechas Históricas + Sucursales)...\n";
+        echo "1. Iniciando Herramienta (Modo Cronológico Unificado)...\n";
         $this->load->database();
         $this->load->model('Customer'); 
         
@@ -36,6 +36,9 @@ class Accounting_tools extends MX_Controller {
         }
     }
 
+    // =========================================================================
+    // COMANDO PRINCIPAL (LÓGICA UNIFICADA)
+    // =========================================================================
     public function pobla_conta($fecha_inicio_str = null, $fecha_fin_str = null) {
         ini_set('memory_limit', '2048M');
         set_time_limit(0); 
@@ -47,65 +50,113 @@ class Accounting_tools extends MX_Controller {
         $ts_inicio = strtotime($fecha_inicio_str . ' 00:00:00');
         $ts_fin    = strtotime($fecha_fin_str . ' 23:59:59');
 
-        echo "=== MIGRANDO DE $fecha_inicio_str A $fecha_fin_str ===\n";
+        echo "=== RECOPILANDO TRANSACCIONES ($fecha_inicio_str al $fecha_fin_str) ===\n";
 
-        $this->_procesar_prestamos($ts_inicio, $ts_fin);
+        // 1. OBTENER TODO (SIN PROCESAR AÚN)
+        $timeline = [];
 
-        $this->_procesar_pagos($ts_inicio, $ts_fin);
-
-        echo "\n=== FINALIZADO EXITOSAMENTE ===\n";
-    }
-
-    private function _procesar_prestamos($ts_inicio, $ts_fin) {
-        echo "\n--- Procesando Préstamos ---\n";
-        
+        // --- A. Cargar Préstamos ---
         $this->db->select('*')->from('c19_loans')
                  ->where('loan_approved_date >=', $ts_inicio)
                  ->where('loan_approved_date <=', $ts_fin);
         $prestamos = $this->db->get()->result_array();
-
-        $count = 0;
-        foreach ($prestamos as $loan) {
-            $loan_id = $loan['loan_id'];
-
-            if ($this->_voucher_existe("Préstamo #$loan_id")) {
-                continue; 
-            }
-
-            if ($this->_crear_voucher_prestamo_local($loan)) {
-                echo "OK: Préstamo #$loan_id\n";
-                $count++;
-            } else {
-                echo "ERROR: Falló Préstamo #$loan_id\n";
-            }
+        
+        foreach ($prestamos as $p) {
+            // Normalizar fecha para ordenamiento
+            $fecha = is_numeric($p['loan_approved_date']) ? $p['loan_approved_date'] : strtotime($p['loan_approved_date']);
+            
+            $timeline[] = [
+                'tipo'      => 'prestamo',
+                'timestamp' => $fecha,
+                'fecha_legible' => date('Y-m-d H:i:s', $fecha),
+                'data'      => $p
+            ];
         }
-        echo "Total Préstamos Creados: $count\n";
-    }
+        echo "   -> " . count($prestamos) . " Préstamos encontrados.\n";
 
-    private function _procesar_pagos($ts_inicio, $ts_fin) {
-        echo "\n--- Procesando Pagos ---\n";
-
+        // --- B. Cargar Pagos ---
         $this->db->select('*')->from('c19_loan_payments')
                  ->where('date_paid >=', $ts_inicio)
                  ->where('date_paid <=', $ts_fin);
         $pagos = $this->db->get()->result_array();
 
-        $count = 0;
-        foreach ($pagos as $pago) {
-            $loan_id = $pago['loan_id'];
-            
-            if ($this->_voucher_existe("Pago de préstamo #$loan_id", "Cuota")) {
-            }
+        foreach ($pagos as $p) {
+            // Normalizar fecha
+            $fecha = is_numeric($p['date_paid']) ? $p['date_paid'] : strtotime($p['date_paid']);
 
-            if ($this->_crear_voucher_pago_local($pago)) {
-                echo "OK: Pago ID {$pago['loan_payment_id']}\n";
-                $count++;
-            } else {
-                echo "ERROR: Falló Pago ID {$pago['loan_payment_id']}\n";
+            $timeline[] = [
+                'tipo'      => 'pago',
+                'timestamp' => $fecha,
+                'fecha_legible' => date('Y-m-d H:i:s', $fecha),
+                'data'      => $p
+            ];
+        }
+        echo "   -> " . count($pagos) . " Pagos encontrados.\n";
+
+        // 2. ORDENAR CRONOLÓGICAMENTE
+        echo "=== ORDENANDO TRANSACCIONES... ===\n";
+        
+        usort($timeline, function($a, $b) {
+            if ($a['timestamp'] == $b['timestamp']) {
+                return 0;
+            }
+            return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
+        });
+
+        // 3. PROCESAR EN ORDEN
+        echo "=== INICIANDO PROCESAMIENTO SECUENCIAL ===\n";
+        
+        $total_ok = 0;
+        $total_error = 0;
+        $saltados = 0;
+
+        foreach ($timeline as $evento) {
+            $tipo = $evento['tipo'];
+            $data = $evento['data'];
+            $fecha_log = $evento['fecha_legible'];
+
+            if ($tipo === 'prestamo') {
+                $id = $data['loan_id'];
+                
+                // Validación existencia
+                if ($this->_voucher_existe("Préstamo #$id")) {
+                    $saltados++; continue;
+                }
+
+                echo "[$fecha_log] Procesando Préstamo #$id... ";
+                if ($this->_crear_voucher_prestamo_local($data)) {
+                    echo "OK\n"; $total_ok++;
+                } else {
+                    echo "ERROR\n"; $total_error++;
+                }
+
+            } elseif ($tipo === 'pago') {
+                $id = $data['loan_payment_id'];
+                $loan_id = $data['loan_id'];
+
+                // Validación simple de duplicados
+                if ($this->_voucher_existe("Pago de préstamo #$loan_id", "Cuota")) {
+                     // Nota: validación débil, se confía en la lógica interna
+                }
+
+                echo "[$fecha_log] Procesando Pago ID $id... ";
+                if ($this->_crear_voucher_pago_local($data)) {
+                    echo "OK\n"; $total_ok++;
+                } else {
+                    echo "ERROR\n"; $total_error++;
+                }
             }
         }
-        echo "Total Pagos Creados: $count\n";
+
+        echo "\n=== RESUMEN FINAL ===\n";
+        echo "Procesados OK: $total_ok\n";
+        echo "Errores:       $total_error\n";
+        echo "Ya existían:   $saltados\n";
     }
+
+    // =========================================================================
+    // LÓGICA DE NEGOCIO (SIN CAMBIOS RESPECTO A VERSIÓN ANTERIOR)
+    // =========================================================================
 
     private function _crear_voucher_prestamo_local($loan_data) {
         try {
@@ -113,6 +164,7 @@ class Accounting_tools extends MX_Controller {
             $amount  = floatval($loan_data['apply_amount']);
             if ($amount <= 0) return false;
 
+            // Sucursal
             $branch_id = (isset($loan_data['branch_id']) && $loan_data['branch_id'] > 0) 
                          ? $loan_data['branch_id'] 
                          : 1;
@@ -125,10 +177,11 @@ class Accounting_tools extends MX_Controller {
             $fecha_raw = $loan_data['loan_approved_date'];
             $fecha_historica = is_numeric($fecha_raw) 
                                ? date('Y-m-d H:i:s', $fecha_raw) 
-                               : $fecha_raw;
+                               : $fecha_raw; 
 
             $this->db->trans_start();
 
+            // 1. Voucher
             $voucher_data = [
                 'voucher_date' => $fecha_historica,
                 'voucher_type' => 'egreso',
@@ -136,7 +189,7 @@ class Accounting_tools extends MX_Controller {
                 'total_debit'  => $amount,
                 'total_credit' => $amount,
                 'added_by'     => $employee_id,
-                'added_date'   => $fecha_historica,
+                'added_date'   => $fecha_historica, 
                 'branch_id'    => $branch_id
             ];
             $this->db->insert('c19_accounting_vouchers', $voucher_data);
@@ -144,6 +197,7 @@ class Accounting_tools extends MX_Controller {
 
             if (!$voucher_id) { $this->db->trans_rollback(); return false; }
 
+            // 2. Transacciones
             $entries = [
                 ['acc' => 58, 'deb' => $amount, 'cre' => 0, 'desc' => 'Préstamo por cobrar', 'type' => 'asset', 'ord' => 0],
                 ['acc' => 5,  'deb' => 0, 'cre' => $amount, 'desc' => 'Desembolso en caja',  'type' => 'asset', 'ord' => 1]
@@ -154,7 +208,7 @@ class Accounting_tools extends MX_Controller {
                     'account_id'       => $e['acc'],
                     'amount'           => ($e['deb'] > 0) ? $e['deb'] : $e['cre'],
                     'description'      => $descripcion . ' - ' . $e['desc'],
-                    'added_date'       => $fecha_historica,
+                    'added_date'       => $fecha_historica, 
                     'added_by'         => $employee_id,
                     'transaction_type' => $e['type'],
                     'movement_type'    => ($e['deb'] > 0) ? 'debit' : 'credit',
@@ -181,6 +235,7 @@ class Accounting_tools extends MX_Controller {
         $payment_id = $payment_data['loan_payment_id'];
 
         try {
+            // Sucursal
             $branch_id = (isset($payment_data['branch_id']) && $payment_data['branch_id'] > 0) 
                          ? $payment_data['branch_id'] 
                          : 1;
@@ -190,11 +245,13 @@ class Accounting_tools extends MX_Controller {
 
             $amount = floatval($payment_data['paid_amount']); 
             
+            // Fecha Histórica
             $fecha_raw = $payment_data['date_paid'];
             $fecha_historica = is_numeric($fecha_raw) 
                                ? date('Y-m-d H:i:s', $fecha_raw) 
                                : $fecha_raw;
 
+            // --- LÓGICA DE CUOTA ---
             $installment_number = 0;
             $interest = 0;
             
@@ -212,20 +269,18 @@ class Accounting_tools extends MX_Controller {
                 $num = 0;
                 foreach($json_objects as $obj) {
                     $num++;
-                    // Convertir fecha del JSON (d/m/Y) a Y-m-d
+                    // Convertir fecha JSON
                     $fecha_json_ymd = "N/A";
                     if (isset($obj->payment_date)) {
                         $temp_date = str_replace('/', '-', $obj->payment_date); 
                         $fecha_json_ymd = date('Y-m-d', strtotime($temp_date));
                     }
 
-                    // A) Comparación Exacta
                     if ($fecha_json_ymd == $fecha_target_ymd) {
                         $installment_number = $num;
                         $interest = floatval($obj->interest);
                         break;
                     }
-                    // B) Comparación Aproximada (Mes/Año)
                     if (substr($fecha_json_ymd, 0, 7) == substr($fecha_target_ymd, 0, 7)) {
                         $installment_number = $num;
                         $interest = floatval($obj->interest);
@@ -253,7 +308,7 @@ class Accounting_tools extends MX_Controller {
             $caja_moneda_nacional = $custom_round($capital_final + $iva + $intereses_amortizables);
             $total_val = $custom_round($caja_moneda_nacional + $it);
 
-            // --- INSERTAR VOUCHER ---
+            // --- VOUCHER ---
             $customer_name = $this->_get_customer_name($payment_data['customer_id']);
             $descripcion = "Pago de préstamo #{$payment_data['loan_id']} - Cliente: {$customer_name} - Cuota N° {$installment_number}";
             
@@ -262,13 +317,13 @@ class Accounting_tools extends MX_Controller {
             $this->db->trans_start();
 
             $voucher_data = [
-                'voucher_date' => $fecha_historica, // FECHA REAL
+                'voucher_date' => $fecha_historica,
                 'voucher_type' => 'ingreso',
                 'description'  => $descripcion,
                 'total_debit'  => $total_val,
                 'total_credit' => $total_val,
                 'added_by'     => $this->admin_id,
-                'added_date'   => $fecha_historica, // FECHA REAL
+                'added_date'   => $fecha_historica,
                 'branch_id'    => $branch_id
             ];
             $this->db->insert('c19_accounting_vouchers', $voucher_data);
@@ -276,7 +331,7 @@ class Accounting_tools extends MX_Controller {
 
             if (!$voucher_id) { $this->db->trans_rollback(); return false; }
 
-            // Insertar Asientos
+            // Asientos
             $entries = [
                 ['acc'=>348, 'deb'=>$it, 'cre'=>0, 'desc'=>'IT', 'type'=>'expenses', 'ord'=>0],
                 ['acc'=>5,   'deb'=>$caja_moneda_nacional, 'cre'=>0, 'desc'=>'Caja MN', 'type'=>'asset', 'ord'=>1],
@@ -292,14 +347,14 @@ class Accounting_tools extends MX_Controller {
                         'account_id'       => $e['acc'],
                         'amount'           => ($e['deb'] > 0) ? $e['deb'] : $e['cre'],
                         'description'      => $descripcion . ' - ' . $e['desc'],
-                        'added_date'       => $fecha_historica, // FECHA REAL
+                        'added_date'       => $fecha_historica,
                         'added_by'         => $this->admin_id,
                         'transaction_type' => $e['type'],
                         'movement_type'    => ($e['deb'] > 0) ? 'debit' : 'credit',
                         'voucher_id'       => $voucher_id,
                         'payment_methods'  => $metodo_pago,
                         'invoice_number'   => 'PAGO-' . $payment_data['loan_id'],
-                        'purchased_date'   => $fecha_historica, // FECHA REAL
+                        'purchased_date'   => $fecha_historica,
                         'transaction_order'=> $e['ord'],
                         'branch_id'        => $branch_id
                     ];
