@@ -6,7 +6,7 @@ class Accounting_tools extends MX_Controller {
     private $admin_id = 1; 
     private $default_branch_id = 1; 
     
-    // Cache para evitar consultar la BD repetidamente
+    // Cache para evitar duplicados en la misma ejecución
     private $cache_ids_procesados = [];
 
     public function __construct() {
@@ -16,7 +16,7 @@ class Accounting_tools extends MX_Controller {
             die("ERROR: Acceso denegado. Solo CLI.");
         }
 
-        echo "1. Iniciando Herramienta (Orden: Día > Tipo > Hora)...\n";
+        echo "1. Iniciando Herramienta (Recuperación de Hora Real + Ordenamiento Estricto)...\n";
         $this->load->database();
         $this->load->model('Customer'); 
         
@@ -54,7 +54,7 @@ class Accounting_tools extends MX_Controller {
         $ts_fin    = strtotime($fecha_fin_str . ' 23:59:59');
 
         echo "=== RECOPILANDO DATOS ($fecha_inicio_str al $fecha_fin_str) ===\n";
-        $this->cache_ids_procesados = []; // Limpiar cache
+        $this->cache_ids_procesados = [];
 
         $timeline = [];
 
@@ -65,11 +65,14 @@ class Accounting_tools extends MX_Controller {
         $prestamos = $this->db->get()->result_array();
         
         foreach ($prestamos as $p) {
-            $fecha = is_numeric($p['loan_approved_date']) ? $p['loan_approved_date'] : strtotime($p['loan_approved_date']);
+            // Recuperar fecha/hora real
+            $fecha_full = $this->_obtener_fecha_real_con_hora($p, 'loan_approved_date', null); 
+            $ts_evento = strtotime($fecha_full);
+
             $timeline[] = [
                 'tipo'      => 'prestamo', 
-                'timestamp' => $fecha,
-                'fecha_txt' => date('Y-m-d H:i:s', $fecha),
+                'timestamp' => $ts_evento,
+                'fecha_txt' => $fecha_full,
                 'id_ref'    => 'LOAN-' . $p['loan_id'], 
                 'data'      => $p
             ];
@@ -82,11 +85,14 @@ class Accounting_tools extends MX_Controller {
         $pagos = $this->db->get()->result_array();
 
         foreach ($pagos as $p) {
-            $fecha = is_numeric($p['date_paid']) ? $p['date_paid'] : strtotime($p['date_paid']);
+            // Recuperar fecha/hora real (usando date_modified como fallback si date_paid es 00:00)
+            $fecha_full = $this->_obtener_fecha_real_con_hora($p, 'date_paid', 'date_modified'); 
+            $ts_evento = strtotime($fecha_full);
+
             $timeline[] = [
                 'tipo'      => 'pago',
-                'timestamp' => $fecha,
-                'fecha_txt' => date('Y-m-d H:i:s', $fecha),
+                'timestamp' => $ts_evento,
+                'fecha_txt' => $fecha_full,
                 'id_ref'    => 'PAGO-' . $p['loan_id'] . '-' . $p['loan_payment_id'], 
                 'data'      => $p
             ];
@@ -94,20 +100,19 @@ class Accounting_tools extends MX_Controller {
 
         echo "   -> Total eventos encontrados: " . count($timeline) . "\n";
 
-        // 3. ORDENAMIENTO REGLA DE NEGOCIO (DÍA > TIPO > HORA)
-        echo "=== ORDENANDO (Primero Desembolsos del Día, luego Pagos) ===\n";
+        // 3. ORDENAMIENTO ESTRICTO (DÍA > TIPO > HORA)
+        echo "=== ORDENANDO (Día -> Desembolsos -> Pagos) ===\n";
         
         usort($timeline, function($a, $b) {
-            // A. Extraer solo el DÍA (Ymd) para comparar fechas sin importar la hora
+            // 1. Comparar solo el DÍA (Ymd)
             $dia_a = date('Ymd', $a['timestamp']);
             $dia_b = date('Ymd', $b['timestamp']);
 
-            // Si son días distintos, el día menor va primero
             if ($dia_a != $dia_b) {
                 return ($dia_a < $dia_b) ? -1 : 1;
             }
             
-            // B. Si es el MISMO DÍA: Desembolso (0) gana a Pago (1)
+            // 2. Si es el MISMO DÍA: Desembolso (0) gana a Pago (1)
             $peso_a = ($a['tipo'] === 'prestamo') ? 0 : 1;
             $peso_b = ($b['tipo'] === 'prestamo') ? 0 : 1;
             
@@ -115,7 +120,7 @@ class Accounting_tools extends MX_Controller {
                 return ($peso_a < $peso_b) ? -1 : 1;
             }
             
-            // C. Si es Mismo Día y Mismo Tipo: Respetar hora original
+            // 3. Si es Mismo Día y Mismo Tipo: Ordenar por Hora
             if ($a['timestamp'] != $b['timestamp']) {
                 return ($a['timestamp'] < $b['timestamp']) ? -1 : 1;
             }
@@ -126,19 +131,16 @@ class Accounting_tools extends MX_Controller {
         // 4. PROCESAR
         echo "=== INICIANDO PROCESAMIENTO ===\n";
         
-        $ok = 0;
-        $err = 0;
-        $skip = 0;
+        $ok = 0; $err = 0; $skip = 0;
 
         foreach ($timeline as $evento) {
             $tipo = $evento['tipo'];
             $data = $evento['data'];
             $id_ref = $evento['id_ref'];
+            $fecha_real = $evento['fecha_txt']; // Usamos la fecha corregida con hora
 
-            // Evitar procesar duplicados en memoria
             if (in_array($id_ref, $this->cache_ids_procesados)) continue;
 
-            // Validación estricta contra BD (Invoice Number)
             if ($this->_ya_existe_en_bd($id_ref)) {
                 $skip++;
                 $this->cache_ids_procesados[] = $id_ref;
@@ -148,13 +150,13 @@ class Accounting_tools extends MX_Controller {
             $resultado = false;
 
             if ($tipo === 'prestamo') {
-                $resultado = $this->_crear_voucher_prestamo($data, $id_ref);
-                if ($resultado) echo "OK: Desembolso #{$data['loan_id']} [{$evento['fecha_txt']}]\n";
-                else echo "ERROR GRAVE: Desembolso #{$data['loan_id']}\n";
+                $resultado = $this->_crear_voucher_prestamo($data, $id_ref, $fecha_real);
+                if ($resultado) echo "OK: Desembolso #{$data['loan_id']} [$fecha_real]\n";
+                else echo "ERROR: Desembolso #{$data['loan_id']}\n";
 
             } elseif ($tipo === 'pago') {
-                $resultado = $this->_crear_voucher_pago($data, $id_ref);
-                if ($resultado) echo "OK: Pago ID {$data['loan_payment_id']} [{$evento['fecha_txt']}]\n";
+                $resultado = $this->_crear_voucher_pago($data, $id_ref, $fecha_real);
+                if ($resultado) echo "OK: Pago ID {$data['loan_payment_id']} [$fecha_real]\n";
                 else echo "ERROR: Pago ID {$data['loan_payment_id']}\n";
             }
 
@@ -171,10 +173,44 @@ class Accounting_tools extends MX_Controller {
     }
 
     // =========================================================================
-    // LÓGICA DE NEGOCIO
+    // LÓGICA DE RECUPERACIÓN DE FECHA (CORAZÓN DEL ARREGLO)
     // =========================================================================
 
-    private function _crear_voucher_prestamo($loan_data, $invoice_ref) {
+    private function _obtener_fecha_real_con_hora($row, $col_principal, $col_fallback = null) {
+        $val_principal = isset($row[$col_principal]) ? $row[$col_principal] : null;
+        
+        // Convertir a Timestamp si es string
+        $ts_p = is_numeric($val_principal) ? $val_principal : strtotime($val_principal);
+        
+        // Verificar si tiene hora (es decir, si NO es medianoche exacta 00:00:00)
+        // Ojo: Si la transacción fue realmente a medianoche, esto la moverá, pero es un caso raro.
+        $tiene_hora = (date('H:i:s', $ts_p) !== '00:00:00');
+
+        if ($tiene_hora) {
+            return date('Y-m-d H:i:s', $ts_p);
+        }
+
+        // Si es 00:00:00, intentamos usar el fallback (date_modified)
+        if ($col_fallback && isset($row[$col_fallback]) && !empty($row[$col_fallback])) {
+            $val_fallback = $row[$col_fallback];
+            $ts_f = is_numeric($val_fallback) ? $val_fallback : strtotime($val_fallback);
+            
+            // Solo usar fallback si es el MISMO DÍA (para no falsear la fecha contable)
+            if (date('Y-m-d', $ts_p) === date('Y-m-d', $ts_f)) {
+                // Usamos la fecha original + la hora del fallback
+                return date('Y-m-d H:i:s', $ts_f);
+            }
+        }
+
+        // Si no hay fallback válido, retornamos la original (ni modo, será 00:00:00)
+        return date('Y-m-d H:i:s', $ts_p);
+    }
+
+    // =========================================================================
+    // LÓGICA DE NEGOCIO (VOUCHERS)
+    // =========================================================================
+
+    private function _crear_voucher_prestamo($loan_data, $invoice_ref, $fecha_op) {
         $loan_id = $loan_data['loan_id'];
         $amount  = floatval($loan_data['apply_amount']);
         if ($amount <= 0) return false;
@@ -183,33 +219,28 @@ class Accounting_tools extends MX_Controller {
                      ? $loan_data['branch_id'] : $this->default_branch_id;
 
         $customer_name = $this->_get_customer_name($loan_data['customer_id']);
-        $fecha_op = is_numeric($loan_data['loan_approved_date']) ? date('Y-m-d H:i:s', $loan_data['loan_approved_date']) : $loan_data['loan_approved_date'];
-        
         $descripcion = "Desembolso de préstamo #" . $loan_id . " - Cliente: " . $customer_name;
 
-        // INICIO TRANSACCIÓN
         $this->db->trans_start();
 
-        // 1. Cabecera Voucher
+        // Voucher
         $voucher_data = [
-            'voucher_date' => $fecha_op,
+            'voucher_date' => $fecha_op, // Fecha con Hora Real
             'voucher_type' => 'egreso',
             'description'  => $descripcion,
             'total_debit'  => $amount,
             'total_credit' => $amount,
             'added_by'     => $this->admin_id,
-            'added_date'   => $fecha_op,
+            'added_date'   => $fecha_op, 
             'branch_id'    => $branch_id
         ];
         
         if (!$this->db->insert('c19_accounting_vouchers', $voucher_data)) {
-            echo "   [SQL ERROR VOUCHER] " . json_encode($this->db->error()) . "\n";
-            $this->db->trans_rollback();
-            return false;
+            $this->db->trans_rollback(); return false;
         }
         $voucher_id = $this->db->insert_id();
 
-        // 2. Asientos
+        // Asientos
         $entries = [
             ['acc' => 58, 'deb' => $amount, 'cre' => 0, 'desc' => 'Préstamo por cobrar', 'type' => 'asset', 'ord' => 0],
             ['acc' => 5,  'deb' => 0, 'cre' => $amount, 'desc' => 'Desembolso en caja',  'type' => 'asset', 'ord' => 1]
@@ -233,9 +264,7 @@ class Accounting_tools extends MX_Controller {
             ];
             
             if (!$this->db->insert('c19_accounting_transactions', $t_data)) {
-                echo "   [SQL ERROR TRANSACTION] " . json_encode($this->db->error()) . "\n";
-                $this->db->trans_rollback();
-                return false;
+                $this->db->trans_rollback(); return false;
             }
         }
 
@@ -243,7 +272,7 @@ class Accounting_tools extends MX_Controller {
         return $this->db->trans_status();
     }
 
-    private function _crear_voucher_pago($payment_data, $invoice_ref) {
+    private function _crear_voucher_pago($payment_data, $invoice_ref, $fecha_op) {
         $loan_id = $payment_data['loan_id'];
         $branch_id = (isset($payment_data['branch_id']) && $payment_data['branch_id'] > 0) 
                      ? $payment_data['branch_id'] : $this->default_branch_id;
@@ -252,8 +281,7 @@ class Accounting_tools extends MX_Controller {
         if (!$loan_info) return false;
 
         $amount = floatval($payment_data['paid_amount']); 
-        $fecha_op = is_numeric($payment_data['date_paid']) ? date('Y-m-d H:i:s', $payment_data['date_paid']) : $payment_data['date_paid'];
-
+        
         // Lógica de Cuota
         $installment_number = 0;
         $interest = 0;
@@ -305,7 +333,7 @@ class Accounting_tools extends MX_Controller {
         $this->db->trans_start();
 
         $voucher_data = [
-            'voucher_date' => $fecha_op,
+            'voucher_date' => $fecha_op, // Fecha con Hora Real
             'voucher_type' => 'ingreso',
             'description'  => $descripcion,
             'total_debit'  => $total,
@@ -316,7 +344,6 @@ class Accounting_tools extends MX_Controller {
         ];
         
         if (!$this->db->insert('c19_accounting_vouchers', $voucher_data)) {
-            echo "   [SQL ERROR VOUCHER PAGO] " . json_encode($this->db->error()) . "\n";
             $this->db->trans_rollback(); return false;
         }
         $voucher_id = $this->db->insert_id();
@@ -348,7 +375,6 @@ class Accounting_tools extends MX_Controller {
                     'branch_id'        => $branch_id
                 ];
                 if (!$this->db->insert('c19_accounting_transactions', $t_data)) {
-                    echo "   [SQL ERROR TRANSAC PAGO] " . json_encode($this->db->error()) . "\n";
                     $this->db->trans_rollback(); return false;
                 }
             }
@@ -358,14 +384,9 @@ class Accounting_tools extends MX_Controller {
         return $this->db->trans_status();
     }
 
-    // =========================================================================
-    // UTILITARIOS Y VALIDACIONES
-    // =========================================================================
-
     private function _ya_existe_en_bd($invoice_ref) {
         $this->db->where('invoice_number', $invoice_ref);
-        $count = $this->db->count_all_results('c19_accounting_transactions');
-        return ($count > 0);
+        return ($this->db->count_all_results('c19_accounting_transactions') > 0);
     }
 
     private function _get_customer_name($person_id) {
