@@ -6,3 +6,4 @@ application/logs/
 /temp/
 application/config/database.php
 *.pdf
+application/controllers/phpqrcode/cache/*

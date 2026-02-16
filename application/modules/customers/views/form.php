@@ -294,6 +294,23 @@
 
                                             </div>
 
+                                            <div class="form-group">
+                                                <label for="pin">PIN (exactamente 4 dígitos numéricos)</label>
+                                                <input type="password" class="form-control" id="pin" name="pin" 
+                                                    maxlength="4" pattern="\d{4}" 
+                                                    inputmode="numeric"
+                                                    title="El PIN debe contener exactamente 4 dígitos numéricos"
+                                                    required>
+                                            </div>
+
+                                            <div class="form-group">
+                                                <label for="confirm_pin">Confirmar PIN</label>
+                                                <input type="password" class="form-control" id="confirm_pin" name="confirm_pin" 
+                                                    maxlength="4" pattern="\d{4}"
+                                                    inputmode="numeric"
+                                                    title="Debe contener exactamente 4 dígitos y coincidir con el PIN ingresado"
+                                                    required>
+                                            </div>
                                         </div>
 
                                         <?php if ($user_info->role_id != CUSTOMER_ROLE_ID):?>

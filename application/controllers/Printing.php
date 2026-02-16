@@ -91,6 +91,71 @@ class Printing extends CI_Controller {
         send($return);
     }
     
+    //tarea 3
+    public function export_all_receivables_pdf()
+    {
+        // Consulta mejorada con validaciones
+        $query = $this->db->query("
+            SELECT 
+                l.loan_id,
+                CONCAT(pc.first_name, ' ', pc.last_name) AS customer,
+                pc.phone_number AS customer_phone,
+                l.description,
+                l.loan_amount,
+                l.loan_balance,
+                CONCAT(pa.first_name, ' ', pa.last_name) AS agent,
+                CONCAT(pap.first_name, ' ', pap.last_name) AS approved_by,
+                FROM_UNIXTIME(l.loan_approved_date, '%d/%m/%Y') AS formatted_loan_approved_date,
+                FROM_UNIXTIME(l.loan_payment_date, '%d/%m/%Y') AS formatted_payment_date,
+                l.loan_status
+            FROM c19_loans l
+            LEFT JOIN c19_customers c ON l.customer_id = c.person_id
+            LEFT JOIN c19_people pc ON c.person_id = pc.person_id
+            LEFT JOIN c19_employees a ON l.loan_agent_id = a.person_id
+            LEFT JOIN c19_people pa ON a.person_id = pa.person_id
+            LEFT JOIN c19_employees ap ON l.loan_approved_by_id = ap.person_id
+            LEFT JOIN c19_people pap ON ap.person_id = pap.person_id
+            WHERE l.loan_status = 'approved'
+            AND l.loan_payment_date IS NOT NULL
+            AND MONTH(FROM_UNIXTIME(l.loan_payment_date)) = MONTH(CURDATE())
+            AND YEAR(FROM_UNIXTIME(l.loan_payment_date)) = YEAR(CURDATE())
+            ORDER BY l.loan_id DESC
+        ");
+        
+        $result = $query->result_array();
+
+        // Verificar si hay resultados
+        if (empty($result)) {
+            // Crear un PDF vacío con mensaje
+            $html = '<h2>Reporte de Préstamos (Aprobados, Mes Actual)</h2>
+                    <p>No se encontraron registros para el mes actual</p>';
+        } else {
+            $data = [
+                'titulo' => 'Reporte de Préstamos (Aprobados, Mes Actual)',
+                'fecha' => date('d/m/Y H:i:s'),
+                'registros' => $result
+            ];
+
+            // Cargar la vista - asegúrate de que la ruta views/pdf/reporte_cuentas_pdf.php existe
+            $html = $this->load->view('pdf/reporte_cuentas_pdf', $data, TRUE);
+        }
+
+        // Usar la misma librería PDF que el resto de la aplicación
+        $pdfFilePath = FCPATH . "/downloads/reports/reporte_prestamos_".date('Ymd_His').".pdf";
+
+        $this->load->library('pdf');
+        $pdf = $this->pdf->load('"en-GB-x","A4-L","","",10,10,10,10,6,3');
+        $pdf->SetFooter($_SERVER['HTTP_HOST'] . '|{PAGENO}|' . date(DATE_RFC822));
+        $pdf->WriteHTML($html);
+        
+        // Salida directa al navegador
+        $pdf->Output('reporte_prestamos.pdf', 'I');
+        
+        // Detener la ejecución para evitar conflicto con CI
+        exit;
+    }
+    //
+
     public function payment_list($filename = '')
     {
         ini_set('memory_limit', '-1');

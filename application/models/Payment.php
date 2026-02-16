@@ -91,7 +91,8 @@ class Payment extends CI_Model {
                    CONCAT(teller.first_name, ' ',teller.last_name) as teller_name, 
                    loan_types.name as loan_type,
                    loans.loan_amount,
-                   loans.loan_balance";
+                   loans.loan_balance,
+                   loan_payments.remarks as payment_remarks";
 
         $this->db->select($select, FALSE);
         $this->db->from('loan_payments');
@@ -130,6 +131,12 @@ class Payment extends CI_Model {
             $this->db->where("date_paid <=", $filters["to_date"]);
         }
         
+        //Tarea 16
+        if ( isset($filters["remarks"]) && $filters["remarks"] != '' )
+        {
+            $this->db->where("loan_payments.remarks LIKE '%" . $this->db->escape_like_str($filters["remarks"]) . "%'");
+        }
+        //Fin Tarea 16
         if ( isset($filters["loan_status"]) && $filters["loan_status"] != '' )
         {
             switch( $filters["loan_status"] )

@@ -74,6 +74,7 @@ class Payments extends Secure_area implements iData_controller {
         $datatable->add_column('loan_amount', false);
         $datatable->add_column('payable_amount', false);
         $datatable->add_column('loan_balance', false);
+        $datatable->add_column('remarks', false); //Tarea 16
         $datatable->add_column('trans_date', false);
         $datatable->add_column('payment_due', false);
         $datatable->add_column('overdue_days', false);
@@ -113,6 +114,7 @@ class Payments extends Secure_area implements iData_controller {
         $filters["from_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($from_date)) : strtotime($from_date);
         $filters["to_date"] = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($to_date)) : strtotime($to_date);
         $filters["loan_status"] = $loan_status;
+        $filters["remarks"] = $remarks;//Tarea 16
         
         $payments = $this->Payment->get_all($limit, $offset, $keywords, $order, $selected_user, $filters);  
         $count_all = $this->Payment->get_all($limit, $offset, $keywords, $order, $selected_user, $filters, 1);
@@ -141,6 +143,7 @@ class Payments extends Secure_area implements iData_controller {
             $data_row["loan_amount"] = (trim($payment->loan_type) !== "" ? $payment->loan_type : "Individual") . " (" . to_currency($payment->loan_amount) . ")";
             $data_row["payable_amount"] = to_currency($payment->paid_amount);
             $data_row["loan_balance"] = to_currency($payment->balance_amount - $payment->paid_amount);
+            $data_row["remarks"] = $payment->remarks ? $payment->remarks : '-';
             $data_row["trans_date"] = date($this->config->item('date_format'), $payment->date_paid);
             $data_row["payment_due"] = date($this->config->item('date_format'), $payment->payment_due);
             $data_row["overdue_days"] = $payment->date_paid - $payment->payment_due > 0 ? ($payment->date_paid - $payment->payment_due) / (60 * 60 * 24) : 0;

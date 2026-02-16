@@ -75,20 +75,32 @@
                                     </div>
                                     <div class="hr-line-dashed"></div>
 
-                                    <div class="form-group row"><label class="col-sm-2 control-label"><?php echo form_label($this->lang->line('payments_loan') . ':', 'loan', array('class' => 'wide required')); ?></label>
+                                    <div class="form-group row"><label class="col-sm-2 control-label"><?php echo form_label($this->lang->line('payments_loan') . ':', 'loan_id', array('class' => 'wide required')); ?> </label>
                                         <div class="col-sm-10">
-                                            <select id="loan_id" name="loan_id" class="form-control">
+                                            <?php $is_loan_selected = ($payment_info->loan_id > 0); ?>
+
+                                            <!-- Select de préstamos (solo visible si no hay préstamo seleccionado) -->
+                                            <select id="loan_id" name="loan_id" class="form-control" style="display: <?= $is_loan_selected ? 'none' : '' ?>">
                                                 <?= $balance_amount = ''; ?>
                                                 <option value="">Elegir</option>
                                                 <?php foreach ($loans as $loan): ?>
                                                     <?php $selected = ''; ?>
                                                     <?php if ($loan['loan_id'] === $payment_info->loan_id) : ?>
-                                                        <?php $selected = 'selected="selected"'; ?>                    
-                                                        <?php $balance_amount = $loan['balance']; ?>                    
+                                                        <?php $selected = 'selected="selected"'; ?>
+                                                        <?php $balance_amount = $loan['balance']; ?>
                                                     <?php endif; ?>
-                                                    <option value="<?= $loan['loan_id'] ?>" <?= $selected; ?> data-balance="<?= $loan['balance'] ?>"><?= $loan['text']; ?></option>
+                                                    <option value="<?= $loan['loan_id'] ?>" <?= $selected; ?> data-balance="<?= $loan['balance'] ?>">
+                                                        <?= $loan['text']; ?>
+                                                    </option>
                                                 <?php endforeach; ?>
                                             </select>
+                                            <!-- Campo oculto que guarda el ID -->
+                                            <input type="hidden" id="loan_id_hidden" name="loan_id_hidden" value="<?= $payment_info->loan_id; ?>" />
+                                            <!-- Texto del préstamo seleccionado -->
+                                            <span id="sp-loan-id">
+                                                ID: <?= $payment_info->loan_id; ?>
+                                            </span>
+                                            <!-- Campo oculto que guarda el balance -->
                                             <input type="hidden" name="balance_amount" id="balance_amount" value="<?= $balance_amount; ?>" />
                                         </div>
                                     </div>

@@ -1218,7 +1218,7 @@ class Loan extends CI_Model {
 
             default:
 
-                $data_scheds = $this->calculate_fixed_fee($post_var);
+                $data_scheds = $this->calculate_percentage($post_var);
 
                 break;
 
@@ -3471,14 +3471,6 @@ class Loan extends CI_Model {
 
             $pay_term = $pay_term - 1;
             $i++;
-
-            if($i == $term){
-                if( $balance_owed != 0 ){
-                    $apply_amount += $balance_owed; // Ajusta el pago total
-                    $balance_owed = 0; // Establece el balance a cero
-                }
-            }
-
             $y++;
         }
 
@@ -3487,6 +3479,7 @@ class Loan extends CI_Model {
 
 
     function calculate_loan_pago_excel($post_var)
+
     {
 
         $grace_period = $post_var["grace_period_days"];
@@ -3527,10 +3520,9 @@ class Loan extends CI_Model {
 
         $loan_amount = $apply_amount;
         $interest_amount = ($loan_amount * ($interest_rate/100));
-        $interest_amount = round($interest_calc, 2);
         //$operating_expenses_amount = ($loan_amount * ($operating_expenses/100));
         $operating_expenses_amount = $operating_expenses;
-        $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)), $pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
+        $payment_amount = (($interest_rate/100)*pow((1+($interest_rate/100)),$pay_term))*($loan_amount/(pow((1+($interest_rate/100)),$pay_term)-1));
         $payment_amount_fees = $payment_amount + $operating_expenses_amount;
         $data_scheds = [];
         $no_of_days = 0;
@@ -3621,7 +3613,9 @@ class Loan extends CI_Model {
         // Configuración de fecha
         if ($this->config->item('date_format') == 'd/m/Y') {
             $payment_date = strtotime(uk_to_isodate($post_var["InstallmentStarted"]));
-        } else {
+        }
+        else
+        {
             $payment_date = strtotime($post_var["InstallmentStarted"]);
         }
 
@@ -3710,8 +3704,8 @@ class Loan extends CI_Model {
                 $payment_date = strtotime('+1 ' . $pay_term_name, $payment_date);
             }
 
-            // Excluir domingos o feriados
-            if (is_plugin_active("holidays")) {
+            if (is_plugin_active("holidays"))
+            {
                 $payment_date = get_excluded_days($payment_date, $exclude_schedules);
             } else {
                 if ($exclude_sundays) {

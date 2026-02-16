@@ -84,6 +84,7 @@ $lang["_next_payment_date"] = "Siguiente <br>fecha de<br> pago";
 $lang["_status"] = "Estado";
 $lang["_total"] = "Total";
 $lang["_print"] = "Imprimir";
+$lang["_print_all"] = "Imprimir Siguientes Cuentas";
 $lang["_export_csv"] = "Exportar CSV";
 $lang["_payable_amount"] = "CANTIDAD A PAGAR";
 $lang["_payment_date"] = "Fecha de pago";

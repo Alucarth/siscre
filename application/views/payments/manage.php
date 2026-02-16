@@ -112,10 +112,11 @@
                                             <tr>
                                                 <th style="text-align: center; width: 1%"></th>
                                                 <th style="text-align: center"><?= $this->lang->line('common_trans_id') ?></th>
-                                                <th style="text-align: center"><?= $this->lang->line('loans_customer') ?></th>
+                                                <th style="text-align: center"><?= $this->lang->line('loans_customer') ?></th>  
                                                 <th style="text-align: center"><?= $this->lang->line('payments_loan') ?></th>
                                                 <th style="text-align: center">Cuota</th>
-                                                <th style="text-align: center"><?= $this->lang->line('loans_balance') ?></th>                    
+                                                <th style="text-align: center"><?= $this->lang->line('loans_balance') ?></th>
+                                                <th style="text-align: center">Observaciones</th><!--Tarea 16-->
                                                 <th style="text-align: center"><?= $this->lang->line('payments_date_paid') ?></th>
                                                 <th style="text-align: center">Fecha de pago programada</th>
                                                 <th style="text-align: center">Días en mora</th>
@@ -123,7 +124,7 @@
                                             </tr>
                                         </thead>
                                         <tfoot>
-                                            <tr>
+                                               <tr>
                                                 <th colspan="4" style="text-align:right" class="tf-label">Total:</th>
                                                 <th colspan="1" style="text-align:right" class="tf-total-paid"></th>
                                                 <th colspan="3"></th>
@@ -148,7 +149,7 @@
 <div class="extra-filters" style="display: none;">
     &nbsp;<button class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> Imprimir</button>
     <select class="form-control input-sm hidden-xs" id="sel-staff">
-        <option value="-1">Todo</option>
+        <opt    ion value="-1">Todo</option>
         <?php foreach ($staffs as $staff): ?>
             <option value="<?= $staff->person_id; ?>" <?= ((isset($_GET['employee_id'])) && $_GET['employee_id'] === $staff->person_id) ? 'selected="selected"' : ""; ?>><?= $staff->first_name . " " . $staff->last_name; ?></option>
         <?php endforeach; ?>

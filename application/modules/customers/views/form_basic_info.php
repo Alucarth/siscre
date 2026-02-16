@@ -183,7 +183,7 @@
     
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
-                <?php echo form_label($this->lang->line('common_address_1') . ':', 'address_1'); ?>
+                Zona:
             </label>
             <div class="col-sm-9">
                 <?php
@@ -192,7 +192,8 @@
                             'name' => 'address_1',
                             'id' => 'address_1',
                             'value' => $person_info->address_1,
-                            'class' => 'form-control'
+                            'class' => 'form-control',
+                            'placeholder' => "El Kenko, Villa Adela, San Roque, etc."
                         )
                 );
                 ?>
@@ -202,7 +203,7 @@
 
         <div class="form-group row">
             <label class="control-label col-sm-3 text-xs-right">
-                <?php echo form_label($this->lang->line('common_address_2') . ':', 'address_2'); ?>
+                Calle:
             </label>
             <div class="col-sm-9">
                 <?php
@@ -211,10 +212,20 @@
                             'name' => 'address_2',
                             'id' => 'address_2',
                             'value' => $person_info->address_2,
-                            'class' => 'form-control'
+                            'class' => 'form-control',
+                            'placeholder' => "Número o Nombre de la calle, Avenida, etc."
                         )
                 );
                 ?>
+            </div>
+        </div>
+       
+        <div class="form-group row">
+            <label class="control-label col-sm-3 text-xs-right">
+                Puerta/Dpto. No:
+            </label>
+            <div class="col-sm-9">
+                <input type="text" class="form-control" id="street_no" name="street_no" value="<?=$person_info->street_no;?>" />
             </div>
         </div>
 
@@ -227,18 +238,25 @@
                 <input type="text" class="form-control" name="city" id="city" value="<?=$person_info->city?>" />
             </div>
         </div>
-        <div class="hr-line-dashed"></div>
-        
+        <div class="hr-line-dashed"></div>        
+
         <div class="form-group row">
-            <label class="control-label col-sm-3 text-xs-right">
-                Calle/Puerta/Dpto. No:
-            </label>
+            <label class="control-label col-sm-3 text-xs-right"><?php echo form_label($this->lang->line('common_country') . ':', 'country'); ?></label>
             <div class="col-sm-9">
-                <input type="text" class="form-control" id="street_no" name="street_no" value="<?=$person_info->street_no;?>" />
+                <?php
+                echo form_input(
+                        array(
+                            'name' => 'country',
+                            'id' => 'country',
+                            'value' => $person_info->country,
+                            'class' => 'form-control'
+                        )
+                );
+                ?>
             </div>
         </div>
 
-        <div class="form-group row">
+        <div class="form-group row" hidden>
             <label class="control-label col-sm-3 text-xs-right">
                 <?php echo form_label($this->lang->line('common_state') . ':', 'state'); ?></a>
             </label>
@@ -249,7 +267,7 @@
 
         <div class="hr-line-dashed"></div>
 
-        <div class="form-group row">
+        <div class="form-group row" hidden>
             <label class="control-label col-sm-3 text-xs-right">
                 <?php echo form_label($this->lang->line('common_zip') . ':', 'zip'); ?>
             </label>
@@ -268,22 +286,6 @@
         </div>
 
         <div class="hr-line-dashed"></div>
-
-        <div class="form-group row">
-            <label class="control-label col-sm-3 text-xs-right"><?php echo form_label($this->lang->line('common_country') . ':', 'country'); ?></label>
-            <div class="col-sm-9">
-                <?php
-                echo form_input(
-                        array(
-                            'name' => 'country',
-                            'id' => 'country',
-                            'value' => $person_info->country,
-                            'class' => 'form-control'
-                        )
-                );
-                ?>
-            </div>
-        </div>
             
     </div>
 

@@ -687,10 +687,48 @@ class Customers extends Person_controller {
             $lead_data["business_total_employees"] = $this->input->post("business_total_employees");
             $lead_data["business_agent_record"] = $this->input->post("business_agent_record");            
 
-            // fwrite($myfile, $txt);
-            // $txt = json_encode($lead_data)."\n";
-            // fwrite($myfile, $txt);
-            // fclose($myfile);
+            // ===== VALIDACIÓN DEL PIN =====
+            $pin = $this->input->post("pin");
+            $confirm_pin = $this->input->post("confirm_pin");
+            
+            // Validar que ambos campos de PIN estén presentes si uno está lleno
+            if ((!empty($pin) && empty($confirm_pin)) || (empty($pin) && !empty($confirm_pin))) {
+                echo json_encode(array(
+                    'success' => false, 
+                    'message' => 'Debe completar ambos campos de PIN'
+                ));
+                exit;
+            }
+            
+            if (!empty($pin)) {
+                // Validar que el PIN contenga solo números
+                if (!ctype_digit($pin)) {
+                    echo json_encode(array(
+                        'success' => false, 
+                        'message' => 'El PIN solo puede contener números'
+                    ));
+                    exit;
+                }
+                
+                // Validar longitud del PIN (4-6 dígitos)
+                if (strlen($pin) < 4 || strlen($pin) > 6) {
+                    echo json_encode(array(
+                        'success' => false, 
+                        'message' => 'El PIN debe tener entre 4 y 6 dígitos'
+                    ));
+                    exit;
+                }
+                
+                // Validar que coincidan los PINs
+                if ($pin !== $confirm_pin) {
+                    echo json_encode(array(
+                        'success' => false, 
+                        'message' => 'Los PINs no coinciden'
+                    ));
+                    exit;
+                }
+                $lead_data["pin"] = md5($pin);
+            }
 
             $this->leads_model->save_customer($lead_data);
             
