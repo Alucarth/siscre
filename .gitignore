@@ -3,3 +3,6 @@
 /demo/
 /temp/
 *.pdf
+/logs/*
+/application/logs/*
+/application/config/database.php
