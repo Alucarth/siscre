@@ -567,6 +567,20 @@ class Customers extends Person_controller {
     function save($customer_id = -1)
     {
         $employer_id = $this->input->post("employer");
+        $id_no = $this->input->post('id_no');
+
+        if ($customer_id == -1 && !empty($id_no)) {
+            $exists = $this->db->get_where('leads', array('id_no' => $id_no))->num_rows();
+            
+            if ($exists > 0) {
+                echo json_encode(array(
+                    'success' => false, 
+                    'message' => 'El número de documento ' . $id_no . ' ya se encuentra registrado.',
+                    'person_id' => -1
+                ));
+                exit;
+            }
+        }
         
         $person_data = array(
             'first_name' => $this->input->post('first_name'),
@@ -583,12 +597,12 @@ class Customers extends Person_controller {
             'role_id' => CUSTOMER_ROLE_ID
         );
         
-        if ( trim($this->input->post("password")) != trim($this->input->post("repassword")))
-        {
-            echo json_encode(array('success' => false, 'message' => ' Password don\'t match!' .
-                $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => -1));
-            exit;
-        }
+        // if ( trim($this->input->post("password")) != trim($this->input->post("repassword")))
+        // {
+        //     echo json_encode(array('success' => false, 'message' => ' Password don\'t match!' .
+        //         $person_data['first_name'] . ' ' . $person_data['last_name'], 'person_id' => -1));
+        //     exit;
+        // }
 
         $int_date_of_birth = $this->config->item('date_format') == 'd/m/Y' ? strtotime(uk_to_isodate($this->input->post('date_of_birth'))) : strtotime($this->input->post('date_of_birth'));
         
@@ -687,48 +701,43 @@ class Customers extends Person_controller {
             $lead_data["business_total_employees"] = $this->input->post("business_total_employees");
             $lead_data["business_agent_record"] = $this->input->post("business_agent_record");            
 
-            // ===== VALIDACIÓN DEL PIN =====
             $pin = $this->input->post("pin");
             $confirm_pin = $this->input->post("confirm_pin");
             
-            // Validar que ambos campos de PIN estén presentes si uno está lleno
-            if ((!empty($pin) && empty($confirm_pin)) || (empty($pin) && !empty($confirm_pin))) {
-                echo json_encode(array(
-                    'success' => false, 
-                    'message' => 'Debe completar ambos campos de PIN'
-                ));
-                exit;
-            }
+            // if ((!empty($pin) && empty($confirm_pin)) || (empty($pin) && !empty($confirm_pin))) {
+            //     echo json_encode(array(
+            //         'success' => false, 
+            //         'message' => 'Debe completar ambos campos de PIN'
+            //     ));
+            //     exit;
+            // }
             
-            if (!empty($pin)) {
-                // Validar que el PIN contenga solo números
-                if (!ctype_digit($pin)) {
-                    echo json_encode(array(
-                        'success' => false, 
-                        'message' => 'El PIN solo puede contener números'
-                    ));
-                    exit;
-                }
+            // if (!empty($pin)) {
+            //     if (!ctype_digit($pin)) {
+            //         echo json_encode(array(
+            //             'success' => false, 
+            //             'message' => 'El PIN solo puede contener números'
+            //         ));
+            //         exit;
+            //     }
                 
-                // Validar longitud del PIN (4-6 dígitos)
-                if (strlen($pin) < 4 || strlen($pin) > 6) {
-                    echo json_encode(array(
-                        'success' => false, 
-                        'message' => 'El PIN debe tener entre 4 y 6 dígitos'
-                    ));
-                    exit;
-                }
+            //     if (strlen($pin) < 4 || strlen($pin) > 6) {
+            //         echo json_encode(array(
+            //             'success' => false, 
+            //             'message' => 'El PIN debe tener entre 4 y 6 dígitos'
+            //         ));
+            //         exit;
+            //     }
                 
-                // Validar que coincidan los PINs
-                if ($pin !== $confirm_pin) {
-                    echo json_encode(array(
-                        'success' => false, 
-                        'message' => 'Los PINs no coinciden'
-                    ));
-                    exit;
-                }
-                $lead_data["pin"] = md5($pin);
-            }
+            //     if ($pin !== $confirm_pin) {
+            //         echo json_encode(array(
+            //             'success' => false, 
+            //             'message' => 'Los PINs no coinciden'
+            //         ));
+            //         exit;
+            //     }
+            //     $lead_data["pin"] = md5($pin);
+            // }
 
             $this->leads_model->save_customer($lead_data);
             

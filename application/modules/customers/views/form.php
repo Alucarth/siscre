@@ -278,7 +278,7 @@
 
                                         <div id="div-password">
 
-                                            <div class="form-group">
+                                            <!-- <div class="form-group">
 
                                                 <label>Contraseña:</label>
 
@@ -292,7 +292,7 @@
 
                                                 <input type="password" class="form-control" id="repassword" name="repassword" />
 
-                                            </div>
+                                            </div> -->
 
                                             <div class="form-group">
                                                 <label for="pin">PIN (exactamente 4 dígitos numéricos)</label>
@@ -676,53 +676,36 @@
 
 
         $('#customer_form').on("submit", function (e) {
+            $("#btn-save").prop("disabled", true);
 
             e.preventDefault();
-
-
-
             var $this = $(this);
-
             var formData = new FormData( this );
 
-
-
             $.ajax({
-
                 url: $this.attr("action"),
-
                 type: 'POST',
-
                 data: formData,
 
                 success: function (data) {
-
                     var data = $.parseJSON(data);
 
                     if (!data.success)
-
                     {
-
                         set_feedback(data.message, 'error_message', true);
-
-                    } else
-
-                    {
-
+                        $("#btn-save").prop("disabled", false);
+                    } else {
                         set_feedback(data.message, 'success_message', false);
-
                         window.location.href = '<?=site_url('customers/view/')?>' + data.person_id;
-
                     }
-
+                },
+                error: function() {
+                    $("#btn-save").prop("disabled", false);
                 },
 
                 cache: false,
-
                 contentType: false,
-
                 processData: false
-
             });
 
         });
