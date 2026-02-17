@@ -80,6 +80,7 @@ class Loans extends Secure_area implements iData_controller
         $datatable->add_column('loan_amount', false);
         $datatable->add_column('net_proceeds', false);
         $datatable->add_column('loan_balance', false);
+        $datatable->add_column('installment_amount', false);
         $datatable->add_column('agent', false);
         $datatable->add_column('approved_by', false);
         $datatable->add_column('formatted_loan_approved_date', false);
@@ -175,7 +176,16 @@ class Loans extends Secure_area implements iData_controller
                 }
             }
             $scheds = json_decode($loan->periodic_loan_table);
-            $next_payment_date = sync_payment_date( $loan->due_paid, $scheds);
+            $next_payment_date = sync_payment_date($loan->due_paid, $scheds);
+            if ($next_payment_date > 0) {
+                log_message('error', "Controlador pide buscar fecha timestamp: $next_payment_date (" . date('Y-m-d', $next_payment_date) . ")");
+                $next_installment_amount = $this->Loan->get_installment_amount_by_date($loan->loan_id, $next_payment_date);
+            } else {
+                $next_installment_amount = 0;
+                $next_installment_amount = isset($next_installment_amount) && $next_installment_amount > 0 
+                    ? $next_installment_amount 
+                    : 0;
+            }
             $fees = json_decode($loan->misc_fees, true);
             $total_fees = 0;
             if ( is_array($fees) && count($fees) > 0 )

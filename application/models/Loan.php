@@ -1230,7 +1230,48 @@ class Loan extends CI_Model {
 
     }
 
-    
+    function get_installment_amount_by_date($loan_id, $target_date_timestamp)
+    {
+        $target_date_str = date('Y-m-d', $target_date_timestamp);
+        
+        $this->db->where("loan_id", $loan_id);
+        $query = $this->db->get("loans");
+
+        if ($query && $query->num_rows() > 0)
+        {
+            $row = $query->row();
+            $scheds = json_decode($row->periodic_loan_table);
+
+            if (is_array($scheds))
+            {
+                foreach ($scheds as $value)
+                {
+                    $sched_date_raw = $value->payment_date;
+                    $d = DateTime::createFromFormat('d/m/Y', $sched_date_raw);
+                    
+                    if ($d && $d->format('d/m/Y') === $sched_date_raw) {
+                        $sched_date_clean = $d->format('Y-m-d');
+                    } else {
+                        $sched_date_clean = date('Y-m-d', strtotime(str_replace('/', '-', $sched_date_raw)));
+                    }
+
+                    if ($sched_date_clean == $target_date_str)
+                    {
+                        $capital   = isset($value->payment_amount_capital) ? (float)$value->payment_amount_capital : 0;
+                        $interes   = isset($value->interest) ? (float)$value->interest : 0;
+                        $gastos    = isset($value->operating_expenses_amount) ? (float)$value->operating_expenses_amount : 0;
+                        
+                        $total_calculado = $capital + $interes + $gastos;
+
+                        log_message('error', "[DEBUG Loan #$loan_id] Suma: $capital + $interes + $gastos = $total_calculado");
+                        
+                        return $total_calculado;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
 
     function calculate_loan_interest_reduction($post_var)
     {

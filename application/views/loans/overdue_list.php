@@ -124,7 +124,7 @@
                                                 <th style="text-align: center"><?=ktranslate2("Description");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Proceeds");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Balance");?></th>
-                                                <!-- <th style="text-align: center"><?=ktranslate2("Monto Total");?></th> -->
+                                                <!-- <th style="text-align: center"><?=ktranslate2("Monto Siguiente Cuota");?></th> -->
                                                 <th style="text-align: center"><?=ktranslate2("Agent");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Approved <br/>By");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Date <br/>Approved");?></th>
@@ -157,7 +157,7 @@
 
 <div class="extra-filters" style="display: none;">
     <button class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print");?></button>
-    <!-- <button class="btn btn-primary" id="btn-export-all-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print All");?></button> -->
+    <!-- <button class="btn btn-primary" id="btn-export-all-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print All");?></button>--> <!--Todas laas cuentas  -->
 </div>
 
 <div id="dt-extra-params">
