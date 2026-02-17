@@ -157,7 +157,7 @@
 
 <div class="extra-filters" style="display: none;">
     <button class="btn btn-primary" id="btn-export-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print");?></button>
-    <button class="btn btn-primary" id="btn-export-all-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print All");?></button>
+    <!-- <button class="btn btn-primary" id="btn-export-all-pdf"><span class="fa fa-print"></span> <?= ktranslate2("Print All");?></button> -->
 </div>
 
 <div id="dt-extra-params">
