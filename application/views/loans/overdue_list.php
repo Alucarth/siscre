@@ -127,7 +127,7 @@
                                                 <th style="text-align: center"><?=ktranslate2("Agent");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Approved by");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Date <br/>Approved");?></th>
-                                                <th style="text-align: center"><?=ktranslate2("Next <br/>Payment<br/> Date");?></th>
+                                                <th style="text-align: center"><?=ktranslate2("Fecha <br/>Siguiente<br/> Pago");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Monto <br/>Siguiente<br/> Cuota");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Status");?></th>                            
                                             </tr>
