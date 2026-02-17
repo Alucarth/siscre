@@ -134,7 +134,7 @@
                                         </thead>
                                         <tfoot>
                                             <tr>
-                                                <th colspan="4" style="text-align:right" class="tf-label"><?= ktranslate2("Total");?>:</th>
+                                                <th colspan="5" style="text-align:right" class="tf-label"><?= ktranslate2("Total");?>:</th>
                                                 <th colspan="1" style="text-align:right" class="tf-total-proceeds"></th>
                                                 <th colspan="1" style="text-align:right" class="tf-total-balance"></th>
                                                 <th colspan="5"></th>
