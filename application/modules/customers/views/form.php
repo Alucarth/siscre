@@ -299,8 +299,7 @@
                                                 <input type="password" class="form-control" id="pin" name="pin" 
                                                     maxlength="4" pattern="\d{4}" 
                                                     inputmode="numeric"
-                                                    title="El PIN debe contener exactamente 4 dígitos numéricos"
-                                                    required>
+                                                    title="El PIN debe contener exactamente 4 dígitos numéricos">
                                             </div>
 
                                             <div class="form-group">
@@ -308,8 +307,7 @@
                                                 <input type="password" class="form-control" id="confirm_pin" name="confirm_pin" 
                                                     maxlength="4" pattern="\d{4}"
                                                     inputmode="numeric"
-                                                    title="Debe contener exactamente 4 dígitos y coincidir con el PIN ingresado"
-                                                    required>
+                                                    title="Debe contener exactamente 4 dígitos y coincidir con el PIN ingresado">
                                             </div>
                                         </div>
 
