@@ -451,29 +451,124 @@ function log_transactions($log_data = [])
     }
 }
 
-function sync_payment_date( $due_paid, $scheds )
+function sync_payment_date($due_paid, $scheds)
 {
     $ci = &get_instance();
-    
-    foreach( $scheds as $sched )
-    {
-        if ( $ci->config->item('date_format') == 'd/m/Y' )
-        {
-            $payment_date = strtotime(uk_to_isodate($sched->payment_date));
-        }
-        else
-        {
-            $payment_date = strtotime($sched->payment_date);
-        }
-	
-        if ( $due_paid >= $payment_date )
-        {
 
+    if (!is_array($scheds) || count($scheds) === 0) {
+        return 0;
+    }
+
+    // 1) Normalizar due_paid a timestamp
+    $due_paid_ts = 0;
+    if (is_numeric($due_paid)) {
+        $due_paid_ts = (int)$due_paid;
+    } elseif (is_string($due_paid) && trim($due_paid) !== '') {
+        $tmp = trim($due_paid);
+
+        // Si el sistema usa d/m/Y y due_paid viene así
+        if ($ci->config->item('date_format') == 'd/m/Y') {
+            $ts = strtotime(uk_to_isodate($tmp));
+            if ($ts) $due_paid_ts = $ts;
         }
-        else
-        {
-            return $payment_date;
+
+        // Fallback: datetime YYYY-mm-dd HH:ii:ss o similares
+        if ($due_paid_ts <= 0) {
+            $due_paid_ts = strtotime(str_replace('/', '-', $tmp));
+            if (!$due_paid_ts) $due_paid_ts = 0;
         }
+    }
+
+    // 2) Recorrer schedule y devolver la primera fecha > due_paid
+    foreach ($scheds as $sched) {
+        if (!isset($sched->payment_date)) continue;
+
+        if ($ci->config->item('date_format') == 'd/m/Y') {
+            $payment_ts = strtotime(uk_to_isodate($sched->payment_date));
+        } else {
+            $payment_ts = strtotime($sched->payment_date);
+        }
+
+        if ($payment_ts <= 0) continue;
+
+        if ($due_paid_ts < $payment_ts) {
+            return $payment_ts;
+        }
+    }
+
+    // si ya no hay siguiente fecha
+    return 0;
+}
+
+if (!function_exists('sync_next_payment_info')) {
+
+    /**
+     * Retorna la siguiente fecha de pago (timestamp) y el monto de la siguiente cuota
+     * leyendo el mismo schedule ($scheds) ya decodificado.
+     *
+     * @param mixed $due_paid  timestamp Unix (ideal) o string convertible
+     * @param array $scheds    array de objetos (json_decode)
+     * @return array ['payment_ts' => int, 'amount' => float, 'sched' => object|null]
+     */
+    function sync_next_payment_info($due_paid, $scheds)
+    {
+        // 1) Normalizar
+        if (!is_array($scheds) || count($scheds) === 0) {
+            return ['payment_ts' => 0, 'amount' => 0.0, 'sched' => null];
+        }
+
+        // due_paid: en tu caso ya es timestamp (ej. 1770868800)
+        $due_paid_ts = 0;
+        if (is_numeric($due_paid)) {
+            $due_paid_ts = (int)$due_paid;
+        } elseif (is_string($due_paid) && trim($due_paid) !== '') {
+            $tmp = trim($due_paid);
+            $due_paid_ts = strtotime(str_replace('/', '-', $tmp));
+            if (!$due_paid_ts) $due_paid_ts = 0;
+        }
+
+        // 2) Recorrer schedule y encontrar la primera cuota cuya fecha sea > due_paid
+        foreach ($scheds as $sched) {
+            if (!isset($sched->payment_date) || trim((string)$sched->payment_date) === '') {
+                continue;
+            }
+
+            // Parse robusto del payment_date (tu JSON viene d/m/Y)
+            $raw = trim((string)$sched->payment_date);
+            $payment_ts = 0;
+
+            $d = DateTime::createFromFormat('d/m/Y', $raw);
+            if ($d && $d->format('d/m/Y') === $raw) {
+                $payment_ts = strtotime($d->format('Y-m-d'));
+            } else {
+                $payment_ts = strtotime(str_replace('/', '-', $raw));
+            }
+
+            if ($payment_ts <= 0) continue;
+
+            // Primera fecha futura
+            if ($due_paid_ts < $payment_ts) {
+
+                // 3) Monto: usar payment_amount directamente (ya existe en tu JSON)
+                $amount = 0.0;
+
+                if (isset($sched->payment_amount) && is_numeric($sched->payment_amount)) {
+                    $amount = (float)$sched->payment_amount;
+                } else {
+                    // Fallback por componentes (por si algún registro viejo no tiene payment_amount)
+                    $capital = (isset($sched->payment_amount_capital) && is_numeric($sched->payment_amount_capital)) ? (float)$sched->payment_amount_capital : 0.0;
+                    $interest = (isset($sched->interest) && is_numeric($sched->interest)) ? (float)$sched->interest : 0.0;
+                    $expenses = (isset($sched->operating_expenses_amount) && is_numeric($sched->operating_expenses_amount)) ? (float)$sched->operating_expenses_amount : 0.0;
+
+                    $amount = $capital + $interest + $expenses;
+                }
+
+                return ['payment_ts' => (int)$payment_ts, 'amount' => (float)$amount, 'sched' => $sched];
+            }
+        }
+
+        // Si ya no hay siguiente cuota (o schedule vacío/invalid)
+        return ['payment_ts' => 0, 'amount' => 0.0, 'sched' => null];
     }
 }
 

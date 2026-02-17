@@ -124,20 +124,20 @@
                                                 <th style="text-align: center"><?=ktranslate2("Description");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Proceeds");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Balance");?></th>
-                                                <!-- <th style="text-align: center"><?=ktranslate2("Monto Siguiente Cuota");?></th> -->
                                                 <th style="text-align: center"><?=ktranslate2("Agent");?></th>
-                                                <th style="text-align: center"><?=ktranslate2("Approved <br/>By");?></th>
+                                                <th style="text-align: center"><?=ktranslate2("Approved by");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Date <br/>Approved");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Next <br/>Payment<br/> Date");?></th>
+                                                <th style="text-align: center"><?=ktranslate2("Monto <br/>Siguiente<br/> Cuota");?></th>
                                                 <th style="text-align: center"><?=ktranslate2("Status");?></th>                            
                                             </tr>
                                         </thead>
                                         <tfoot>
                                             <tr>
-                                                <th colspan="5" style="text-align:right" class="tf-label"><?= ktranslate2("Total");?>:</th>
+                                                <th colspan="5" style="text-align:right" class="tf-label"><?= ktranslate2("Total:")?></th>
                                                 <th colspan="1" style="text-align:right" class="tf-total-proceeds"></th>
                                                 <th colspan="1" style="text-align:right" class="tf-total-balance"></th>
-                                                <th colspan="5"></th>
+                                                <th colspan="6"></th>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -175,19 +175,22 @@
 <?php echo form_close(); ?>
 
 <script>
-    function loansFooter( row, data, start, end, display, table )
+    function loansFooter(row, data, start, end, display, table)
     {
-        var api = table.api(), data;
+        var api = table.api();
         var url = '<?=site_url('loans/ajax');?>';
+
         var params = {
             ajax_type: 6,
-            softtoken:$("input[name='softtoken']").val()
+            softtoken: $("input[name='softtoken']").val()
         };
-        $.post(url, params, function(data){
-            if ( data.status == "OK" )
+
+        $.post(url, params, function(resp){
+            if (resp.status == "OK")
             {
-                $( api.column( 4 ).footer() ).html(data.total_proceeds);
-                $( api.column( 5 ).footer() ).html(data.total_balance);
+                // ✅ No tocar la celda "Total:"; solo llenar estas dos por clase
+                $(api.table().footer()).find('th.tf-total-proceeds').html(resp.total_proceeds);
+                $(api.table().footer()).find('th.tf-total-balance').html(resp.total_balance);
             }
         }, "json");
     }

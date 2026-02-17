@@ -66,34 +66,59 @@ class Loans extends Secure_area implements iData_controller
         return [];
     }
 
-    function set_dt_transactions($datatable)
+    function set_dt_transactions($datatable, $dt_mode = 'full')
     {
-        $datatable->add_server_params('', '', [$this->security->get_csrf_token_name() => $this->security->get_csrf_hash(), "ajax_type" => 3]);
+        $datatable->add_server_params(
+            '',
+            '',
+            [
+                $this->security->get_csrf_token_name() => $this->security->get_csrf_hash(),
+                "ajax_type" => 3,
+                "dt_mode" => $dt_mode,   // <-- NUEVO
+            ]
+        );
+
         $datatable->ajax_url = site_url('loans/ajax');
 
-        $datatable->add_column('actions', false);
-        $datatable->add_column('id', false);
-        $datatable->add_column('customer', false);
-        $datatable->add_column('customer_phone', false);//tlefono del cliente
-        $datatable->add_column('loan_product', false);
-        $datatable->add_column('description', false);
-        $datatable->add_column('loan_amount', false);
-        $datatable->add_column('net_proceeds', false);
-        $datatable->add_column('loan_balance', false);
-        $datatable->add_column('installment_amount', false);
-        $datatable->add_column('agent', false);
-        $datatable->add_column('approved_by', false);
-        $datatable->add_column('formatted_loan_approved_date', false);
-        $datatable->add_column('formatted_payment_date', false);
-        $datatable->add_column('loan_status', false);
+        // Columnas según modo
+        if ($dt_mode === 'moras') {
+            // Vista A: sin producto/monto préstamo, con monto siguiente cuota
+            $datatable->add_column('actions', false);
+            $datatable->add_column('id', false);
+            $datatable->add_column('customer', false);
+            $datatable->add_column('customer_phone', false);
+            $datatable->add_column('description', false);
+            $datatable->add_column('net_proceeds', false);
+            $datatable->add_column('loan_balance', false);
+            $datatable->add_column('agent', false);
+            $datatable->add_column('approved_by', false);
+            $datatable->add_column('formatted_loan_approved_date', false);
+            $datatable->add_column('formatted_payment_date', false);
+            $datatable->add_column('installment_amount', false);
+            $datatable->add_column('loan_status', false);
+        } else {
+            // Vista B: con producto/monto préstamo, sin monto siguiente cuota
+            $datatable->add_column('actions', false);
+            $datatable->add_column('id', false);
+            $datatable->add_column('customer', false);
+            $datatable->add_column('customer_phone', false);
+            $datatable->add_column('loan_product', false);
+            $datatable->add_column('description', false);
+            $datatable->add_column('loan_amount', false);
+            $datatable->add_column('net_proceeds', false);
+            $datatable->add_column('loan_balance', false);
+            $datatable->add_column('agent', false);
+            $datatable->add_column('approved_by', false);
+            $datatable->add_column('formatted_loan_approved_date', false);
+            $datatable->add_column('formatted_payment_date', false);
+            $datatable->add_column('loan_status', false);
+        }
 
         $datatable->add_table_definition(["orderable" => false, "targets" => 0]);
         $datatable->order = [[1, 'desc']];
-
         $datatable->allow_search = true;
         $datatable->no_expand_height = true;
         $datatable->callbacks["footerCallback"] = "loansFooter";
-
         $datatable->table_id = "#tbl_loans_transactions";
         $datatable->add_titles('Loans');
         $datatable->has_edit_dblclick = 0;
@@ -101,6 +126,8 @@ class Loans extends Secure_area implements iData_controller
 
     function _dt_transactions()
     {
+        $dt_mode = $this->input->post('dt_mode') ?: 'full';
+
         $selected_user = $this->input->post("employee_id");
         $due_from_date = $this->input->post("due_from_date");
         $due_to_date = $this->input->post("due_to_date");
@@ -176,15 +203,21 @@ class Loans extends Secure_area implements iData_controller
                 }
             }
             $scheds = json_decode($loan->periodic_loan_table);
-            $next_payment_date = sync_payment_date($loan->due_paid, $scheds);
-            if ($next_payment_date > 0) {
-                log_message('error', "Controlador pide buscar fecha timestamp: $next_payment_date (" . date('Y-m-d', $next_payment_date) . ")");
-                $next_installment_amount = $this->Loan->get_installment_amount_by_date($loan->loan_id, $next_payment_date);
-            } else {
-                $next_installment_amount = 0;
-                $next_installment_amount = isset($next_installment_amount) && $next_installment_amount > 0 
-                    ? $next_installment_amount 
-                    : 0;
+            // Nuevo: obtener fecha + monto desde el mismo schedule (sin consultar BD)
+            $next = sync_next_payment_info($loan->due_paid, $scheds);
+
+            $next_payment_date = isset($next['payment_ts']) ? (int)$next['payment_ts'] : 0;
+            // Solo en moras necesitamos monto
+            $next_installment_amount = 0.0;
+            if ($dt_mode === 'moras') {
+                $next_installment_amount = isset($next['amount']) ? (float)$next['amount'] : 0.0;
+            }
+            // Log temporal de verificación (puedes quitarlo luego)
+            if ($next_payment_date > 0 && $next_installment_amount <= 0) {
+                log_message(
+                    'error',
+                    "[NextInstallment ZERO] loan_id={$loan->loan_id} due_paid={$loan->due_paid} next_ts={$next_payment_date} next_date=" . date('Y-m-d', $next_payment_date) . " amount={$next_installment_amount}"
+                );
             }
             $fees = json_decode($loan->misc_fees, true);
             $total_fees = 0;
@@ -201,29 +234,53 @@ class Loans extends Secure_area implements iData_controller
             $net_proceeds = $loan->net_proceeds > 0 ? ($loan->net_proceeds) : ($loan->apply_amount - $total_fees);
             $data_row = [];
             $data_row["DT_RowId"] = $loan->loan_id;
-            $data_row["actions"] = $actions;
-            $data_row["id"] = $loan->loan_id;
-            $data_row["loan_product"] = $loan->loan_type;
-            $data_row["description"] = $loan->description;
-            $data_row["net_proceeds"] = to_currency($net_proceeds);
-            $data_row["loan_amount"] = to_currency($loan->loan_amount);
-            $data_row["loan_balance"] = to_currency($loan->loan_balance);
-            $data_row["customer"] = $loan->customer_name;
-            $data_row["customer_phone"] = $loan->customer_phone;//telefono cliente
-            $data_row["agent"] = $loan->agent_name;
-            $data_row["approved_by"] = $loan->approver_name;
-            $data_row["formatted_loan_approved_date"] = $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '';
-            $data_row["formatted_payment_date"] = ($next_payment_date > 0) ? date($this->config->item('date_format'), $next_payment_date) : '';
-            $data_row["loan_status"] = $loan->loan_balance > 0 ? ktranslate2(ucwords($loan->loan_status)) : ktranslate2('Paid');
+
+            if ($dt_mode === 'moras') {
+                // MORAS: sin producto/monto préstamo, con monto siguiente cuota
+                $data_row["actions"] = $actions;
+                $data_row["id"] = $loan->loan_id;
+                $data_row["customer"] = $loan->customer_name;
+                $data_row["customer_phone"] = $loan->customer_phone;
+                $data_row["description"] = $loan->description;
+
+                $data_row["net_proceeds"] = to_currency($net_proceeds);
+                $data_row["loan_balance"] = to_currency($loan->loan_balance);
+
+                $data_row["agent"] = $loan->agent_name;
+                $data_row["approved_by"] = $loan->approver_name;
+
+                $data_row["formatted_loan_approved_date"] = $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '';
+                $data_row["formatted_payment_date"] = ($next_payment_date > 0) ? date($this->config->item('date_format'), $next_payment_date) : '';
+
+                $data_row["installment_amount"] = to_currency($next_installment_amount);
+                $data_row["loan_status"] = $loan->loan_balance > 0 ? ktranslate2(ucwords($loan->loan_status)) : ktranslate2('Paid');
+
+            } else {
+                // FULL: con producto/monto préstamo, sin monto siguiente cuota
+                $data_row["actions"] = $actions;
+                $data_row["id"] = $loan->loan_id;
+                $data_row["customer"] = $loan->customer_name;
+                $data_row["customer_phone"] = $loan->customer_phone;
+                $data_row["loan_product"] = $loan->loan_type;
+                $data_row["description"] = $loan->description;
+
+                $data_row["loan_amount"] = to_currency($loan->loan_amount);
+                $data_row["net_proceeds"] = to_currency($net_proceeds);
+                $data_row["loan_balance"] = to_currency($loan->loan_balance);
+
+                $data_row["agent"] = $loan->agent_name;
+                $data_row["approved_by"] = $loan->approver_name;
+
+                $data_row["formatted_loan_approved_date"] = $loan->loan_approved_date > 0 ? date($this->config->item('date_format'), $loan->loan_approved_date) : '';
+                $data_row["formatted_payment_date"] = ($next_payment_date > 0) ? date($this->config->item('date_format'), $next_payment_date) : '';
+
+                $data_row["loan_status"] = $loan->loan_balance > 0 ? ktranslate2(ucwords($loan->loan_status)) : ktranslate2('Paid');
+            }
 
             $tbl_net_proceeds += $net_proceeds;
             $tbl_proceeds += $loan->loan_amount;
             $tbl_balance += $loan->loan_balance;
-            //se requiere reparar URGENTE
-            if($loan->loan_status == 'approved')
-            {
-                $tmp[] = $data_row;
-            }
+            $tmp[] = $data_row;
         }
 
         $this->session->set_userdata("tbl_net_proceeds", $tbl_net_proceeds);
