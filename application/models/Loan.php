@@ -52,12 +52,17 @@ class Loan extends CI_Model {
         {
             $sorter = $filters["sorter"];
         }
-        $select = " l.*, 
-                    IF( (SELECT (l.loan_amount - sum(paid_amount)) loan_balance FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.balance_amount LIMIT 1) > 0, (SELECT (l.loan_amount - sum(paid_amount)) loan_balance FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.balance_amount LIMIT 1), l.loan_balance ) AS loan_balance,
-                    (SELECT a.date_paid FROM c19_loan_payments a WHERE a.loan_id = l.loan_id AND a.delete_flag = 0 ORDER BY a.date_paid DESC LIMIT 1) due_paid, customer.phone_number as customer_phone,
-                    CONCAT(customer.first_name, ' ', customer.last_name) as customer_name, 
-                    CONCAT(agent.first_name, ' ',agent.last_name) as agent_name, 
-                    CONCAT(approver.first_name, ' ', approver.last_name) as approver_name";
+        $select = " l.*,
+            IF( (l.loan_amount - IFNULL(p.sum_paid,0)) > 0,
+                (l.loan_amount - IFNULL(p.sum_paid,0)),
+                l.loan_balance
+            ) AS loan_balance,
+            IFNULL(p.last_paid,0) AS due_paid,
+            customer.phone_number as customer_phone,
+            CONCAT(customer.first_name, ' ', customer.last_name) as customer_name,
+            CONCAT(agent.first_name, ' ',agent.last_name) as agent_name,
+            CONCAT(approver.first_name, ' ', approver.last_name) as approver_name
+        ";
         if (is_plugin_active('loan_products'))
         {
             $select .= ",                   
@@ -78,6 +83,17 @@ class Loan extends CI_Model {
         }
         $this->db->select($select, FALSE);
         $this->db->from('loans l');
+        $this->db->join(
+            "(SELECT loan_id,
+                    SUM(paid_amount) AS sum_paid,
+                    MAX(date_paid) AS last_paid
+            FROM c19_loan_payments
+            WHERE delete_flag = 0
+            GROUP BY loan_id) p",
+            "p.loan_id = l.loan_id",
+            "LEFT",
+            false
+        );
         $this->db->join('people as customer', 'customer.person_id = l.customer_id', 'LEFT');
         $this->db->join('people as agent', 'agent.person_id = l.loan_agent_id', 'LEFT');
         $this->db->join('people as approver', 'approver.person_id = l.loan_approved_by_id', 'LEFT');

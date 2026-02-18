@@ -1,5 +1,5 @@
 /uploads/
-/downloads/
+/downloads/*
 /demo/
 /logs/
 application/logs/

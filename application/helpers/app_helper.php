@@ -451,29 +451,116 @@ function log_transactions($log_data = [])
     }
 }
 
-function sync_payment_date( $due_paid, $scheds )
+function sync_payment_date($due_paid, $scheds)
 {
     $ci = &get_instance();
-    
-    foreach( $scheds as $sched )
-    {
-        if ( $ci->config->item('date_format') == 'd/m/Y' )
-        {
-            $payment_date = strtotime(uk_to_isodate($sched->payment_date));
-        }
-        else
-        {
-            $payment_date = strtotime($sched->payment_date);
-        }
-	
-        if ( $due_paid >= $payment_date )
-        {
 
+    if (!is_array($scheds) || count($scheds) === 0) {
+        return 0;
+    }
+
+    // 1) Normalizar due_paid a timestamp
+    $due_paid_ts = 0;
+    if (is_numeric($due_paid)) {
+        $due_paid_ts = (int)$due_paid;
+    } elseif (is_string($due_paid) && trim($due_paid) !== '') {
+        $tmp = trim($due_paid);
+
+        // Si el sistema usa d/m/Y y due_paid viene así
+        if ($ci->config->item('date_format') == 'd/m/Y') {
+            $ts = strtotime(uk_to_isodate($tmp));
+            if ($ts) $due_paid_ts = $ts;
         }
-        else
-        {
-            return $payment_date;
+
+        // Fallback: datetime YYYY-mm-dd HH:ii:ss o similares
+        if ($due_paid_ts <= 0) {
+            $due_paid_ts = strtotime(str_replace('/', '-', $tmp));
+            if (!$due_paid_ts) $due_paid_ts = 0;
         }
+    }
+
+    // 2) Recorrer schedule y devolver la primera fecha > due_paid
+    foreach ($scheds as $sched) {
+        if (!isset($sched->payment_date)) continue;
+
+        if ($ci->config->item('date_format') == 'd/m/Y') {
+            $payment_ts = strtotime(uk_to_isodate($sched->payment_date));
+        } else {
+            $payment_ts = strtotime($sched->payment_date);
+        }
+
+        if ($payment_ts <= 0) continue;
+
+        if ($due_paid_ts < $payment_ts) {
+            return $payment_ts;
+        }
+    }
+
+    // si ya no hay siguiente fecha
+    return 0;
+}
+
+if (!function_exists('fast_sched_date_to_ts')) {
+    function fast_sched_date_to_ts($date_str)
+    {
+        $ci = &get_instance();
+        $date_str = str_replace('\\/', '/', (string)$date_str);
+
+        // Caso típico en tu sistema: d/m/Y
+        if ($ci->config->item('date_format') === 'd/m/Y') {
+            // Espera dd/mm/yyyy
+            if (preg_match('~^(\d{2})/(\d{2})/(\d{4})$~', $date_str, $m)) {
+                // mktime es mucho más rápido que DateTime/strtotime
+                return mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)$m[3]);
+            }
+        }
+
+        // Fallback (por si llega en otro formato)
+        $date_str = str_replace('/', '-', $date_str);
+        $ts = strtotime($date_str);
+        return $ts ? $ts : 0;
+    }
+}
+
+if (!function_exists('sync_next_payment_info')) {
+    function sync_next_payment_info($due_paid, $scheds)
+    {
+        $due_paid = (int)$due_paid;
+
+        if (!is_array($scheds) || count($scheds) === 0) {
+            return ['payment_ts' => 0, 'amount' => 0];
+        }
+
+        foreach ($scheds as $sched) {
+            if (!isset($sched->payment_date)) continue;
+
+            $ts = fast_sched_date_to_ts($sched->payment_date);
+            if ($ts <= 0) continue;
+
+            // Si ya pagó hasta esta fecha, seguir buscando
+            if ($due_paid > 0 && $due_paid >= $ts) {
+                continue;
+            }
+
+            // Encontramos la siguiente cuota
+            $cap   = (isset($sched->payment_amount_capital) && is_numeric($sched->payment_amount_capital)) ? (float)$sched->payment_amount_capital : 0.0;
+            $int   = (isset($sched->interest) && is_numeric($sched->interest)) ? (float)$sched->interest : 0.0;
+            $gasto = (isset($sched->operating_expenses_amount) && is_numeric($sched->operating_expenses_amount)) ? (float)$sched->operating_expenses_amount : 0.0;
+
+            $calc = $cap + $int + $gasto;
+
+            // Preferimos "calc" porque es coherente (capital+interés+gastos)
+            // Si existe payment_amount y coincide, da lo mismo; si no coincide, nos quedamos con calc.
+            $amount = $calc;
+
+            if ($amount <= 0 && isset($sched->payment_amount) && is_numeric($sched->payment_amount)) {
+                $amount = (float)$sched->payment_amount;
+            }
+
+            return ['payment_ts' => $ts, 'amount' => $amount];
+        }
+
+        return ['payment_ts' => 0, 'amount' => 0];
     }
 }
 
