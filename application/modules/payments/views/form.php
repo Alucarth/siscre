@@ -154,18 +154,12 @@
                                     <div class="hr-line-dashed"></div>
 
                                     <?php 
-                                        // ==========================================================
-                                        // CORRECCIÓN DE CÁLCULO INICIAL (PHP)
-                                        // ==========================================================
-                                        // Separamos la cuota pura del ahorro para mostrarlo correctamente
                                         $ahorro_inicial = isset($payment_info->operating_expenses_amount) ? (float)$payment_info->operating_expenses_amount : 0;
                                         $total_backend  = (float)$payment_info->paid_amount;
                                         
-                                        // Si el backend manda el total, restamos el ahorro para obtener la cuota
                                         $cuota_pura = $total_backend - $ahorro_inicial;
                                         if($cuota_pura < 0) $cuota_pura = 0; // Seguridad
 
-                                        // El total visual debe coincidir con el backend
                                         $total_visual = $cuota_pura + $ahorro_inicial;
                                     ?>
 
@@ -179,7 +173,6 @@
                                                     array(
                                                         'name' => 'paid_amount',
                                                         'id' => 'paid_amount',
-                                                        // Usamos la cuota calculada, no el total
                                                         'value' => number_format($cuota_pura, 2, '.', ''), 
                                                         'class' => 'form-control',
                                                         'type' => 'number',
@@ -243,7 +236,6 @@
                                     <script>
                                     $(document).ready(function () {
 
-                                        // 1) Cuando cambia el préstamo, recargo los vencimientos
                                         $("#loan_id").on("change", function () {
                                             var url = '<?= site_url('payments/ajax') ?>';
                                             var params = {
@@ -260,14 +252,12 @@
                                             }, 'json');
                                         });
 
-                                        // Función para recalcular el Total (cuota + ahorro)
                                         function recalcTotal() {
                                             var cuota  = parseFloat($("#paid_amount").val())               || 0;
                                             var ahorro = parseFloat($("#operating_expenses_amount").val()) || 0;
                                             $("#total_amount").val((cuota + ahorro).toFixed(2));
                                         }
 
-                                        // 2) Cuando cambia la fecha de vencimiento, AJAX tipo 2 + recalcTotal()
                                         $("#sel_payment_due").on("change", function () {
                                             var url = '<?= site_url('payments/ajax') ?>';
                                             var params = {
@@ -284,29 +274,22 @@
                                                 if (data.status === "OK") {
                                                     $("#hid-penalty-amount-total").val(data.penalty_amount);
                                                     
-                                                    // =========================================================
-                                                    // CORRECCIÓN JS: Evitar doble suma en el AJAX
-                                                    // =========================================================
                                                     var totalBackend = parseFloat(data.amount_to_pay) || 0;
                                                     var ahorroBackend = parseFloat(data.operating_expenses_amount) || 0;
-                                                    
-                                                    // Calculamos la cuota pura restando el ahorro al total que envía el backend
+
                                                     var cuotaPura = totalBackend - ahorroBackend;
                                                     if(cuotaPura < 0) cuotaPura = 0;
 
                                                     $("#paid_amount").val(cuotaPura.toFixed(2));
                                                     $("#operating_expenses_amount").val(ahorroBackend.toFixed(2));
                                                     
-                                                    // Recalculamos el total visual
                                                     recalcTotal();
                                                 }
                                             }, 'json');
                                         });
 
-                                        // 3) Si el usuario edita manualmente cualquiera de los dos inputs, vuelvo a calcular
                                         $("#paid_amount, #operating_expenses_amount").on("input", recalcTotal);
 
-                                        // 4) Al cargar la página, un primer recálculo (por si ya vienen valores precargados)
                                         recalcTotal();
 
                                     });
